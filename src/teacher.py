@@ -63,6 +63,8 @@ def main():
                     help="직전 투구 결과를 교사 피처로 추가 (train 전용)")
     ap.add_argument("--max-season", type=int, default=0,
                     help="이 시즌 이하 행만 OOF 교사 학습·예측에 사용")
+    ap.add_argument("--drop-f-pre", type=int, default=0,
+                    help="이 시즌 이전 F리그 행을 load 단계에서 제외")
     ap.add_argument("--folds", type=int, default=4)
     ap.add_argument("--iters", type=int, default=1500)
     ap.add_argument("--lr", type=float, default=0.03)
@@ -70,7 +72,7 @@ def main():
     ap.add_argument("--seed", type=int, default=42)
     args = ap.parse_args()
 
-    train, features, tm = load()
+    train, features, tm = load(drop_f_pre=args.drop_f_pre)
     if args.max_season:
         n0 = len(train)
         train = train.loc[train["season"] <= args.max_season].sort_index().copy()
