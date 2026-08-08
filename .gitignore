@@ -1,0 +1,21 @@
+# 대회 데이터 (Dacon 배포본 — 재배포 금지, 700MB+)
+data/
+
+# 산출물 — 재생성 가능. 판정 근거는 LEDGER.tsv 와 docs/ 에 남는다
+model/
+out/
+output/
+submissions/
+catboost_info/
+tmp/
+*.pkl
+*.npz
+*.pt
+
+# 환경
+.venv/
+__pycache__/
+.ipynb_checkpoints/
+
+# 아카이브 zip (내용은 docs/*.md 에 이미 있다)
+docs/handoff_archive/

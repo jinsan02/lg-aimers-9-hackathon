@@ -1,0 +1,17 @@
+[project]
+name = "aimers9"
+version = "0.1.0"
+description = "LG Aimers 9기 — 투구 제구 성공 확률 예측"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "pandas==2.0.3",
+    "numpy==1.26.4",
+    "scikit-learn==1.8.0",
+    "joblib==1.5.3",
+]
+
+[dependency-groups]
+dev = [
+    "jupyter",
+    "matplotlib",
+]

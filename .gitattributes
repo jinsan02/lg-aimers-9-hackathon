@@ -1,0 +1,11 @@
+# 줄바꿈을 머신별로 고정한다.
+#
+# .bat 가 LF 로 저장되면 cmd 의 `goto` 라벨이 깨진다(2026-08-08 에 당함).
+# .sh 는 A100(리눅스)에서 도는데 CRLF 면 `$'\r': command not found` 가 난다.
+# Windows 노트북에서 편집하고 두 OS 로 scp 하므로 git 이 자동 변환하게 두면 안 된다.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.sh  text eol=lf
+*.tsv text eol=lf
+*.pdf binary
+*.zip binary
