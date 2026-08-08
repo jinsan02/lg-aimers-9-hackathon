@@ -107,6 +107,14 @@ F리그 분리 · isotonic 계열 전반 · 시드 확장
 
 # Current Hypothesis
 
+새 1순위는 `RT1 roster-transition`이다. F→R 투수는 2020~2024 매년 R 평균보다
+−.0110~−.0338 낮았고, 2024 VB2가 이 구간을 .01608 과대예측했다. 2023R에서 고정한
+조건효과는 2024R 편향제거 기준 +4.09로 전이했다. generic 복귀·타자 이동은 불안정하다.
+
+기존 `F 2023=ABS 1년차` 해석은 공식 연혁과 실패모드 감사로 폐기했다. 퓨처스 ABS는
+2020년부터 운영됐고 F reverse가 2022 .0497→2023 .2988로 뛴 것은 데이터/타깃 체제
+단절이다. 현행 v18 SHIFT 값은 새 검증 없이 바꾸지 않는다.
+
 H1 dynamic hierarchy는 source 2022→2023R +8.03이 target 2024 -19.09로 반전해 닫혔다.
 OR1 segmentation fault는 PairLogitPairwise group64의 pair 메모리 폭증으로 확인했다.
 group16은 50iter smoke를 통과해 A100 정식 `OR2_rank16`을 실행 중이다. 4070의
@@ -138,8 +146,10 @@ G0 topology-only graph는 A100 미학습 2024 `866.90`(동일 seed AB 대비 -1.
 1. **A100 실행 중:** `OR2_rank16` seed42. group64는 pair 전개 메모리 폭증으로
    금지했다. 4070 빠른 게이트는 refit 중 native crash로 끝나 A100 정식 미학습
    표면만 판정에 쓴다.
-2. **4070 실행 중:** `BC1_offset` seed42. 실행 근거 없이 닫혔고 target/제출
-   baseline 경로도 누락됐던 `skill_pc_hat` 로짓 오프셋을 수정 코드로 재검정한다.
+2. **4070 완료:** `BC1_offset=899.31`, 동일 seed `VB2_base=911.22` 대비 −11.91.
+   수정된 baseline 경로에서도 개선되지 않아 확장 없이 닫는다.
+3. **다음 1순위:** `RT1 roster-transition`. 투수 직전 리그와 같은/다른 리그 이력량을
+   시즌 이전 lookup으로 만들고 4070 val2024 seed42 한 변경 게이트부터 수행한다.
 
 1. **완료:** `TH2_hl2`, 4070 val2024 8시드, drop 없음. 지문 일치(exit 0),
    오류 없음. `VB2_base` 대비 paired +0.164(SE 1.760, t=.093)으로 승격 실패.

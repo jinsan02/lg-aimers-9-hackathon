@@ -12,6 +12,19 @@ Codex
 
 ## Status
 
+2026-08-09 ABS·R/F·신규/복귀 감사:
+
+- 상세: [`docs/REGIME_ROSTER_AUDIT.md`](docs/REGIME_ROSTER_AUDIT.md), 재현 도구
+  `tools/regime_roster_audit.py`.
+- 공식 연혁상 F ABS는 2020년부터 운영. 기존 `F 2023=ABS 1년차` 서사는 폐기한다.
+  F 2022→2023 reverse `.0497→.2988`은 정책 효과보다 데이터/타깃 체제 단절이다.
+- 새 1순위 `RT1`: 투수 직전 리그와 같은/다른 리그 과거 이력량. F→R 열세는
+  2020~2024 모두 같은 부호, 2024 VB2 과대예측 `.01608`, source 고정 centered +4.09.
+- generic 복귀는 2023→2024 부호 반전, 타자 이동은 약함, F 홈팀 변화 전이 상관 −.338.
+- `BC1_offset=899.31`, 같은 4070·seed42 `VB2_base=911.22` 대비 −11.91로 종료.
+- v18 SHIFT 0.0052의 ABS 인과 설명은 무효지만 값은 별도 단일변경 검증 전까지 유지한다.
+- A100 `OR2_rank16`은 계속 분리 실행 중. 4070은 현재 유휴.
+
 2026-08-09 04:10 밀린 작업 처리:
 
 - `baseline-col` 결함 수정: 최종 refit 모델 marker, test-season Pool baseline,

@@ -103,3 +103,5 @@ FLAG content-two-tower | CLOSED | 미학습 675.32 / 제출 표면 699.67 | raw 
 FLAG dynamic-hier-offset | CLOSED | 2022→2023R +8.03 → 2024 -19.09 | 이전 시즌 CatBoost OOF 잔차로 투수·타자 상태를 만들고 source에서 수축·계수를 고정했다. 투수 상태 연도 상관 +.115, 타자 -.089라 다음 시즌에 유지되는 잠재효과가 아니며 source 선택 이득이 반전했다.
 FLAG --rank-group-size 64 | BANNED | 4070 CUDA OOM / A100 segmentation fault | PairLogitPairwise는 그룹 안 쌍을 전개한다. 4070은 추가 2748MB 요구 시 2317MB만 남아 명시적 OOM, A100도 장시간 뒤 native crash. group16 이하만 허용한다.
 FLAG --baseline-col skill_pc_hat | REOPENED | 기존 중립 판정 무효 | 기존 CLOSED에는 LEDGER 실행 행이 없고 refit 모델 marker·test-season Pool·fpipe 제출 baseline이 누락돼 target/제출 예측이 오프셋 없이 계산됐다. 세 경로 수정 뒤 BC1으로 다시 측정한다.
+FLAG --baseline-col skill_pc_hat | CLOSED | BC1_offset 899.31 vs VB2_base_s42 911.22 | 누락됐던 refit/test/fpipe baseline 경로를 모두 고친 같은 4070·seed42 재검정에서도 −11.91. skill 추정치를 로짓 출발점으로 강제하면 CatBoost가 이미 학습한 수준 효과와 중복된다.
+FLAG F-2023-ABS-first-year-analogue | BANNED | 공식 연혁 + reverse .0497→.2988 | KBO는 퓨처스리그 ABS를 2020년부터 운영했다. F 2022→2023 성공률 .7087→.4729와 reverse 6배 급증은 ABS 최초 도입이 아니라 데이터/타깃 체제 단절이다. 이를 R 2024→2025의 1년차→2년차 아날로그로 쓰지 않는다.
