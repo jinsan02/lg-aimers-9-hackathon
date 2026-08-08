@@ -4,7 +4,7 @@
 > **역사는 여기 없다** → [docs/EXPERIMENTS_LOG.md](docs/EXPERIMENTS_LOG.md)
 > 닫힌 질문 → [docs/SETTLED.md](docs/SETTLED.md) · 실행 기록 → `LEDGER.tsv`
 
-갱신 2026-08-09 (H1 동적 계층 기각·OR2 rank-group16 실행 중)
+갱신 2026-08-09 (RT1 roster-transition·PG1 pitcher×league 실행 중)
 
 ## Objective
 
@@ -138,6 +138,16 @@ G0 topology-only graph는 A100 미학습 2024 `866.90`(동일 seed AB 대비 -1.
 > 필요한 +11을 낼 근거 있는 축이 없다. 현행 v18을 보존하고 새 직교 가설이 필요하다.
 
 # Next Experiment
+
+## 2026-08-09 04:37 야간 분리 실행
+
+- A100: `RT1A_roster`(미학습 2024) → 정상 종료 시 `PG1A_pg` 순차 실행.
+- 4070: `RT1V_roster`(val2024 제출 표면) → 정상 종료 시 `PG1V_pg` 순차 실행.
+- RT1은 타깃 없이 시즌 S 이전 투수의 직전 등장 리그·공백과 R/F 이력량만 쓴다.
+  테스트 행끼리 상태를 갱신하지 않으며 cutoff/행 독립 검문을 양 머신에서 통과했다.
+- PG1은 이미 구현돼 있으나 현행에서 빠진 `pitcher_id×game_type` expanding TE를
+  단독 변경으로 더한다. 둘 다 단일시드 게이트이며 자동 다중시드 확장은 하지 않는다.
+- 로그: A100 `out/rt_pg_a100.log`, 4070 `out/rt_pg_4070.log`.
 
 ## Codex 단독 실행 큐 (임시 운영)
 

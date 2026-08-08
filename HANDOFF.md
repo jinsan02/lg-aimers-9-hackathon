@@ -12,6 +12,18 @@ Codex
 
 ## Status
 
+2026-08-09 04:37 야간 큐를 노트북과 분리해 시작:
+
+- A100 PID `1642883`, GPU 38,338 MiB 확인. `RT1A_roster` seed3
+  (val2023→test2024, `--drop-f-pre 2022`) 뒤 성공 시 `PG1A_pg`를 순차 실행한다.
+  PPID 1 분리 완료, 로그 `out/rt_pg_a100.log`.
+- 4070 예약 작업 `Aimersrt_pg` 실행 상태(`0x41301`), Python 자식 PID `7700`과
+  약 5.37GB 메모리 확인. `RT1V_roster` seed42(val2024) 뒤 성공 시 `PG1V_pg`.
+  다음 자동 발화는 2099-01-01, 로그 `out/rt_pg_4070.log`.
+- RT1 새 코드 `src/roster_transition.py`는 시즌 이전 고정 이력만 사용하며 양 머신
+  cutoff/행 독립 테스트·문법검사 통과. 네 명령 모두 precheck 종료코드 0.
+- 두 체인은 단일시드 게이트까지만 수행한다. 결과를 본 뒤에만 6/8시드 승격한다.
+
 2026-08-09 ABS·R/F·신규/복귀 감사:
 
 - 상세: [`docs/REGIME_ROSTER_AUDIT.md`](docs/REGIME_ROSTER_AUDIT.md), 재현 도구

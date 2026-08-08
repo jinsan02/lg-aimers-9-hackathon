@@ -703,6 +703,8 @@ def main():
                     help="체력·심리 파생 (이닝×경험, 접전 압박)")
     ap.add_argument("--feat-gap", action="store_true",
                     help="경력 공백 피처 (군 복무 복귀 등) — train 이력 lookup")
+    ap.add_argument("--feat-roster", action="store_true",
+                    help="시즌 이전 투수 이력 기반 신규/복귀/F-R 전환 피처")
     ap.add_argument("--feat-abs", action="store_true",
                     help="ABS(자동 볼판정) 측정 체제 플래그")
     ap.add_argument("--feat-rules", action="store_true",
