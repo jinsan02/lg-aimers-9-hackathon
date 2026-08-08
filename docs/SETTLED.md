@@ -94,3 +94,6 @@ FLAG --drop-unstable | BANNED | E47 -262 및 IndexError | 성능 손실뿐 아�
 FLAG --fill-prev | CLOSED | -3.51 | 이전값 결측 대체가 개선되지 않는다.
 FLAG --feat-v5 | CLOSED | -26 | 확장 피처 묶음이 일반화되지 않는다.
 FLAG --te-halflife 2 | CLOSED | 제출 표면 +0.164, SE 1.760, t=.093 | A100의 drop-f-pre 판정 표면에서는 +6.03(t=3.32)이었으나 실제 제출 학습집합과 같은 4070 val2024 8시드에서는 사라졌다. 현행 base+cell 블렌드 대체 이득도 +0.610이고, 전반기 선택 가중은 후반기 -1.573 / 반대는 -1.112로 불안정하다. 학습집합 지문은 0.5401750413으로 일치했으므로 무효 실행이 아니라 **표면 전이 실패**다.
+FLAG tabm-current-121 | CLOSED | 단독 821.81, AB 대비 margin −2.5 | 구 피처 TabM을 현재 121/std 피처와 올바른 val2023→test2024 refit 구조로 다시 만들었다. AB와 rms가 .0121뿐이고 성능 격차 61.6이 다양성 상한 59.1보다 커 최적 가중 0. **강한 TE를 같이 먹이면 NN도 Cat 기하를 재구성한다.**
+FLAG tabm-cell-consistent | CLOSED | 6시드 단독 839.34, 현행 블렌드 가중 0.00 | TabM 32-head에 14 실패셀 softmax와 성공 marginal BCE를 공동 적용했다. 파일럿 1시드는 AB 대비 +16.58로 보였지만 6시드 평균은 +1.48, `AB+DW_cell` 동시 NNLS에서 가중 0. 전반→후반도 0, 반대 방향만 .122라 선택 편의였다.
+FLAG mtnn-cell-consistent | CLOSED | 현행 블렌드 증분 +1.36 | 일반 MLP의 14셀 softmax+marginal BCE. 단독 701.99, rms .0256으로 다양하지만 격차가 너무 크다. `AB+DW_cell` 위 자기적합 증분 +1.36이고 후반→전반 가중 0이라 제출 비용·전이 위험을 못 넘는다.

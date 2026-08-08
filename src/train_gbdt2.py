@@ -987,10 +987,14 @@ def main():
         codes, vocab = [], {}
         for c in CAT_COLS:
             ss = train[c].astype(str)
-            cats = sorted(ss.unique())
+            # 범주 사전도 적합 행만으로 만든다. 검증/test 행 전체를 훑어 새 범주를
+            # 미리 등록하면 값 자체는 타깃이 아니어도 행 독립 감사의 경계가 흐려진다.
+            # 미관측 값은 전부 하나의 unknown 코드로 보낸다.
+            cats = sorted(ss.loc[is_fit].unique())
             vocab[c] = cats
+            unk = len(cats)
             codes.append(ss.map({v: i for i, v in enumerate(cats)})
-                         .to_numpy(np.int32))
+                         .fillna(unk).to_numpy(np.int32))
         Xc = (np.stack(codes, 1) if codes
               else np.zeros((len(train), 0), np.int32))
         os.makedirs(os.path.dirname(args.dump_npz) or ".", exist_ok=True)
@@ -1002,12 +1006,17 @@ def main():
         import failmode as fm
         lab = fm._pitch_labels(train)
         aux = np.stack([lab[m].to_numpy(np.float32) for m in fm.MODES], 1)
+        cell, cell_names, cell_success = fm.build_cells(train)
+        is_test = train.get("_is_test", pd.Series(False, index=train.index))
         print(f"보조 라벨 {aux.shape} | 복원률 "
               f"{np.isfinite(aux).all(1).mean() * 100:.2f}%")
         np.savez(args.dump_npz, Xn=Xn, Xc=Xc,
                  y=train[TARGET].to_numpy(np.float32),
                  aux=aux, aux_names=np.array(fm.MODES),
-                 is_val=is_val.to_numpy())
+                 cell=cell.to_numpy(np.int16),
+                 cell_names=np.array(cell_names),
+                 cell_success=np.array(sorted(cell_success), np.int16),
+                 is_val=is_val.to_numpy(), is_test=is_test.to_numpy())
         joblib.dump({"num": num, "cat_cols": CAT_COLS, "vocab": vocab,
                      "features": features, "fpipe": art},
                     args.dump_npz.replace(".npz", "_meta.pkl"), compress=3)
