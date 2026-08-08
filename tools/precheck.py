@@ -19,6 +19,15 @@ import os
 import re
 import sys
 
+# SETTLED.md 는 한글 + U+2212(−) 를 쓴다. Windows 콘솔(cp949)에 그대로 찍으면
+# UnicodeEncodeError 로 죽는다 — 금지 축을 알려주려는 도구가 크래시하면 그냥
+# 무시하고 실험을 돌리게 된다. 인코딩할 수 없는 글자는 대체 문자로 흘린다.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SETTLED = os.path.join(ROOT, "docs", "SETTLED.md")
 LEDGER = os.path.join(ROOT, "LEDGER.tsv")

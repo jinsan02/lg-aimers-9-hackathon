@@ -224,6 +224,11 @@ Claude 는 *구현 세부에 개입하지 않는다*. 무엇을·왜·어떤 기
 bash tools/agent_sync.sh start codex     # 또는 claude
 ```
 
+> ⚠️ **노트북에서 `bash` 가 WSL 로 잡히면 `E_ACCESSDENIED` 로 죽는다**(2026-08-08
+> Codex 세션에서 발생). 그때는 Git Bash 를 직접 부르는 래퍼를 쓸 것 —
+> `tools\agent_sync.cmd start codex`. 실패한 걸 무시하고 진행하면 fetch 도
+> 원장 병합도 안 된 상태로 남의 커밋 위를 덮어쓴다.
+
 이게 하는 일: 원격 pull(fast-forward만) · **커밋 안 된 변경이 있으면 멈춤** ·
 `LEDGER.tsv` 두 머신에서 합치기 · HANDOFF Status 출력 · 원격 GPU 작업 표시.
 

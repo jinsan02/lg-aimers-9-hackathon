@@ -14,6 +14,9 @@ tmp/
 
 # 환경
 .venv/
+# 에이전트 로컬 설정 — 노트북에선 전역 gitignore 가 막지만 다른 머신엔 그 규칙이 없다
+.claude/
+.codex/
 __pycache__/
 .ipynb_checkpoints/
 
