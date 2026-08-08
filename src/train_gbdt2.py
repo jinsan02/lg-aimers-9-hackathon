@@ -236,9 +236,22 @@ def run_cat(args, train, features, is_val):
             classes_count=len(names), early_stopping_rounds=args.es,
             random_seed=args.seed, verbose=200)
         clf.fit(tr, eval_set=va)
-        p = fm.success_prob(clf.predict_proba(train.loc[is_val, features]), succ)
+        cell_proba = clf.predict_proba(train.loc[is_val, features])
+        p = fm.success_prob(cell_proba, succ)
         best_iter = clf.get_best_iteration()
         clf._fm_success = sorted(succ)      # 추론에서 성공 셀을 알아야 한다
+        if args.dump_cell_proba:
+            # 성공 셀을 합친 스칼라만 저장하면 14개 실패 구성의 정보가 사라진다.
+            # 검증 모델의 전체 분포를 별도 산출물로 남겨 시간 전이 메타모델을
+            # 검문한다. 모델 학습·점수·pkl에는 아무 영향이 없다.
+            np.savez_compressed(
+                f"./out/{args.model}_{args.tag}_cell_val.npz",
+                y=train.loc[is_val, TARGET].to_numpy(np.float64),
+                row_id=train.loc[is_val, "row_id"].to_numpy(),
+                proba=cell_proba.astype(np.float32),
+                success=np.array(sorted(succ), dtype=np.int16),
+                names=np.array(names),
+            )
         if args.no_refit:
             return clf, np.clip(p, 0.0, 1.0), best_iter
         full = Pool(train[features], code, cat_features=CAT_COLS,
@@ -703,6 +716,9 @@ def main():
                     help="E124: (성공,실투,볼,반대) 셀 다중분류로 학습하고 "
                          "P(성공)=성공 셀 합으로 복원. 출력 기하가 심플렉스로 "
                          "바뀌어 형제 CatBoost 와 불일치(rms)가 커진다")
+    ap.add_argument("--dump-cell-proba", action="store_true",
+                    help="failmode-cells 검증/test의 전체 클래스 확률을 저장. "
+                         "학습이나 저장 모델은 바꾸지 않는 분석 전용 출력")
     ap.add_argument("--baseline-col", default="",
                     help="E120 재검정: 그 열의 logit 을 CatBoost baseline 으로 "
                          "준다. 손실·링크는 Logloss 그대로 유지한다 "
@@ -1123,8 +1139,10 @@ def main():
             # 셀 하나의 확률이라 완전히 다른 값이 나온다 (DV_cell 이 BSS -1367,
             # rms 0.37 로 나온 원인). 검증 경로처럼 성공 셀을 합산해야 한다.
             _succ = getattr(model, "_fm_success", None)
+            _cell_proba = None
             if _succ is not None:
-                pt = model.predict_proba(Xt)[:, _succ].sum(axis=1)
+                _cell_proba = model.predict_proba(Xt)
+                pt = _cell_proba[:, _succ].sum(axis=1)
             elif getattr(model, "_fm_multilabel", False):
                 pt = model.predict_proba(Xt)[:, 0]
             elif hasattr(model, "predict_proba"):
@@ -1145,9 +1163,15 @@ def main():
                       flush=True)
             # row_id 를 같이 남긴다 — 세그먼트별 드리프트를 보려면 예측을 원본
             # 행에 정확히 되붙여야 한다 (순서 가정은 조용히 틀어진다)
+            _test_payload = {
+                "y": yt, "pred": pt,
+                "row_id": test_df["row_id"].to_numpy(),
+            }
+            if args.dump_cell_proba and _cell_proba is not None:
+                _test_payload["cell_proba"] = _cell_proba.astype(np.float32)
+                _test_payload["cell_success"] = np.asarray(_succ, dtype=np.int16)
             np.savez_compressed(f"./out/{args.model}_{args.tag}_test_preds.npz",
-                                y=yt, pred=pt,
-                                row_id=test_df["row_id"].to_numpy())
+                                **_test_payload)
 
         np.savez_compressed(f"./out/{args.model}_{args.tag}_val_preds.npz",
                             y=y_va, pred=p)

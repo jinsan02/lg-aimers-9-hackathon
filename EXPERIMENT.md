@@ -4,7 +4,7 @@
 > **역사는 여기 없다** → [docs/EXPERIMENTS_LOG.md](docs/EXPERIMENTS_LOG.md)
 > 닫힌 질문 → [docs/SETTLED.md](docs/SETTLED.md) · 실행 기록 → `LEDGER.tsv`
 
-갱신 2026-08-09 (현재 GPU 큐 종료·SK2 제출 승격 실패)
+갱신 2026-08-09 (직교 가설 O1·14셀 posterior stacking 실행 중)
 
 ## Objective
 
@@ -118,6 +118,10 @@ F리그 분리 · isotonic 계열 전반 · 시드 확장
 # Next Experiment
 
 ## Codex 단독 실행 큐 (임시 운영)
+
+0. **A100 실행 중:** `OG1_cell14` 6시드. 기존 DW_cell과 동일 모델에서 검증/test의
+   14셀 전체 확률만 추가 저장한다. 완료 후 2023 전·후반 source-only 선택 → 미학습
+   2024 적용으로 scalar stack 대비 +3 이상인지 판정한다. 4070은 유휴.
 
 1. **완료:** `TH2_hl2`, 4070 val2024 8시드, drop 없음. 지문 일치(exit 0),
    오류 없음. `VB2_base` 대비 paired +0.164(SE 1.760, t=.093)으로 승격 실패.
