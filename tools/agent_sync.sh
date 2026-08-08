@@ -27,12 +27,15 @@ start)
   bash tools/ledger_sync.sh
   echo
   echo "읽을 것: AGENTS.md -> EXPERIMENT.md -> HANDOFF.md"
-  echo "현재 Status: $(grep -A1 '^## Status' HANDOFF.md | tail -1)"
+  echo "현재 Status: $(grep -A3 '^## Status' HANDOFF.md | grep -v '^##' | grep -v '^$' | head -1)"
   echo "실행 중인 원격 작업:"
-  ssh hsu-server "pgrep -af train_gbdt2 | grep -oE 'tag [A-Za-z0-9_.]+'" 2>/dev/null \
-    | sed 's/^/  A100 /' || echo "  A100 (접속 실패)"
-  ssh desktop-4070 'tasklist /fi "imagename eq python.exe" /fo table | find /c "python.exe"' \
-    2>/dev/null | tr -d '\r' | sed 's/^/  4070 python 프로세스 /' || echo "  4070 (접속 실패)"
+  a=$(ssh -o ConnectTimeout=10 hsu-server \
+        "pgrep -af train_gbdt2 | grep -oE 'tag [A-Za-z0-9_.]+'" 2>/dev/null)
+  echo "  A100  ${a:-(없음)}"
+  b=$(ssh -o ConnectTimeout=10 desktop-4070 \
+        'tasklist /fi "imagename eq python.exe" /fo table | find /c "python.exe"' \
+        2>/dev/null | tr -d '\r\n ')
+  echo "  4070  python 프로세스 ${b:-?}개  (부모+자식 쌍이면 작업 1개)"
   ;;
 end)
   echo "=== $WHO 작업 종료 ==="
