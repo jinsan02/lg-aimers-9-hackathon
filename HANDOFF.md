@@ -4,21 +4,56 @@
 
 ## Current Agent
 
-Claude
+Codex
 
 ## Next Agent
 
-Codex
+Claude
 
 ## Status
 
-`WAITING_FOR_CODEX` — **두 GPU 모두 비어 있다.** 1차 증류(`DS_self`/`DS_seq`)는
-15:44 에 6시드 다 끝났지만 **교사 누수라 수치를 쓰지 않는다.** LEDGER 에 남아 있는
-`DS_*` 행(미학습 2024 ≈1017~1020)은 비교군으로 쓰지 말 것 — 아래 E165b 로 다시 잰다.
+`READY_FOR_CLAUDE` — **E165b 12시드가 A100에서 18:20 정상 종료됐고 두 GPU 모두 비었다.**
+1차 누수 실행 `DS_*`는 계속 무효이며, 아래 `DT_*`만 판정할 것.
+
+## E165b Result (Codex, 2026-08-08 18:25)
+
+실행: `run_e165b.sh` 전문 그대로. 오류/Traceback 없음. 비교군과 후보 모두 `HS-GPU`,
+시드 `3,4,5,6,8,13`, `val=2023 → test=2024`로 일치한다.
+
+| 축 | 앙상블 | AB 대비 Δ | 페어평균 | SE | t | D | rms | Dmax | margin | 최적 w | 이득 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `DT_self` | 911.84 | +28.43 | +34.89 | 2.38 | 14.68 | -28.4 | .0108 | 47.1 | +75.6 | .802 | +30.28 |
+| `DT_seq` | **916.82** | **+33.42** | **+39.85** | 1.92 | **20.74** | -33.4 | .0110 | 48.1 | **+81.5** | .847 | **+34.54** |
+| `DW_cell` | 896.86 | +13.46 | +17.76 | 1.68 | 10.54 | -13.5 | .0107 | 46.0 | +59.5 | .646 | +19.22 |
+
+교사 OOF: `T2_self=2147.1`, `T2_seq=2187.7` (seq +40.6). 1차 교사는
+`T_self=2076.0`, `T_seq=2115.1`이지만 학습 시즌이 달라 절대값 직접 판정은 금지.
+
+동시 NNLS(2024 자기적합, 낙관치): `DW_cell 0.344 + DT_seq 0.656 = 924.41`.
+`AB_base+DW_cell=902.63` 대비 +21.78이며 `DT_self` 가중은 0. `DT_self/seq`간
+수준 제거 rms=.0018이라 사실상 같은 계열이고 seq만 남는다. 가중치는 판정/채택값이 아니다.
+
+### 엄격성 caveat
+
+현재 `teacher.py`는 지시대로 `load → fpipe.fit(전체) → season<=2023 필터 → labels` 순서다.
+`compute_priors`의 전역 shrink prior에는 2024 **입력분포**가 소량 섞일 수 있다. 타깃 누수는
+제거됐지만 완전한 미학습 2024 표면은 아니다. 채택 전 T3는
+`load → season<=2023 필터 → fpipe.fit → labels` 순서로 재검정 권장.
+
+### 신규 탐색 후보 (세 서브에이전트 읽기 전용 감사 완료)
+
+1. 이미 구현·실행 0회: `--skill-axes count,hand` (A100 약 12~15분)
+2. 이미 구현·실행 0회: `--feat-window`; 특히 middle 최근창 잔차 신호 (약 12~15분)
+3. 직전 경기 success/middle 비율의 공통 분모에서 투구 수 복원 정확도 감사(CPU)
+4. E165 계열 채택 시 hard 25% + teacher soft 75% 혼합(학생 6시드 약 40분)
+5. success/middle/ball/reverse soft-vector 증류
+6. 후순위: pitcher-season QueryCrossEntropy, rolling OOT gate, pitcher-team 계층
+
+Claude가 먼저 E165b/T3 필요성을 판정하고, 다음 실험은 한 번에 한 변경만 지시할 것.
 
 ---
 
-# Current Task
+# Completed Task
 
 **E165b — 누수 없는 증류 재검정**
 

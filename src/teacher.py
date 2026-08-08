@@ -24,6 +24,7 @@ K-fold 로 **out-of-fold** 예측만 쓴다.
 실행:
   python src/teacher.py --tag T_seq --prev            # 직전 투구 포함
   python src/teacher.py --tag T_self                  # 자기증류(합법 피처만)
+  python src/teacher.py --tag T2_self --max-season 2023
 """
 
 import argparse
@@ -60,6 +61,8 @@ def main():
     ap.add_argument("--tag", required=True)
     ap.add_argument("--prev", action="store_true",
                     help="직전 투구 결과를 교사 피처로 추가 (train 전용)")
+    ap.add_argument("--max-season", type=int, default=0,
+                    help="이 시즌 이하 행만 OOF 교사 학습·예측에 사용")
     ap.add_argument("--folds", type=int, default=4)
     ap.add_argument("--iters", type=int, default=1500)
     ap.add_argument("--lr", type=float, default=0.03)
@@ -72,6 +75,11 @@ def main():
     train, new_cols, new_cats, _ = fpipe.fit(train, A, ~is_val, tm)
     features = features + [c for c in new_cols if c not in features]
     CAT_COLS[:] = [c for c in CAT_COLS + new_cats if c in features]
+
+    if args.max_season:
+        n0 = len(train)
+        train = train.loc[train["season"] <= args.max_season].sort_index().copy()
+        print(f"교사 상한 시즌 {args.max_season}: {n0} -> {len(train)}행")
 
     if args.prev:
         # ⚠️ train 전용. 같은 투수의 직전 투구 결과 — 학생은 절대 못 본다.
