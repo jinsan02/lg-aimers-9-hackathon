@@ -12,6 +12,16 @@ Codex
 
 ## Status
 
+2026-08-09 03:21 KST: G0 graph 파일럿 두 대를 노트북과 완전 분리해 실행했다.
+
+- A100 `G0A_graph` seed3: val2023→test2024, `--drop-f-pre 2022`. PID 1614122,
+  GPU 38,338 MiB 사용을 확인했다. 로그 `out/g0a_graph.log`.
+- 4070 `G0V_graph` seed42: val2024 제출 표면, drop 없음. 예약 작업
+  `Aimersg0v_graph`, 상태 running(0x41301), 다음 자동 실행 2099-01-01. 로그
+  `out/g0v_graph.log`.
+- `tools/test_graph_features.py` cutoff/행 독립 테스트 통과. 두 명령 precheck 통과.
+- OR1_rank는 03:02 A100에서 segmentation fault로 종료되어 산출물이 없다. 현재 우선순위는 G0.
+
 2026-08-09 Codex가 동적 계층/GNN 신규 축을 사전 설계했다. 상세 내용은
 [`docs/HIERARCHY_GNN_PLAN.md`](docs/HIERARCHY_GNN_PLAN.md), 구조 감사 도구는
 `tools/hierarchy_graph_audit.py`다. 2024 기준 exact-pair hit 51.2%, pitcher hit 80.1%,

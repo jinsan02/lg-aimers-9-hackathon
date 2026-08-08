@@ -648,6 +648,8 @@ def main():
                     help="이 시즌 이하의 game_type=F 행 제외 (예: 2022)")
     ap.add_argument("--feat-v2", action="store_true",
                     help="features.py 파생 피처 추가")
+    ap.add_argument("--feat-graph-topology", action="store_true",
+                    help="완료된 과거 시즌의 투수-타자 그래프 구조/이웃 피처")
     ap.add_argument("--feat-v4", action="store_true",
                     help="엔티티×상황 타깃 통계 lookup (feat-v2 필요)")
     ap.add_argument("--feat-v5", action="store_true",

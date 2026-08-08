@@ -25,7 +25,7 @@ import pandas as pd
 #   2. 시즌내 복원(std) → 궤적(profile) → 폼 → 도메인 교차 → 창분해 → 카운트
 #   3. 타깃 인코딩(TE) → 교차항(cross)
 #   4. 실력 추정(skill)   ← TE 산출 컬럼을 입력으로 쓰므로 **반드시 TE 뒤**
-STEP_ORDER = ("tm", "v2", "std", "te", "skill")
+STEP_ORDER = ("tm", "v2", "graph", "std", "te", "skill")
 
 TM_PREFIX = ("tm_", "tmx_", "sct_")
 TM_KEYS = ("pitcher_id", "season", "balls_before", "strikes_before")
@@ -87,6 +87,13 @@ def fit(train, args, is_fit, tm_table=None, verbose=True):
         new_cols += cols
         new_cats += [c for c in NEW_CAT if c in cols]
         say(f"피처 v2/v3: +{len(cols)}개")
+
+    # 1.5 관계 그래프 — 각 시즌은 오직 완료된 이전 시즌의 edge/label만 본다.
+    if getattr(args, "feat_graph_topology", False):
+        import graph_features as gf
+        train, cols, art["graph"] = gf.add_expanding(train)
+        new_cols += cols
+        say(f"동결 과거 관계 그래프: +{len(cols)}개")
 
     # 2. 시즌내 복원 계열
     if args.feat_std:
@@ -197,6 +204,9 @@ def transform(df, art):
     if art.get("priors") is not None:
         from features import add_features
         df, _ = add_features(df, art["priors"])
+    if art.get("graph") is not None:
+        import graph_features as gf
+        df, _ = gf.apply_tables(df, art["graph"])
     if art.get("std") is not None:
         df, _ = _apply_std(df, art["std"])
         if art.get("profile") is not None:

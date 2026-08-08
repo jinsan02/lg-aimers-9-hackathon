@@ -107,6 +107,11 @@ F리그 분리 · isotonic 계열 전반 · 시드 확장
 
 # Current Hypothesis
 
+2026-08-09 03:21: G0 topology-only graph feature를 구현하고 두 파일럿을 분리 실행했다.
+A100 `G0A_graph`는 미학습 2024 판정 표면, 4070 `G0V_graph`는 val2024 제출 표면이다.
+노트북 종료와 무관하게 각각 `setsid/nohup`, `tools/run4070.sh` 예약 작업으로 동작한다.
+OR1_rank는 segmentation fault로 산출물 없이 종료됐으며 G0 뒤에 원인을 조사한다.
+
 > **Claude 최종 판정: 증류 기각.** 판정 표면 `+38.43` 의 85% 가 교사만 본 F 구체제
 > 행이었고(`DT5_seq` 로 +4.6~7.0 붕괴), 제출 표면에서는 base 대비 −10.19 에 블렌드
 > 가중 0.00 이다. base 와 rms 0.0067 로 셋 중 가장 닮았다 — 새 기하가 아니라 base 의
