@@ -71,15 +71,15 @@ def main():
     args = ap.parse_args()
 
     train, features, tm = load()
-    is_val = pd.Series(False, index=train.index)      # 교사는 전체를 쓴다
-    train, new_cols, new_cats, _ = fpipe.fit(train, A, ~is_val, tm)
-    features = features + [c for c in new_cols if c not in features]
-    CAT_COLS[:] = [c for c in CAT_COLS + new_cats if c in features]
-
     if args.max_season:
         n0 = len(train)
         train = train.loc[train["season"] <= args.max_season].sort_index().copy()
         print(f"교사 상한 시즌 {args.max_season}: {n0} -> {len(train)}행")
+
+    is_val = pd.Series(False, index=train.index)      # 교사는 전체를 쓴다
+    train, new_cols, new_cats, _ = fpipe.fit(train, A, ~is_val, tm)
+    features = features + [c for c in new_cols if c not in features]
+    CAT_COLS[:] = [c for c in CAT_COLS + new_cats if c in features]
 
     if args.prev:
         # ⚠️ train 전용. 같은 투수의 직전 투구 결과 — 학생은 절대 못 본다.
