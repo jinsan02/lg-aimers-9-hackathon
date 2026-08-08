@@ -116,8 +116,12 @@ def main() -> int:
         raise ValueError("val/test 셀 이름 불일치")
 
     meta = pd.read_csv("./data/train.csv", encoding="utf-8-sig",
-                       usecols=["row_id", "game_month"])
-    month = pd.Series(meta.game_month.to_numpy(), index=meta.row_id).reindex(rid_s).to_numpy()
+                       usecols=["row_id", "game_month", "game_type"])
+    month_map = pd.Series(meta.game_month.to_numpy(), index=meta.row_id)
+    league_map = pd.Series(meta.game_type.astype(str).to_numpy(), index=meta.row_id)
+    month = month_map.reindex(rid_s).to_numpy()
+    league_s = league_map.reindex(rid_s).to_numpy()
+    league_t = league_map.reindex(rid_t).to_numpy()
     if np.isnan(month).any():
         raise ValueError("source month 결측")
     first = month <= 6
@@ -126,34 +130,49 @@ def main() -> int:
 
     print(f"source={len(ys):,} target={len(yt):,} cells={len(names)} "
           f"source halves={first.sum():,}/{(~first).sum():,}")
-    print("source_delta는 같은 alpha의 scalar 대비 양방향 centered BSS 증분")
-    rows = []
-    for alpha in ALPHAS:
-        transfer = {arm: [] for arm in Xs}
-        for fit, test in ((first, ~first), (~first, first)):
-            for arm in Xs:
-                pack = ridge_fit(Xs[arm][fit], ys[fit], alpha)
-                transfer[arm].append(centered_bss(ys[test],
-                                                   ridge_predict(pack, Xs[arm][test])))
-        for arm in ("modes", "cells"):
-            delta = np.array(transfer[arm]) - np.array(transfer["scalar"])
-            rows.append((float(delta.min()), float(delta.mean()), alpha, arm))
-            print(f"alpha={alpha:<4g} {arm:<5} source_delta "
-                  f"{delta[0]:+7.3f}/{delta[1]:+7.3f} "
-                  f"min={delta.min():+7.3f} mean={delta.mean():+7.3f}")
 
-    # target을 보지 않고 source 양방향 최솟값, 그다음 평균으로 하나만 선택한다.
-    eligible = [r for r in rows if r[0] > 0]
-    chosen = max(eligible or rows, key=lambda r: (r[0], r[1]))
-    _, _, alpha, arm = chosen
-    pred = {}
-    for name in ("scalar", arm):
-        pred[name] = ridge_predict(ridge_fit(Xs[name], ys, alpha), Xt[name])
-    delta = centered_bss(yt, pred[arm]) - centered_bss(yt, pred["scalar"])
-    print(f"\n선택(source only): arm={arm} alpha={alpha:g}")
-    print(f"target centered scalar={centered_bss(yt, pred['scalar']):.3f} "
-          f"{arm}={centered_bss(yt, pred[arm]):.3f} delta={delta:+.3f}")
-    print("승격 게이트: source 양방향 모두 양수 + target delta >= +3.0")
+    def scenario(label: str, source_mask: np.ndarray,
+                 target_route: np.ndarray) -> tuple[str, float, float, float]:
+        """target_route 밖에서는 신규 팔을 scalar와 같게 둬 그 리그에 외삽하지 않는다."""
+        print(f"\n=== {label} source={source_mask.sum():,} route={target_route.sum():,} ===")
+        print("source_delta는 같은 alpha의 scalar 대비 양방향 centered BSS 증분")
+        rows = []
+        for alpha in ALPHAS:
+            transfer = {arm: [] for arm in Xs}
+            for fit, test in ((source_mask & first, source_mask & ~first),
+                              (source_mask & ~first, source_mask & first)):
+                for arm0 in Xs:
+                    pack = ridge_fit(Xs[arm0][fit], ys[fit], alpha)
+                    transfer[arm0].append(centered_bss(
+                        ys[test], ridge_predict(pack, Xs[arm0][test])))
+            for arm0 in ("modes", "cells"):
+                d = np.array(transfer[arm0]) - np.array(transfer["scalar"])
+                rows.append((float(d.min()), float(d.mean()), alpha, arm0))
+                print(f"alpha={alpha:<4g} {arm0:<5} source_delta "
+                      f"{d[0]:+7.3f}/{d[1]:+7.3f} "
+                      f"min={d.min():+7.3f} mean={d.mean():+7.3f}")
+        eligible = [r for r in rows if r[0] > 0]
+        chosen = max(eligible or rows, key=lambda r: (r[0], r[1]))
+        source_min, _, alpha, arm0 = chosen
+        scalar = ridge_predict(ridge_fit(Xs["scalar"][source_mask],
+                                         ys[source_mask], alpha), Xt["scalar"])
+        candidate = ridge_predict(ridge_fit(Xs[arm0][source_mask],
+                                            ys[source_mask], alpha), Xt[arm0])
+        candidate = np.where(target_route, candidate, scalar)
+        delta = centered_bss(yt, candidate) - centered_bss(yt, scalar)
+        print(f"선택(source only): arm={arm0} alpha={alpha:g} source_min={source_min:+.3f}")
+        print(f"target centered scalar={centered_bss(yt, scalar):.3f} "
+              f"routed={centered_bss(yt, candidate):.3f} delta={delta:+.3f}")
+        return arm0, alpha, source_min, delta
+
+    # 전체는 진단용이다. 2023 F는 신체제 과거가 없어 정직한 source가 아니다.
+    scenario("ALL (진단용: 2023 F 체제 공백)", np.ones(len(ys), dtype=bool),
+             np.ones(len(yt), dtype=bool))
+    result = scenario("R->R route (주 판정)", league_s == "R", league_t == "R")
+    print("\n승격 게이트(주 판정): R source 양방향 모두 양수 + "
+          "R-only route의 전체 target delta >= +3.0")
+    print(f"RESULT arm={result[0]} alpha={result[1]:g} "
+          f"source_min={result[2]:+.3f} target_delta={result[3]:+.3f}")
     return 0
 
 

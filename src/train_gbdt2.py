@@ -459,6 +459,84 @@ def run_cat(args, train, features, is_val):
 
 
 
+def _rank_pool(train, features, mask, group_size=64):
+    """시간적으로 가까운 행끼리 고정 블록을 만들어 전역 수준 대신 로컬 순서를 학습."""
+    from catboost import Pool
+
+    d = train.loc[mask, [*features, TARGET, ID]].copy()
+    d = d.sort_values(ID, kind="stable")
+    group = np.arange(len(d), dtype=np.int64) // int(group_size)
+    pool = Pool(d[features], d[TARGET].astype(float), cat_features=CAT_COLS,
+                group_id=group)
+    return pool, d.index.to_numpy()
+
+
+def _fit_rank_sigmoid(raw, y):
+    """ranking raw score를 확률로. source 검증 시즌에서만 적합해 미래 시즌에 고정."""
+    raw = np.asarray(raw, np.float64)
+    y = np.asarray(y, np.float64)
+    mu, sd = float(raw.mean()), float(raw.std())
+    sd = max(sd, 1e-8)
+    z = (raw - mu) / sd
+    X = np.column_stack([np.ones(len(z)), z])
+    w = np.array([np.log(y.mean() / (1 - y.mean())), 1.0], np.float64)
+    for _ in range(30):
+        q = 1.0 / (1.0 + np.exp(-np.clip(X @ w, -30, 30)))
+        v = np.maximum(q * (1 - q), 1e-8)
+        grad = X.T @ (y - q)
+        hess = (X * v[:, None]).T @ X + 1e-6 * np.eye(2)
+        step = np.linalg.solve(hess, grad)
+        w += step
+        if np.max(np.abs(step)) < 1e-8:
+            break
+    return float(w[0]), float(w[1]), mu, sd
+
+
+def _rank_probability(raw, calib):
+    a, b, mu, sd = calib
+    z = (np.asarray(raw, np.float64) - mu) / sd
+    return 1.0 / (1.0 + np.exp(-np.clip(a + b * z, -30, 30)))
+
+
+def run_rank(args, train, features, is_val):
+    """O2: Brier의 해상도 항을 직접 노리는 pairwise ranking CatBoost."""
+    from catboost import CatBoostRanker
+
+    for c in CAT_COLS:
+        train[c] = train[c].astype(str)
+    tr, _ = _rank_pool(train, features, ~is_val, args.rank_group_size)
+    va, va_order = _rank_pool(train, features, is_val, args.rank_group_size)
+    model = CatBoostRanker(
+        iterations=args.iters, learning_rate=args.lr, depth=args.depth,
+        l2_leaf_reg=args.l2, border_count=args.border_count,
+        task_type=args.device, devices="0", loss_function="PairLogitPairwise",
+        eval_metric="PairLogit", early_stopping_rounds=args.es,
+        random_seed=args.seed, verbose=200,
+    )
+    model.fit(tr, eval_set=va)
+    raw_sorted = model.predict(va)
+    raw = pd.Series(raw_sorted, index=va_order).reindex(train.index[is_val]).to_numpy()
+    y = train.loc[is_val, TARGET].to_numpy(np.float64)
+    calib = _fit_rank_sigmoid(raw, y)
+    p = _rank_probability(raw, calib)
+    best_iter = model.get_best_iteration()
+    if args.no_refit:
+        model._rank_calib = calib
+        return model, p, best_iter
+
+    full, _ = _rank_pool(train, features, np.ones(len(train), dtype=bool),
+                         args.rank_group_size)
+    final = CatBoostRanker(
+        iterations=max(int(best_iter * args.refit_mult), 1),
+        learning_rate=args.lr, depth=args.depth, l2_leaf_reg=args.l2,
+        border_count=args.border_count, task_type=args.device, devices="0",
+        loss_function="PairLogitPairwise", random_seed=args.seed, verbose=0,
+    )
+    final.fit(full)
+    final._rank_calib = calib
+    return final, p, best_iter
+
+
 def run_lgb(args, train, features, is_val):
     """LightGBM 멤버 (E141).
 
@@ -531,7 +609,7 @@ def run_xgb(args, train, features, is_val):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model", choices=["cat", "xgb", "lgb"], required=True)
+    ap.add_argument("--model", choices=["cat", "xgb", "lgb", "rank"], required=True)
     ap.add_argument("--tag", default="v1")
     ap.add_argument("--lr", type=float, default=0.05)
     ap.add_argument("--depth", type=int, default=8)      # catboost
@@ -719,6 +797,8 @@ def main():
     ap.add_argument("--dump-cell-proba", action="store_true",
                     help="failmode-cells 검증/test의 전체 클래스 확률을 저장. "
                          "학습이나 저장 모델은 바꾸지 않는 분석 전용 출력")
+    ap.add_argument("--rank-group-size", type=int, default=64,
+                    help="PairLogitPairwise 학습 블록 크기. row_id 시간순 고정 블록")
     ap.add_argument("--baseline-col", default="",
                     help="E120 재검정: 그 열의 logit 을 CatBoost baseline 으로 "
                          "준다. 손실·링크는 Logloss 그대로 유지한다 "
@@ -1106,7 +1186,8 @@ def main():
         args.seed = _sd
         args.tag = base_tag if len(seeds) == 1 else f"{base_tag}_s{_sd}"
         t0 = time.time()
-        runner = {"cat": run_cat, "lgb": run_lgb}.get(args.model, run_xgb)
+        runner = {"cat": run_cat, "lgb": run_lgb, "rank": run_rank}.get(
+            args.model, run_xgb)
         model, p, best_iter = runner(args, train, features, is_val)
         score = bss(y_va, p)
         print(f"[{args.model} {args.tag}] val{args.val_season} BSS {score:.2f} "
@@ -1143,6 +1224,8 @@ def main():
             if _succ is not None:
                 _cell_proba = model.predict_proba(Xt)
                 pt = _cell_proba[:, _succ].sum(axis=1)
+            elif getattr(model, "_rank_calib", None) is not None:
+                pt = _rank_probability(model.predict(Xt), model._rank_calib)
             elif getattr(model, "_fm_multilabel", False):
                 pt = model.predict_proba(Xt)[:, 0]
             elif hasattr(model, "predict_proba"):

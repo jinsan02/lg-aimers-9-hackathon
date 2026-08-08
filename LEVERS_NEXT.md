@@ -2,7 +2,7 @@
 
 ## 2026-08-09 직교 가설 재설계 — 기존 큐 소진 뒤
 
-### O1. 실패형태 posterior stacking — **1순위, A100 실행 중**
+### O1. 실패형태 posterior stacking — **기각**
 
 현행 ZD5는 14셀 확률을 계산하지만 제출에서는 성공 셀을 합친 스칼라 하나만 남긴다.
 따라서 `어떤 실패 형태를 예상하는가`는 모두 버려진다. 2023→2024 ABS 변화의 대부분이
@@ -16,6 +16,12 @@
 - 승격: source 양방향 모두 양수, target에서 scalar stack 대비 **+3 이상**.
 - 실행: `OG1_cell14`, A100 6시드. 모델은 `DW_cell`과 같고
   `--dump-cell-proba`는 분석 산출물만 추가한다.
+
+결과: source 2023 R 전·후반에서는 cells 팔이 scalar 대비 최소 `+101.316`으로
+압도적이었지만, source-only 선택(`cells`, alpha=.1)을 미학습 2024 R에 라우팅하자
+전체 centered BSS가 `887.545 → 835.165`, **−52.379**였다. 전체 리그 적용은 −169.797.
+셀별 posterior calibration과 실패형태-성공 잔차 관계가 시즌을 넘지 않는다. 같은 시즌
+반분만으로 메타모델을 고르면 매우 큰 선택 착시가 생기므로 이 축은 닫는다.
 
 ### O2. 행별 조건부 base/cell 가중 — **로컬 검문 후 2순위**
 
@@ -34,7 +40,7 @@
 source가 없다. O1이 통과하면 class posterior에 리그 상호작용을 **별도 한 변경**으로
 검문하고, O1이 실패하면 리그별 고정 w만 저비용 후보로 남긴다.
 
-### O3. pairwise ranking 멤버 — **O1 다음 신규 GPU 축**
+### O3. pairwise ranking 멤버 — **A100 OR1 파일럿 실행 중**
 
 현재 모든 주력은 Logloss/MultiClass 계열이고 RMSE도 닫혔다. 그러나 남은 예산은
 신뢰도보다 해상도다. 같은 121피처로 이진 순서를 직접 학습하는 pairwise ranking
@@ -45,7 +51,8 @@ source가 없다. O1이 통과하면 class posterior에 리그 상호작용을 *
 - 승격 조건: 단독 성능격차보다 다양성 상한이 크고, base+cell 위 고정 소가중 이득 +3 이상.
 - 위험: CatBoost ranking의 group 구성 자체가 결과를 바꾸므로, 임의 그룹 한 종류를
   사후 선택하지 않는다. 시즌×월 안에서 고정 크기 블록을 사전 정의한다.
-- O1 판정 전에는 구현·실행하지 않는다(한 번에 하나의 신규 축).
+- `OR1_rank`: PairLogitPairwise, row_id 시간순 64행 고정 그룹, depth8/lr.01,
+  val2023→test2024, A100 seed42. source 검증 raw score에만 sigmoid를 적합해 target에 고정.
 
 ### O4. multi-season cross-fitted stack — **O1이 양수지만 불안정할 때만**
 

@@ -12,14 +12,13 @@ Codex
 
 ## Status
 
-`RUNNING_CODEX_SOLO` — 기존 큐 종료 뒤 직교 가설 O1을 실행 중이다.
-A100에서 `OG1_cell14` 6시드가 기존 depth5 셀 모델의 전체 14셀 확률을 저장한다.
+`RUNNING_CODEX_SOLO` — 직교 가설 O1 기각 뒤 O3 ranking 파일럿을 실행 중이다.
+A100에서 `OR1_rank` seed42가 PairLogitPairwise 순위 멤버를 측정한다.
 현행 v18 제출본은 동결돼 있다. 아래의 과거
 `READY_FOR_CLAUDE` 블록은 역사 기록이며 현재 배턴이 아니다.
 
 - 노트북: 문서·검문 도구·결과 판정 전용.
-- A100: `OG1_cell14` 6시드 실행 중. 예상 약 1시간, 완료 후
-  `tools/cell_meta_transfer.py AB_base OG1_cell14` 판정.
+- A100: `OR1_rank` 단일시드 실행 중. val2023→test2024, 64행 시간순 그룹.
 - 4070: 유휴. `SK2_k40` 제출 표면 8시드 판정 완료.
 - 제출: `TH2_hl2`가 제출 표면 승격 게이트에 실패해 새 zip을 만들지 않았다.
   현행 `blendv9_0808_0126.zip`을 유지한다. 4070 재검증에서 행 독립 세 항목
@@ -32,7 +31,10 @@ A100에서 `OG1_cell14` 6시드가 기존 depth5 셀 모델의 전체 14셀 확�
   그러나 구 W 세대 2023R→2024R에서는 타자경험 −3.01, 셀분산 −1.17로 붕괴했고
   이닝만 +1.96이었다. 단순 gate는 주력 승격하지 않는다.
 - `OG1_cell14`: scalar 성공합에서 버리던 14셀 posterior를 ridge stack에 사용한다.
-  source 2023 양방향으로 arm/alpha를 선택하고 미학습 2024에서 +3 이상이면 승격한다.
+  source 2023 R 양방향 최소 +101.32였으나 미학습 2024 R route에서 −52.38.
+  같은 시즌 착시가 커 기각, 새 제출 없음.
+- `OR1_rank`: 기존 Logloss/MultiClass와 다른 pairwise 순위 목적. 단일시드 target
+  단독 성능·base와 rms·현행 base+cell 위 블렌드 margin을 게이트로 본다.
 
 - `MC1`: MLP 확률일관성 셀 모델. 6시드 단독 `701.99`, 현행 AB+DW 위
   자기적합 증분 `+1.36`, 반분 한쪽 가중 0으로 종료.

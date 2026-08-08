@@ -4,7 +4,7 @@
 > **역사는 여기 없다** → [docs/EXPERIMENTS_LOG.md](docs/EXPERIMENTS_LOG.md)
 > 닫힌 질문 → [docs/SETTLED.md](docs/SETTLED.md) · 실행 기록 → `LEDGER.tsv`
 
-갱신 2026-08-09 (직교 가설 O1·14셀 posterior stacking 실행 중)
+갱신 2026-08-09 (O1 posterior 기각·O3 pairwise ranking 실행 중)
 
 ## Objective
 
@@ -119,9 +119,10 @@ F리그 분리 · isotonic 계열 전반 · 시드 확장
 
 ## Codex 단독 실행 큐 (임시 운영)
 
-0. **A100 실행 중:** `OG1_cell14` 6시드. 기존 DW_cell과 동일 모델에서 검증/test의
-   14셀 전체 확률만 추가 저장한다. 완료 후 2023 전·후반 source-only 선택 → 미학습
-   2024 적용으로 scalar stack 대비 +3 이상인지 판정한다. 4070은 유휴.
+0. **O1 기각:** `OG1_cell14` 6시드. 2023 R 반분 source에서는 cells가 scalar보다
+   최소 +101.32였으나 미학습 2024 R route에서 −52.38. posterior 잔차가 시즌 비전이.
+1. **A100 실행 중:** `OR1_rank` seed42. PairLogitPairwise 순위 멤버의 미학습 2024
+   단독 성능과 base/cell 대비 다양성 margin을 본다. 통과해야 6시드로 확장한다.
 
 1. **완료:** `TH2_hl2`, 4070 val2024 8시드, drop 없음. 지문 일치(exit 0),
    오류 없음. `VB2_base` 대비 paired +0.164(SE 1.760, t=.093)으로 승격 실패.
