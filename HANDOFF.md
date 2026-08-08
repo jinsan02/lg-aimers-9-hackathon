@@ -4,211 +4,165 @@
 
 ## Current Agent
 
-Codex
+Claude
 
 ## Next Agent
 
-Claude
+Codex
 
 ## Status
 
-`READY_FOR_CLAUDE` — P1·P2 완료, 산출물 노트북 회수 완료. **두 GPU 모두 비었다.**
-P3(가중 선택·제출 패키징)은 Claude 가 노트북에서 한다.
+`READY_FOR_CODEX` — **P1 채택.** P2 는 학습집합이 어긋나 폐기하고 `P2'` 로 다시
+돌린다. 두 GPU 모두 비었다. 아래 `# P2' — 재실행` 이 다음 작업이다.
 
 ---
 
-# P1 · P2 결과 (Codex, 2026-08-08 20:06)
+# P1 결과 — 채택. caveat 종결
 
-## P1 — T3 엄격 재검정 (A100)
+`teacher.py` 를 `load → season<=2023 필터 → fpipe.fit → labels` 로 고친 뒤 재측정.
 
-`teacher.py`를 `load → season<=2023 필터 → fpipe.fit → labels` 순서로 변경했다.
-`T3_seq` 교사 OOF는 **2185.1** (`T2_seq=2187.7`, 차이 -2.6)이다.
+| | 앙상블 | 페어평균 | SE | t |
+|---|---:|---:|---:|---:|
+| `DT_seq` (구 순서) | 916.82 | +39.85 | 1.92 | 20.74 |
+| **`DT3_seq` (엄격)** | **915.38** | **+38.43** | 2.49 | **15.41** |
 
-| 축 | 앙상블 | AB 대비 Δ | 페어평균 | SE | t | D | rms | Dmax | margin | 최적w | 이득 |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| `DT_seq` | 916.82 | +33.42 | +39.85 | 1.92 | 20.74 | -33.4 | .0110 | 48.1 | +81.5 | .847 | +34.54 |
-| `DT3_seq` | **915.38** | **+31.97** | **+38.43** | 2.49 | **15.41** | -32.0 | .0109 | 47.2 | **+79.2** | .839 | **+33.20** |
+직접 비교 `DT3_seq − DT_seq` = **−1.642, SE 0.859, t −1.91.** 사전 조건
+`|Δ| < 2×SE` 충족. LEDGER 의 시드별 `test_bss` 로 독립 재계산해 일치를 확인했다
+(시드별 +0.82, −3.99, −3.27, −2.73, −1.63, +0.95).
 
-핵심 직접 비교 `DT3_seq - DT_seq`: 시드별
-`+0.82, -3.99, -3.27, -2.73, -1.63, +0.95`, 평균 **-1.642**, SE **0.859**,
-t **-1.912**. 사전 조건 `|Δ| < 2×SE≈4`를 충족한다. caveat 종결 판정과
-`docs/SETTLED.md` 추가는 Claude 영역이다. P1 로그 오류/Traceback 없음.
+**잔여 누수는 1.6 점, 전체 이득의 4% 였다.** 예측대로 전역 prior 스칼라 하나였다.
+`docs/SETTLED.md` 에 `teacher-fpipe-order | CLOSED` 로 기록했다.
 
-## P2 — 제출 구조 산출물 (4070)
+**증류 채택. 앞으로 쓰는 값은 `+38.43` 이다.** 교사는 필터-먼저 순서를 쓴다.
 
-| 축 | 완료 | val2024 시드평균 | seed SE | 시드별 BSS |
-|---|---:|---:|---:|---|
-| `VB_base` | 8/8 | **869.114** | 1.300 | 874.33, 864.62, 873.36, 866.82, 868.32, 865.38, 872.00, 868.08 |
-| `DX_seq` | 8/8 | **910.878** | 0.477 | 910.08, 912.01, 912.95, 911.88, 909.65, 911.06, 908.93, 910.46 |
+---
 
-시드 순서는 `42,7,13,3,4,5,6,8`. 노트북에 다음을 회수했다.
+# P2 폐기 — 학습집합이 어긋났다 (Claude 의 명세 오류)
 
-```text
-out/cat_VB_base_s*_val_preds.npz  8개
-out/cat_DX_seq_s*_val_preds.npz   8개
-model/cat_DX_seq_s*.pkl           8개, 총 65,566,336 bytes
+`VB_base` 를 `cat_v14f` 재현본으로 쓰려 했는데 **다른 모델**이었다.
+
+```
+val2024 시드평균   v14f 921.03   ZD5 921.09   VB_base 869.11   DX_seq 910.88
+best_iter          v14f 1283~1671(조기종료)   VB_base·DX_seq ~2990(상한 도달)
 ```
 
-로그의 `증류 타깃 결측 18.51%`는 전체 2019~2024 행 기준이다. 결측 행은 T3에 없는
-2024이며, 실제 validation 모델 학습 구간 ≤2023은 전부 덮는다. 최종 refit에서 2024가
-hard label로 fallback하는 것도 지시한 제출 구조와 일치한다. P2 로그 오류/Traceback 없음.
+원인: **핸드오프에 `--drop-f-pre 2022` 를 넣었다.** P1 판정용 명령에서 그대로
+복사했는데, **제출 멤버 v14f·ZD5 는 그 플래그를 쓰지 않는다.**
 
-## 실행 중 발생·복구한 오류
+pkl 지문으로 확정했다 (`fpipe['priors']['asof_pitcher_success_rate']` 는 학습
+행에서 계산되므로 학습집합의 지문이다):
 
-- `tools\\agent_sync.cmd`가 앱 셸에서 Git Bash PATH를 잃고 WSL `E_ACCESSDENIED`로 실패.
-  Git Bash 실행 파일을 직접 지정해 start 동기화 완료.
-- 4070 precheck가 CP949에서 `−` 문자를 출력하다 `UnicodeEncodeError`. `PYTHONIOENCODING=utf-8`
-  로 재실행해 종료코드 0 확인.
-- 첫 `run4070.sh` 호출은 인자 quoting으로 역슬래시가 사라져 예약 작업 결과 1.
-  잘못된 작업을 동일 이름으로 재생성해 정상 실행했고, 완료 후 예약 작업을 삭제했다.
+```
+v14f    0.5401750413
+ZD5     0.5401750413     ← 같은 학습집합
+DX_seq  0.5356309064     ← 다른 학습집합
+```
 
----
+v16(−6.15)·v17(−53.6) 과 **같은 실수 세 번째**다. 재발 방지로
+`tools/member_fingerprint.py` 를 만들었다 — 지문이 갈리면 종료코드 2.
 
-# E165b 판정 (Claude, 2026-08-08)
-
-**채택 방향.** LEDGER 의 시드별 `test_bss` 로 독립 재계산했고 Codex 수치와 일치한다.
-
-| | 페어평균(LEDGER 재계산) | SE | t |
-|---|---:|---:|---:|
-| `DT_self` | +36.20 | 2.34 | 15.5 |
-| `DT_seq` | **+41.14** | 2.00 | **20.5** |
-
-시드 6개 전부 같은 부호(+33.6 ~ +47.8). `DT_self` 는 폐기 — seq 와 rms .0018 로
-같은 계열이고 NNLS 가중 0 이다. **`DT_seq` 하나만 간다.**
-
-## 남은 caveat — 확인했고, 좁다
-
-`teacher.py:74-75` 가 `is_val = 전부 False` 라 `fpipe.fit` 이 2019~2024 전부를 봤다.
-학생·기준선은 `train_gbdt2.py:800` 에서 `is_fit = ~is_val & ~_is_test` 로 2023·2024
-를 **둘 다** 뺀다. 비대칭이 맞다.
-
-다만 실제로 흐르는 양은 좁다. `target_enc.build_te` 는 시즌 expanding + `shift(1)`
-(`target_enc.py:87-88`) 이라 **2023 행의 키별 rate 는 ≤2022 만 쓴다 — 2024 타깃은
-행 단위로 안 들어간다.** 유일한 경로는 `prior = df[TARGET].mean()`
-(`target_enc.py:56`) 이라는 **전역 스칼라 하나**다. 이걸로 +41 이 나올 수 없다.
-
-그래도 P1 로 닫는다. 1차 누수도 사전엔 "설마" 였다.
+`out/cat_VB_base_*`, `out/cat_DX_seq_*`, `model/cat_DX_seq_*` 는 **가중 선택에
+쓰지 않는다.** P1 판정은 두 팔이 같은 플래그였으므로 **영향 없다.**
 
 ---
 
-# P1 — T3 재검정 (A100)
+# P2' — 재실행 (4070)
 
-## 1. `teacher.py` 순서 수정
+`--drop-f-pre 2022` **를 빼고** 같은 것을 다시 돌린다. 나머지는 전부 동일.
 
-지금:  `load → fpipe.fit(전체) → season 필터 → labels`
-바꿀 것: `load → season 필터 → fpipe.fit → labels`
+교사 `T3_seq` 는 **다시 만들 필요 없다** — `teacher.py` 는 `load()` 를 기본값으로
+불러 `drop_f_pre=0` 이라 이미 v14f·ZD5 와 같은 학습집합이다.
 
-`--max-season` 필터를 `fpipe.fit` **앞으로** 옮긴다. 필터 뒤 `sort_index()` 유지
-(라벨 복원이 투수별 연속 투구 차분이라 경계가 어긋나면 안 된다).
-
-## 2. 교사 재생성 — `T3_seq` 하나만
+## 명령
 
 ```bash
-~/venv451/bin/python src/teacher.py --tag T3_seq --max-season 2023 --prev
+BASE="--model cat --feat-v2 --te p,pc,ph,b,pi --te-dev --feat-std --std-k 80 \
+ --std-to-prior --std-season-prior --feat-domain --feat-skill-pc \
+ --lr 0.01 --es 500 --depth 8 --l2 10 --refit-mult 1.5 \
+ --val-season 2024 --seeds 42,7,13,3,4,5,6,8"
+
+python src/train_gbdt2.py $BASE --tag VB2_base
+python src/train_gbdt2.py $BASE --soft-target ./out/teacher_T3_seq.npz --tag DX2_seq
 ```
 
-`T3_self` 는 만들지 않는다 (self 계열 폐기).
-
-## 3. 학생 6시드 — `DT3_seq`
-
-```bash
-~/venv451/bin/python src/train_gbdt2.py --model cat \
-  --feat-v2 --te p,pc,ph,b,pi --te-dev --feat-std --std-k 80 \
-  --std-to-prior --std-season-prior --feat-domain --feat-skill-pc \
-  --lr 0.01 --es 500 --depth 8 --l2 10 --refit-mult 1.5 --drop-f-pre 2022 \
-  --val-season 2023 --test-season 2024 --seeds 3,4,5,6,8,13 \
-  --soft-target ./out/teacher_T3_seq.npz --tag DT3_seq
-```
-
-## 4. 판정
-
-```bash
-python tools/surf_report.py AB_base DT_seq DT3_seq
-python tools/margin_surf.py AB_base DT_seq DT3_seq
-```
-
-**핵심 비교는 `DT3_seq` vs `DT_seq`** 다 (둘 다 A100, 같은 6시드).
-
-```text
-차이가 SE 안(|Δ| < 2×SE ≈ 4)   → caveat 종결. SETTLED 에 CLOSED 한 줄 추가
-DT3 가 유의하게 낮음            → 남은 이득 = DT3 값. 그 값으로 다시 판단
-DT3 가 AB_base +3 미만          → 증류 전체 폐기. P2 중단하고 Claude 에 즉시 보고
-```
-
----
-
-# P2 — 제출 구조 산출물 (4070, T3_seq 나온 직후 시작)
-
-**P1 의 판정을 기다리지 않는다.** 교사 npz 만 나오면 바로 건다. P1 이 폐기 판정이면
-그때 죽이면 된다.
+`--drop-f-pre` 없음 · `--test-season` 없음. 시드 8개는 v14f 제출본과 동일.
 
 ## 왜 4070 인가
 
-블렌드 멤버끼리는 **같은 머신**에서 나와야 가중이 안 치우친다. 기존 셀 멤버
-`cat_ZD5` 의 2024 검증 예측이 `out/cat_ZD5_s*_val_preds.npz` 로 **4070 산**이다.
-그래서 새 멤버와 base 재생성도 4070 에서 한다. A100 은 P1 전용.
+기존 셀 멤버 `cat_ZD5` 의 2024 검증 예측이 **4070 산**이다. 가중은 멤버끼리
+비교해서 정하므로 같은 머신에서 나와야 한다. A100 은 P2'-B 용.
+
+## 확인할 것 (돌린 직후, 넘기기 전에)
 
 ```bash
-scp hsu-server:~/aimers/out/teacher_T3_seq.npz ./out/     # 노트북 경유로 4070 에 전달
+python tools/member_fingerprint.py v14f ZD5 VB2_base DX2_seq
 ```
 
-## 1. base 멤버 2024 검증 예측 재생성 — `VB_base`
+**종료코드 0 이어야 한다.** 2 면 지문이 갈린 것이니 그대로 넘기지 말고 보고할 것.
 
-`out/` 에 `cat_v14f_*_val_preds.npz` 가 **없다.** 가중을 다시 고르려면 필요하다.
+기대값: `VB2_base` 시드평균이 v14f 의 **921 근처**여야 한다. 869 가 나오면 아직
+학습집합이 다른 것이다. `best_iter` 도 1300~1700 대로 조기종료해야 정상이다.
 
-```
---val-season 2024 (test-season 없음)  --seeds 42,7,13,3,4,5,6,8  --tag VB_base
-```
-
-플래그는 Best Configuration 그대로, `--soft-target` 없이.
-
-> ⚠️ **`--tag v14f` 로 돌리지 말 것.** `model/cat_v14f_s*.pkl` 은 LB 1093.85 를 낸
-> 실물이다. 덮어쓰면 되돌릴 수 없다. 반드시 `VB_base` 로.
-
-## 2. 증류 멤버 — `DX_seq`
-
-같은 명령에 `--soft-target ./out/teacher_T3_seq.npz --tag DX_seq` 만 추가.
-시드도 같은 8개(42,7,13,3,4,5,6,8).
-
-`--val-season 2024` 면 학습 구간이 ≤2023 이라 `T3_seq` 가 **전 행을 덮는다** —
-soft target 결측 0 이어야 한다. 출력의 결측 경고 수치를 반드시 보고할 것.
-
-## 3. 산출물
+## 산출물
 
 ```text
-out/cat_VB_base_s*_val_preds.npz   ← 가중 선택용
-out/cat_DX_seq_s*_val_preds.npz    ← 가중 선택용
-model/cat_DX_seq_s*.pkl            ← 제출 멤버 (≤2024 재학습본)
+out/cat_VB2_base_s*_val_preds.npz   8개   ← 가중 선택용
+out/cat_DX2_seq_s*_val_preds.npz    8개   ← 가중 선택용
+model/cat_DX2_seq_s*.pkl            8개   ← 제출 멤버 (≤2024 재학습본)
 ```
 
-`.pkl` 은 `train_gbdt2.py:1159` 가 `refit-mult 1.5` 재학습본을 저장한다 =
-제출 그대로다. 2024 행은 soft target 이 없어 실제 라벨로 되돌아가는데
-(`train_gbdt2.py:1043`) 그게 맞다 — 보수적인 쪽이다.
+`model/cat_VB2_base_s*.pkl` 도 생기는데 **노트북으로 같이 회수할 것** (제출은
+v14f 를 쓰지만 대조용으로 필요하다).
+
+---
+
+# P2'-B — 판정 표면 확인 (A100, 선택)
+
+4070 이 도는 동안 놀리지 말 것. `--drop-f-pre 2022` 없이 판정 표면에서도 증류
+이득이 남는지 본다. **P2' 와 독립이며, 안 나와도 P2' 는 계속한다.**
+
+```bash
+BASE2="--model cat --feat-v2 --te p,pc,ph,b,pi --te-dev --feat-std --std-k 80 \
+ --std-to-prior --std-season-prior --feat-domain --feat-skill-pc \
+ --lr 0.01 --es 500 --depth 8 --l2 10 --refit-mult 1.5 \
+ --val-season 2023 --test-season 2024 --seeds 3,4,5,6,8,13"
+
+python src/train_gbdt2.py $BASE2 --tag AB2_base
+python src/train_gbdt2.py $BASE2 --soft-target ./out/teacher_T3_seq.npz --tag DT4_seq
+```
+
+```bash
+python tools/surf_report.py AB2_base DT4_seq
+```
+
+`DT4_seq − AB2_base` 가 `+38.43` 근처면 증류 이득이 F리그 플래그와 무관하다는
+확인이 된다.
 
 ---
 
 # Must Keep Fixed
 
 ```text
-피처·학습 플래그   Best Configuration 그대로. 바꾸는 건 --soft-target 하나뿐
-P1 시드           3,4,5,6,8,13   (AB_base·DT_seq 와 동일)
-P2 시드           42,7,13,3,4,5,6,8   (cat_v14f 제출본과 동일)
-P1 은 A100, P2 는 4070. 섞지 말 것
-판정 기준         t >= 2.4 채택 / 95% 상한 < +3 기각
+제출 멤버 학습집합   --drop-f-pre 를 쓰지 않는다 (지문 0.5401750413)
+P2' 시드            42,7,13,3,4,5,6,8   (v14f 제출본과 동일), --val-season 2024
+P2'-B 시드          3,4,5,6,8,13        (AB_base 와 동일)
+P2' 는 4070, P2'-B 는 A100. 섞지 말 것
+판정 기준           t >= 2.4 채택 / 95% 상한 < +3 기각
 ```
 
 ---
 
 # Important Constraints
 
-- **로그를 grep 으로 거르지 말 것.** 1차 증류가 `CatBoostError: Target with classes
-  must contain only 2 unique values` 로 죽었는데 grep 이 트레이스백을 삼켜서
-  "완료"로 보였다. 전문을 `out/*.log` 에 남기고 끝나면 `Error|Traceback` 직접 확인.
+- **넘기기 전에 `tools/member_fingerprint.py` 를 돌릴 것.** 이번 손실의 원인이다.
+- **로그를 grep 으로 거르지 말 것.** 전문을 `out/*.log` 에 남기고 끝나면
+  `Error|Traceback` 을 직접 확인.
 - 실행 전 `python tools/precheck.py --file <스크립트>` 통과.
+  cp949 크래시가 나면 `PYTHONIOENCODING=utf-8` 을 앞에 붙일 것.
 - A100 `setsid nohup ... & disown` / 4070 `bash tools/run4070.sh`.
 - 한 머신에 한 작업. 시작 전 GPU 점유 확인.
 - `failmode.py` 는 **train 전용**. 제출 zip 에 절대 넣지 않는다.
-- `model/cat_v14f_*` · `model/cat_ZD5_*` 는 **읽기 전용으로 취급**. 제출 실물이다.
+- `model/cat_v14f_*` · `model/cat_ZD5_*` 는 **읽기 전용**. LB 1093.85 를 낸 실물이다.
 
 ---
 
@@ -217,33 +171,29 @@ P1 은 A100, P2 는 4070. 섞지 말 것
 ```text
 Status
 Changed Files
-P1  DT3_seq : 앙상블 / 페어평균 / SE / t   (vs AB_base, vs DT_seq)
-    margin  : D / rms / Dmax / margin / 최적w / 이득
-    caveat 판정 (종결 / 축소 / 폐기)
-P2  VB_base : 완료 시드 수, 2024 검증 BSS
-    DX_seq  : 완료 시드 수, 2024 검증 BSS, **soft target 결측 수**
-    저장된 pkl 목록
+P2'   VB2_base : 시드별 val2024 BSS, 시드평균, best_iter
+      DX2_seq  : 시드별 val2024 BSS, 시드평균, best_iter, soft target 결측 수
+      member_fingerprint.py 출력 전문 (종료코드 포함)
+      회수한 파일 목록
+P2'-B AB2_base / DT4_seq : 앙상블 / 페어평균 / SE / t
 발생한 오류 전문
 ```
 
-P3(가중 재선택 · 제출 zip · 스모크)은 **Claude 가 노트북에서** 한다. 제출 판단도
-Claude 영역이다 — P2 산출물만 넘기고 제출은 건드리지 말 것.
+P3(가중 재선택 · 제출 zip · 스모크)은 **Claude 가 노트북에서** 한다.
 
 ---
 
-# Context — 지금 어디까지 왔나
+# Context
 
 | | |
 |---|---|
 | 현재 LB | **1,093.85 (9위)** · 1위 1,126.33 |
 | 제출 파일 | `submissions/blendv9_0808_0126.zip` (v14f 8시드 + ZD5 6시드, w 0.55) |
 | 제출 잔여 | 오늘 4회 |
-| 열린 축 | **증류(DT_seq +41.1, t=20.5)** 하나. std-k 40 은 제출 구조 검증 미실시 |
-
-닫힌 축은 전부 `docs/SETTLED.md` 에 기전과 함께 있다. `precheck.py` 가 읽는다.
+| 채택된 축 | **증류 +38.43 (t=15.4)** — 제출 구조 미구축 |
 
 ## 폐기된 것
 
-- `DS_self` / `DS_seq` — 1차 증류. 교사가 2024 를 학습해서 누수. LEDGER 에 남은
-  ≈1017~1020 행을 **비교군으로 쓰지 말 것**
+- `DS_self` / `DS_seq` — 1차 증류. 교사가 2024 를 학습해서 누수
 - `DT_self` / `T2_self` — seq 와 같은 계열, NNLS 가중 0
+- `VB_base` / `DX_seq` — 학습집합 불일치(`--drop-f-pre 2022`). 가중 선택에 쓰지 말 것

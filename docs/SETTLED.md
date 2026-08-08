@@ -65,4 +65,6 @@ FLAG --row-filter strikes | CLOSED | FX_str −2.76, t=−1.51 (A100 6시드) | 
 FLAG --depth 9 | CLOSED | −3.38, t=−1.68 (4070) | depth 8 이 최적. depth 7(SC_d7)·9 양쪽 음수.
 FLAG --lr 0.02 | CLOSED | −10.66, t=−2.68 (4070) | lr 0.01 유지. 올리면 확실히 나빠진다.
 FLAG --std-k 120 | CLOSED | −4.61, t=−1.40 / k200 −19.98 | 시즌표준화 k 를 올리는 방향은 닫혔다. 내리는 방향(k40)만 OPEN.
+FLAG teacher-fpipe-order | CLOSED | T3 vs T2 −1.64, SE 0.86, t=−1.91 | 교사 `fpipe.fit` 이 2019~2024 를 보는 문제. 순서를 `load → season 필터 → fpipe.fit` 로 고쳐 재측정하니 이득이 +39.85 → +38.43 로 **1.6 만 줄었다**(사전 조건 |Δ|<2×SE 충족). `target_enc.build_te` 가 시즌 expanding + shift(1) 이라 행 단위로는 안 새고, 전역 prior 스칼라 하나만 흘렀다. **교사는 이제 필터-먼저 순서를 쓴다.**
+FLAG 멤버-학습집합-대조 | BANNED | v16 −6.15 / v17 −53.6 / 08-08 VB_base 52점 | 블렌드 가중을 **학습 데이터가 다른 멤버들** 사이에서 고르는 것. 판정용 명령의 `--drop-f-pre 2022` 를 제출 멤버 재현에 복사해 52점 약한 모델을 v14f 재현본으로 착각했다. 눈으로는 구분 안 된다. **`python tools/member_fingerprint.py <태그들>` 로 pkl 의 `fpipe['priors']` 지문을 대조할 것** (다르면 종료코드 2). 제출 멤버 v14f·ZD5 는 `--drop-f-pre 2022` 를 **쓰지 않는다**(지문 0.5401750413).
 FLAG prev-pitch-teacher | OPEN | 교사 A/B +39.1 | 직전 투구 결과의 **조건부** 기여. 단변량으로는 +127 로 보이지만 121개 피처를 다 넣으면 +39 다(T_self 2076.0 → T_seq 2115.1, 같은 랜덤 4-fold). 평가 시점엔 못 쓰므로 증류 교사로만 쓴다.
