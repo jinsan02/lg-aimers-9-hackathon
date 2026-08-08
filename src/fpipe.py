@@ -107,6 +107,7 @@ def fit(train, args, is_fit, tm_table=None, verbose=True):
             "excess": args.std_excess,
             "ratio": args.std_ratio,
             "k_by": k_by,
+            "anchor": bool(getattr(args, "feat_anchor", False)),
         }
         art["std"] = std
         train, cols = _apply_std(train, std)
@@ -221,7 +222,8 @@ def _apply_std(df, std):
     return ss.add_std(df, std["anchors"], k=std["k"], priors=std["priors"],
                       to_career=std["to_career"], multi_k=std["multi_k"],
                       season_prior=std["season_prior"], excess=std["excess"],
-                      ratio=std["ratio"], k_by=std["k_by"])
+                      ratio=std["ratio"], k_by=std["k_by"],
+                      expose_anchor=std.get("anchor", False))
 
 
 def _apply_profile(df, prof, priors):
@@ -266,7 +268,7 @@ def artifact_of(pack):
                       "season_prior": g.get("season_prior"),
                       "excess": g.get("excess", False),
                       "ratio": g.get("ratio", False),
-                      "k_by": g.get("k_by")}
+                      "k_by": g.get("k_by"), "anchor": False}
         if g.get("_prof_table") is not None:
             art["profile"] = {"table": g["_prof_table"], "k": g["_prof_k"],
                               "lags": tuple(range(1, g["_prof_lags"] + 1))}

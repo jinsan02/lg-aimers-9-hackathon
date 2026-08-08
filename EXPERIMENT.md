@@ -4,7 +4,7 @@
 > **역사는 여기 없다** → [docs/EXPERIMENTS_LOG.md](docs/EXPERIMENTS_LOG.md)
 > 닫힌 질문 → [docs/SETTLED.md](docs/SETTLED.md) · 실행 기록 → `LEDGER.tsv`
 
-갱신 2026-08-08 22:10 (Claude 최종 판정 완료)
+갱신 2026-08-08 22:40 (Codex 단독 운영·TA1_anchor 실행 중)
 
 ## Objective
 
@@ -97,6 +97,19 @@ F리그 분리 · isotonic 계열 전반 · 시드 확장
 > 목표 1105 까지 필요한 +11 을 낼 축이 현재 백로그에 없다.
 
 # Next Experiment
+
+## Codex 단독 실행 큐 (임시 운영)
+
+1. **A100 / 진행 중:** `TA1_anchor`, 6시드, `val2023→test2024`,
+   `--drop-f-pre 2022`, 기준 `AB_base`. 순수 과거 앵커만 추가하고 missing은 분리했다.
+2. **4070 / 완료:** 기존 예측만으로 logit blend·세그먼트 resolution·연도 전이 검문.
+   logit `+0.021`, 타자경험 `-47.618`, 투수×타자손(k=100) `-191.952`로 모두 GPU 승격 실패.
+3. `TW1_window`는 앙상블 +3.75, 페어 +3.42(SE 2.40, t=1.42), blend +3.78로
+   보류. 추가시드보다 `TA1_anchor` 신규 축을 우선한다.
+4. RMSE, 기존 TabM 단순 재블렌드, 현재 형태의 skill-hand는 닫힌/중복 축이라 재실행하지 않는다.
+
+Claude 검토는 현재 진행 조건이 아니다. 사용자가 복귀를 지시하기 전까지 Codex가 수치와
+규칙을 근거로 다음 큐까지 결정한다.
 
 ## Claude 검토 → P3 방향 확정
 

@@ -71,3 +71,25 @@ FLAG 멤버-학습집합-대조 | BANNED | v16 −6.15 / v17 −53.6 / 08-08 VB_
 FLAG --soft-target | CLOSED | 제출 표면 −10.19, 블렌드 가중 0.00 | **증류 종료.** 판정 표면의 `+38.43` 은 대부분 **교사만 본 F 2022 이전 행**이었다 — 교사에게도 `--drop-f-pre 2022` 를 걸면(`DT5_seq`) `+4.6~7.0` 으로 무너진다(85% 소실). 제출 표면(양쪽 다 drop 없음, val2024 8시드, 지문 일치)에서는 학생이 base 보다 **−10.19**(편향제거) 고, 3멤버 격자에서 최적 dist 가중이 **0.00** 이다. 다양성도 없다 — base 와 rms 0.0067 로 셋 중 가장 닮았다(base-cell 0.0110). 부드러운 타깃은 base 의 매끄러운 복사본이지 새 기하가 아니다.
 FLAG prev-pitch-teacher | CLOSED | 위 `--soft-target` 에 흡수 | 직전 투구 결과는 평가 시점에 못 쓰므로 증류 교사로만 쓸 수 있었는데, 증류 자체가 닫혔다. 조건부 기여 +39.1 은 교사 안에서만 존재한다.
 FLAG prev-pitch-teacher-old | CLOSED | 교사 A/B +39.1 | 직전 투구 결과의 **조건부** 기여. 단변량으로는 +127 로 보이지만 121개 피처를 다 넣으면 +39 다(T_self 2076.0 → T_seq 2115.1, 같은 랜덤 4-fold). 평가 시점엔 못 쓰므로 증류 교사로만 쓴다.
+
+## 2026-08-08 Codex 단독 검문 추가
+
+FLAG logit-blend | CLOSED | centered +0.021 | VB2_base 8시드와 ZD5 6시드, w=.55에서 probability 평균 961.628 vs logit 평균 961.649. 예측 범위가 좁아 실질 차이가 없다.
+FLAG batter-experience-offset | CLOSED | 2023→2024 -47.618 | 2023 경험구간 편향을 고정해 2024에 적용하면 R -51.097, F +3.416. 상관이 높아도 크기가 전이되지 않아 전체 손실이다.
+FLAG pitcher-batter-hand-residual | CLOSED | BI2023→BI2024 k100 -191.952 | 투수×타자손 공통그룹 상관 +.0108, 2024 행 커버 75.6%. 동일시즌 교차적합 +31은 연도 전이 신호가 아니다.
+FLAG extreme-subgroup-correction | CLOSED | 2024 극단성 소실 | 과거 성공률 .679 수준의 후보도 2024 실제 .416~.441로 되돌아왔다. 고정 가능한 고신뢰 하위집단 없음.
+FLAG --loss RMSE | CLOSED | E55 weight 0 / E93 +2.44, t=.80 | Brier 직접 최적화 안건은 이미 측정됐고 불확실성 대비 이득이 없다.
+FLAG --feat-prof | CLOSED | E100 계열 -7.6 | 시즌 lag 프로필 신호가 현재 expanding/asof 피처에 중복된다.
+FLAG --feat-form | CLOSED | E108 -5.4 | 단기 폼 변동이 일반화되지 않는다.
+FLAG --feat-cross | CLOSED | lever H -1.7 | 추가 교차항이 기존 TE/skill과 중복된다.
+FLAG --feat-count | CLOSED | E113 -1.07 | count 확장이 기존 count/TE 신호를 개선하지 못한다.
+FLAG --std-excess | CLOSED | E104 -24.7 | 표준화 초과량 변환이 정보를 훼손한다.
+FLAG --std-ratio | CLOSED | E110 -38.5 | 비율 변환이 불안정하다.
+FLAG --std-multi-k | CLOSED | paired 약 0 | 복수 shrinkage 스케일을 함께 넣어도 추가 신호가 없다.
+FLAG --std-k-mix | CLOSED | E112 계열 | 혼합 shrinkage가 현재 k80을 개선하지 못한다.
+FLAG --std-k-bat | CLOSED | E112 계열 | 타자 전용 shrinkage 변경이 개선되지 않는다.
+FLAG --monotone | CLOSED | E65 -28 | 단조 제약이 필요한 상호작용을 막는다.
+FLAG --keep-ids | CLOSED | E88 -105 | 원시 ID가 과적합을 유발한다.
+FLAG --drop-unstable | BANNED | E47 -262 및 IndexError | 성능 손실뿐 아니라 season_std 요구 열 제거로 코드 경로도 깨진다.
+FLAG --fill-prev | CLOSED | -3.51 | 이전값 결측 대체가 개선되지 않는다.
+FLAG --feat-v5 | CLOSED | -26 | 확장 피처 묶음이 일반화되지 않는다.

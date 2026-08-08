@@ -172,7 +172,8 @@ def season_priors(df, rcols=None):
 
 
 def add_std(df, anchors, k=30.0, priors=None, to_career=True, multi_k=(),
-            season_prior=None, excess=False, ratio=False, k_by=None):
+            season_prior=None, excess=False, ratio=False, k_by=None,
+            expose_anchor=False):
     """차분으로 '당해 시즌' 지표를 만들어 붙인다.
 
     to_career=True (레버 E) - **그 선수의 통산 rate로 수축**한다.
@@ -194,6 +195,11 @@ def add_std(df, anchors, k=30.0, priors=None, to_career=True, multi_k=(),
         # E112: 그룹마다 최적 수축 강도가 다르다. 성공률은 이항(분산 0.25)이라
         # 표본 잡음이 크고, 구종 배합비는 투수마다 안정적이라 덜 수축해야 한다.
         kg = float(k) if not k_by else float(k_by.get(pre, k))
+        if expose_anchor:
+            # 시즌 시작 전에 확정된 순수 과거 표본수. 결측 여부는 별도 실험으로
+            # 남겨 두고, 여기서는 기존 add_std와 똑같이 0으로 처리한다.
+            df[f"anchor_{pre}_n"] = n0
+            new.append(f"anchor_{pre}_n")
         df[f"std_{pre}_n"] = sn
         new.append(f"std_{pre}_n")
         for c in rcols:
@@ -209,6 +215,12 @@ def add_std(df, anchors, k=30.0, priors=None, to_career=True, multi_k=(),
                 sp = np.where(np.isnan(sp), pr, sp)
             else:
                 sp = np.full(len(df), pr)
+            if expose_anchor:
+                # S0/n0 자체는 저표본에서 매우 시끄럽다. std와 같은 k 및 시즌
+                # 사전확률로 수축하되, 당해 시즌 행은 한 건도 섞지 않는다.
+                s0 = df[s0col].fillna(0).to_numpy(np.float64)
+                df[f"anchor_{c}"] = (s0 + kg * sp) / (n0 + kg)
+                new.append(f"anchor_{c}")
             if to_career:
                 car = np.nan_to_num(df[c].to_numpy(np.float64), nan=pr)
                 # 통산 rate는 '그 선수 실력'은 맞지만 **구체제 수준**에 있다.

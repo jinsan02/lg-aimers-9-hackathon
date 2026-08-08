@@ -612,6 +612,9 @@ def main():
     ap.add_argument("--feat-std", action="store_true",
                     help="당해 시즌 성적 복원 피처 (E99). asof 통산 누적을 "
                          "직전 시즌 말 앵커로 차분한다")
+    ap.add_argument("--feat-anchor", action="store_true",
+                    help="시즌 시작 전에 확정된 순수 과거 n0/S0를 수축된 앵커 "
+                         "피처로 노출한다. 신규선수 missing 플래그는 포함하지 않는다")
     ap.add_argument("--std-season-prior", action="store_true",
                     help="수축 목표를 직전 완료 시즌 리그평균 수준에 맞춘다 (E102). "
                          "학습 전체 평균으로 수축하면 예측 시즌보다 위로 끌어올려 "
