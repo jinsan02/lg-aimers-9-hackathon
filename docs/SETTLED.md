@@ -93,3 +93,4 @@ FLAG --keep-ids | CLOSED | E88 -105 | 원시 ID가 과적합을 유발한다.
 FLAG --drop-unstable | BANNED | E47 -262 및 IndexError | 성능 손실뿐 아니라 season_std 요구 열 제거로 코드 경로도 깨진다.
 FLAG --fill-prev | CLOSED | -3.51 | 이전값 결측 대체가 개선되지 않는다.
 FLAG --feat-v5 | CLOSED | -26 | 확장 피처 묶음이 일반화되지 않는다.
+FLAG --te-halflife 2 | CLOSED | 제출 표면 +0.164, SE 1.760, t=.093 | A100의 drop-f-pre 판정 표면에서는 +6.03(t=3.32)이었으나 실제 제출 학습집합과 같은 4070 val2024 8시드에서는 사라졌다. 현행 base+cell 블렌드 대체 이득도 +0.610이고, 전반기 선택 가중은 후반기 -1.573 / 반대는 -1.112로 불안정하다. 학습집합 지문은 0.5401750413으로 일치했으므로 무효 실행이 아니라 **표면 전이 실패**다.
