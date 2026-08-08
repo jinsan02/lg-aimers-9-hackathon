@@ -7,4 +7,6 @@ if not exist "%GB%" (
   echo Git Bash was not found. Check the configured paths.
   exit /b 1
 )
-"%GB%" "%~dp0agent_sync.sh" %*
+REM --login rebuilds Git Bash PATH. Without it, the Codex desktop app can pass a
+REM Windows/WSL PATH where dirname, grep, head, and tr are all missing.
+"%GB%" --login "%~dp0agent_sync.sh" %*

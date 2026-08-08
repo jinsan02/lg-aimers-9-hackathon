@@ -15,6 +15,18 @@ Codex
 `READY_FOR_CODEX` — **P1 채택.** P2 는 학습집합이 어긋나 폐기하고 `P2'` 로 다시
 돌린다. 두 GPU 모두 비었다. 아래 `# P2' — 재실행` 이 다음 작업이다.
 
+## 운영 수정 — Git Bash / WSL (Codex)
+
+Codex 앱에서 `tools\\agent_sync.cmd`가 Git Bash를 비로그인 모드로 열면 Windows/WSL
+PATH를 물려받아 `dirname/grep/head/tr`를 못 찾고 WSL `E_ACCESSDENIED`까지 발생했다.
+래퍼를 `bash.exe --login agent_sync.sh ...`로 수정했고, 이제 `.cmd` 직접 호출이 정상적으로
+Git Bash PATH를 구성하는 것을 확인했다. 다음 교대부터 우회 명령 대신 아래를 그대로 쓸 것.
+
+```cmd
+tools\agent_sync.cmd start claude
+tools\agent_sync.cmd end claude "작업 요약"
+```
+
 ---
 
 # P1 결과 — 채택. caveat 종결
@@ -116,10 +128,22 @@ v14f 를 쓰지만 대조용으로 필요하다).
 
 ---
 
-# P2'-B — 판정 표면 확인 (A100, 선택)
+# P2'-B — 판정 표면 확인 (A100, **필수**)
 
-4070 이 도는 동안 놀리지 말 것. `--drop-f-pre 2022` 없이 판정 표면에서도 증류
-이득이 남는지 본다. **P2' 와 독립이며, 안 나와도 P2' 는 계속한다.**
+`--drop-f-pre 2022` 없이 판정 표면에서도 증류 이득이 남는지 본다.
+**선택이 아니다 — 이게 제출 여부를 가른다.**
+
+## 왜 필수인가
+
+교사는 `load()` 기본값이라 **F 2022 이전 행을 봤다.** 학생은 `--drop-f-pre 2022`
+로 그 행들을 못 봤다. 그러면 `+38.43` 중 일부는 "교사가 학생에게서 뺏은 데이터를
+돌려준 것"일 수 있다. 제출 구조에서는 양쪽 다 그 데이터를 보므로 그 성분은
+사라진다.
+
+크기 감각: v14f(전체 데이터) 921.0 vs VB_base(F 제외) 869.1 = **51.9점.**
+증류 이득 +38.4 가 이 51.9 를 일부 되찾은 것이라면 제출에서는 훨씬 작아진다.
+
+`DT4_seq − AB2_base` 가 답이다. +38 근처면 무관, 반토막이면 이 성분이 실재한다.
 
 ```bash
 BASE2="--model cat --feat-v2 --te p,pc,ph,b,pi --te-dev --feat-std --std-k 80 \
