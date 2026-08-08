@@ -23,7 +23,9 @@ Codex
 - generic 복귀는 2023→2024 부호 반전, 타자 이동은 약함, F 홈팀 변화 전이 상관 −.338.
 - `BC1_offset=899.31`, 같은 4070·seed42 `VB2_base=911.22` 대비 −11.91로 종료.
 - v18 SHIFT 0.0052의 ABS 인과 설명은 무효지만 값은 별도 단일변경 검증 전까지 유지한다.
-- A100 `OR2_rank16`은 계속 분리 실행 중. 4070은 현재 유휴.
+- A100 `OR2_rank16`도 refit 단계 native segmentation fault로 산출물 없이 종료했다.
+  group16은 양 머신 smoke/no-refit만 통과하고 full refit은 실패하므로 ranking 축을 보류한다.
+  현재 양 GPU 유휴, 다음 실제 학습 후보는 `RT1`이다.
 
 2026-08-09 04:10 밀린 작업 처리:
 

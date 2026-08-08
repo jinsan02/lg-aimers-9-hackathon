@@ -105,3 +105,4 @@ FLAG --rank-group-size 64 | BANNED | 4070 CUDA OOM / A100 segmentation fault | P
 FLAG --baseline-col skill_pc_hat | REOPENED | 기존 중립 판정 무효 | 기존 CLOSED에는 LEDGER 실행 행이 없고 refit 모델 marker·test-season Pool·fpipe 제출 baseline이 누락돼 target/제출 예측이 오프셋 없이 계산됐다. 세 경로 수정 뒤 BC1으로 다시 측정한다.
 FLAG --baseline-col skill_pc_hat | CLOSED | BC1_offset 899.31 vs VB2_base_s42 911.22 | 누락됐던 refit/test/fpipe baseline 경로를 모두 고친 같은 4070·seed42 재검정에서도 −11.91. skill 추정치를 로짓 출발점으로 강제하면 CatBoost가 이미 학습한 수준 효과와 중복된다.
 FLAG F-2023-ABS-first-year-analogue | BANNED | 공식 연혁 + reverse .0497→.2988 | KBO는 퓨처스리그 ABS를 2020년부터 운영했다. F 2022→2023 성공률 .7087→.4729와 reverse 6배 급증은 ABS 최초 도입이 아니라 데이터/타깃 체제 단절이다. 이를 R 2024→2025의 1년차→2년차 아날로그로 쓰지 않는다.
+FLAG --model rank full-refit | BANNED | group16 양 머신 native crash | no-refit 50iter smoke는 되지만 validation ranker를 폐기하고 full ranker를 만드는 단계에서 4070과 A100 모두 native crash했다. 별도 프로세스 2단 refit을 구현하기 전에는 재실행하지 않는다.

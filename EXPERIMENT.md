@@ -143,9 +143,9 @@ G0 topology-only graph는 A100 미학습 2024 `866.90`(동일 seed AB 대비 -1.
 
 0. **O1 기각:** `OG1_cell14` 6시드. 2023 R 반분 source에서는 cells가 scalar보다
    최소 +101.32였으나 미학습 2024 R route에서 −52.38. posterior 잔차가 시즌 비전이.
-1. **A100 실행 중:** `OR2_rank16` seed42. group64는 pair 전개 메모리 폭증으로
-   금지했다. 4070 빠른 게이트는 refit 중 native crash로 끝나 A100 정식 미학습
-   표면만 판정에 쓴다.
+1. **OR2 종료:** group64는 pair 전개 메모리 폭증, group16 full refit도 4070과
+   A100 양쪽에서 native crash. no-refit smoke만 통과했으며 산출물 없는 현재 ranking
+   구현은 성능 비교에 쓰지 않고 보류한다.
 2. **4070 완료:** `BC1_offset=899.31`, 동일 seed `VB2_base=911.22` 대비 −11.91.
    수정된 baseline 경로에서도 개선되지 않아 확장 없이 닫는다.
 3. **다음 1순위:** `RT1 roster-transition`. 투수 직전 리그와 같은/다른 리그 이력량을
