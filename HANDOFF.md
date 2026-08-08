@@ -26,6 +26,51 @@ Claude
 
 ---
 
+# 다음 작업 — LEVERS_NEXT.md
+
+네 방향(코드 감사·데이터 감사·문헌 서치·손실 각도)으로 잔여 축을 훑은 결과가
+**[LEVERS_NEXT.md](LEVERS_NEXT.md)** 에 있다. 우선순위와 게이트가 붙어 있다.
+
+## 순서
+
+```text
+T1  로컬 즉시 (GPU 불필요, out/*_val_preds.npz 로 끝난다)
+    T1-1  블렌드 확률평균 → 로짓평균          코드 1줄
+    T1-2  세그먼트별 해상도 도구 (지금 없다)   reliability.py 에 mask
+    T1-3  타자 경험 축 이전성 검정            ⛔ 2023→2024 통과 못하면 폐기
+    T1-4  기록 공백 4건 + SETTLED 13개 누락
+
+T2  GPU 실험 (전부 6시드, val2023→test2024, --drop-f-pre 2022, 기준 AB_base 883.41)
+    T2-1  --skill-axes count,hand   ★ honest_ceiling 유일 양수축 +31
+    T2-2  --feat-window             모델에 산포 피처가 하나도 없다
+    T2-3  앵커(n0/S0) 노출 + missing 플래그   코드 3줄
+    T2-4  --loss RMSE 멤버          Brier 직접 최소화
+    T2-5  --te-halflife 결과 회수    이미 돌렸는데 수치가 없다 (계산만)
+
+T3  중기 — TabM 블렌드 재판정 / MLP-PLR / 공유trunk 멀티헤드
+T4  위생 — SETTLED 13개 추가, 코드 결함 3건 닫기
+```
+
+## Codex 가 먼저 할 것
+
+**T1 전부 + T4-1.** GPU 없이 로컬에서 끝나고, T2 의 우선순위가 T1-2·T1-3 결과에
+따라 바뀐다. T2 는 T1 결과를 Claude 가 본 뒤에 지시한다.
+
+T2-1 은 **구현 함정 2개**가 LEVERS_NEXT 에 적혀 있다. 그거 놓치면 조용히 무효가 된다.
+
+## 돌려줄 것
+
+```text
+T1-1  로짓평균 vs 확률평균 편향제거 점수 (현행 961.63 대비)
+T1-2  세그먼트별 해상도 표 + 각 세그먼트의 도달가능 해상도
+T1-3  타자경험 축 2023 적합 → 2024 적용 이전성 (통과/폐기)
+T1-4  extreme_subgroup 결과, honest_ceiling 타자 행, seg_weight
+T4-1  SETTLED 추가한 줄 목록
+```
+
+---
+
+
 # P1 결과 — 채택. caveat 종결
 
 `teacher.py` 를 `load → season<=2023 필터 → fpipe.fit → labels` 로 고친 뒤 재측정.
