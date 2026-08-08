@@ -84,6 +84,38 @@ class MTNet(nn.Module):
                                          else None)
 
 
+class PLRNet(nn.Module):
+    """Per-feature periodic-linear-ReLU embeddings followed by a small MLP."""
+
+    def __init__(self, n_num, cards, n_aux=0, freq=32, dim=8, sigma=0.1,
+                 hidden=(512, 256), drop=0.15):
+        super().__init__()
+        self.freq = nn.Parameter(torch.randn(n_num, freq) * sigma)
+        self.phase = nn.Parameter(torch.rand(n_num, freq))
+        self.mix = nn.Parameter(torch.randn(n_num, freq, dim) / np.sqrt(freq))
+        self.mix_bias = nn.Parameter(torch.zeros(n_num, dim))
+        self.embs = nn.ModuleList([nn.Embedding(c, min(8, max(2, c // 2)))
+                                   for c in cards])
+        width = n_num * dim + sum(e.embedding_dim for e in self.embs)
+        layers = []
+        for h in hidden:
+            layers += [nn.Linear(width, h), nn.BatchNorm1d(h), nn.SiLU(),
+                       nn.Dropout(drop)]
+            width = h
+        self.trunk = nn.Sequential(*layers)
+        self.main = nn.Linear(width, 1)
+        self.aux = nn.Linear(width, n_aux) if n_aux else None
+
+    def forward(self, xn, xc, xq=None):
+        z = torch.cos(2 * np.pi * (xn.unsqueeze(-1) * self.freq + self.phase))
+        z = torch.relu(torch.einsum("bnf,nfd->bnd", z, self.mix)
+                       + self.mix_bias).flatten(1)
+        parts = [z] + [e(xc[:, i]) for i, e in enumerate(self.embs)]
+        h = self.trunk(torch.cat(parts, 1))
+        return self.main(h).squeeze(1), (self.aux(h) if self.aux is not None
+                                         else None)
+
+
 class CellNet(nn.Module):
     """실패모드 셀 softmax. 성공확률은 성공 셀 확률의 합으로만 만든다."""
 
@@ -125,6 +157,11 @@ def main():
     ap.add_argument("--wd", type=float, default=1e-5)
     ap.add_argument("--drop", type=float, default=0.15)
     ap.add_argument("--qbins", type=int, default=32)
+    ap.add_argument("--plr", action="store_true",
+                    help="수치 피처별 periodic-linear-ReLU 임베딩 사용")
+    ap.add_argument("--plr-freq", type=int, default=32)
+    ap.add_argument("--plr-dim", type=int, default=8)
+    ap.add_argument("--plr-sigma", type=float, default=0.1)
     ap.add_argument("--aux-w", type=float, default=0.3,
                     help="보조 과제 손실 가중. 0 이면 단일과제 대조군")
     ap.add_argument("--cell-consistent", action="store_true",
@@ -181,6 +218,9 @@ def main():
         torch.manual_seed(sd)
         net = (CellNet(Xn.shape[1], cards, n_cells, drop=args.drop,
                        qbins=args.qbins).to(dev) if args.cell_consistent else
+               PLRNet(Xn.shape[1], cards, n_aux, freq=args.plr_freq,
+                      dim=args.plr_dim, sigma=args.plr_sigma,
+                      drop=args.drop).to(dev) if args.plr else
                MTNet(Xn.shape[1], cards, n_aux, drop=args.drop,
                      qbins=args.qbins).to(dev))
         opt = torch.optim.AdamW(net.parameters(), lr=args.lr,
@@ -249,6 +289,9 @@ def main():
                 torch.save({"state": net.state_dict(), "cards": cards,
                             "n_num": Xn.shape[1], "n_aux": n_aux,
                             "qbins": args.qbins, "cell_consistent": args.cell_consistent,
+                            "plr": args.plr, "plr_freq": args.plr_freq,
+                            "plr_dim": args.plr_dim,
+                            "plr_sigma": args.plr_sigma,
                             "n_cells": n_cells, "cell_success": succ},
                            f"./model/mtnn_{args.tag}_s{sd}.pt")
         print("  에폭 곡선 " + " ".join(f"{v:.0f}" for v in hist), flush=True)
@@ -267,6 +310,9 @@ def main():
             torch.manual_seed(sd)
             final = (CellNet(Xn.shape[1], cards, n_cells, drop=args.drop,
                              qbins=args.qbins).to(dev) if args.cell_consistent else
+                     PLRNet(Xn.shape[1], cards, n_aux, freq=args.plr_freq,
+                            dim=args.plr_dim, sigma=args.plr_sigma,
+                            drop=args.drop).to(dev) if args.plr else
                      MTNet(Xn.shape[1], cards, n_aux, drop=args.drop,
                            qbins=args.qbins).to(dev))
             opt = torch.optim.AdamW(final.parameters(), lr=args.lr,

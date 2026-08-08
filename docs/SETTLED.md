@@ -98,3 +98,5 @@ FLAG tabm-current-121 | CLOSED | 단독 821.81, AB 대비 margin −2.5 | 구 �
 FLAG tabm-cell-consistent | CLOSED | 6시드 단독 839.34, 현행 블렌드 가중 0.00 | TabM 32-head에 14 실패셀 softmax와 성공 marginal BCE를 공동 적용했다. 파일럿 1시드는 AB 대비 +16.58로 보였지만 6시드 평균은 +1.48, `AB+DW_cell` 동시 NNLS에서 가중 0. 전반→후반도 0, 반대 방향만 .122라 선택 편의였다.
 FLAG mtnn-cell-consistent | CLOSED | 현행 블렌드 증분 +1.36 | 일반 MLP의 14셀 softmax+marginal BCE. 단독 701.99, rms .0256으로 다양하지만 격차가 너무 크다. `AB+DW_cell` 위 자기적합 증분 +1.36이고 후반→전반 가중 0이라 제출 비용·전이 위험을 못 넘는다.
 FLAG cell-posterior-stack | CLOSED | 2023R source 최소 +101.32 → 2024R route −52.38 | 14셀 전체 확률을 성공합 스칼라 대신 ridge stack에 넣었다. 같은 시즌 전·후반에서는 거대한 이득처럼 보였지만 source-only arm/alpha를 미학습 다음 시즌에 적용하면 반전했다(전체 적용 −169.80). **실패형태 posterior의 클래스별 calibration과 성공 잔차 관계가 시즌을 넘지 않는다.**
+FLAG mlp-plr | CLOSED | 미학습 최고 641.29 / sigma1 517.60 / sigma10 426.58 | TE·skill을 제외한 92개 수치+9개 범주 피처에 periodic-linear-ReLU 임베딩을 적용했다. 주파수 스케일을 0.1→1→10으로 올릴수록 악화했고 CatBoost 868.83과 격차가 너무 커 블렌드 여지가 없다.
+FLAG content-two-tower | CLOSED | 미학습 675.32 / 제출 표면 699.67 | raw ID 없이 투수·타자 asof 콘텐츠 tower와 저랭크 곱/거리 상호작용을 학습해 콜드스타트는 해결했지만 두 표면 모두 CatBoost와 190점 이상 차이다. 관계 구조보다 기존 asof·TE 트리가 훨씬 강하다.
