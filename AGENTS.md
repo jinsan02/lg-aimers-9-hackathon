@@ -213,15 +213,49 @@ Claude 는 *구현 세부에 개입하지 않는다*. 무엇을·왜·어떤 기
 
 ---
 
-## 8. 작업 시작/종료 체크리스트
+## 8. 교대 절차 — 두 에이전트가 같은 트리를 만진다
 
-시작:
+저장소: `github.com/jinsan02/lg-aimers-9-hackathon` (**private**)
+데이터는 안 올라간다(`data/` 무시). 재배포 금지 자료다.
+
+### 시작할 때 — 반드시 먼저
+
+```bash
+bash tools/agent_sync.sh start codex     # 또는 claude
+```
+
+이게 하는 일: 원격 pull(fast-forward만) · **커밋 안 된 변경이 있으면 멈춤** ·
+`LEDGER.tsv` 두 머신에서 합치기 · HANDOFF Status 출력 · 원격 GPU 작업 표시.
+
+멈추면 그건 **이전 세션이 `end` 를 안 부른 것**이다. 덮어쓰지 말고 확인부터.
+
+이어서:
 1. `AGENTS.md` → `EXPERIMENT.md` → `HANDOFF.md`
 2. `docs/SETTLED.md` 에서 하려는 축이 닫혀 있는지
 3. `tools/precheck.py` 통과
-4. 두 머신 GPU 점유 확인
 
-종료:
-1. `HANDOFF.md` 갱신 (Status·결과·다음 권고)
-2. 축이 닫혔으면 `docs/SETTLED.md` 에 추가
-3. 제출했으면 `docs/EXPERIMENTS_LOG.md` 에 LB 기록
+### 끝낼 때 — 넘기기 전에 반드시
+
+```bash
+bash tools/agent_sync.sh end codex "DT_self/DT_seq 재검정 결과"
+```
+
+이게 하는 일: 원장 합치기 · `git add -A` · 커밋 · push · HANDOFF 상태 확인 출력.
+
+그리고 손으로:
+1. **`HANDOFF.md` 의 `Current Agent` / `Next Agent` / `Status` 갱신** — 이게 배턴이다
+2. 축이 닫혔으면 `docs/SETTLED.md` 에 한 줄 (판정·수치·**기전**)
+3. 제출했으면 `docs/EXPERIMENTS_LOG.md` 에 LB 와 예측 대비 오차
+
+### 충돌이 났을 때
+
+`git pull --ff-only` 가 실패하면 **자동 병합하지 말 것.** 두 에이전트가 같은 파일을
+다르게 고친 것이므로 사람이 볼 문제다. `git log --oneline origin/main..HEAD` 와
+`git diff origin/main` 을 찍어 HANDOFF 에 남기고 멈춘다.
+
+### 서로의 영역
+
+- 커밋 메시지 앞에 `[claude]` / `[codex]` 를 붙인다 (`agent_sync.sh` 가 자동)
+- 상대가 쓴 코드를 **판단 없이 리팩터링하지 않는다.** 고칠 이유가 있으면
+  HANDOFF 에 근거를 적고 넘긴다
+- `docs/SETTLED.md` 는 **추가만** 한다. 기존 줄을 지우려면 그걸 뒤집는 실측이 있어야 한다
