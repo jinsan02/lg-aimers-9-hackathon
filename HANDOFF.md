@@ -12,6 +12,20 @@ Codex
 
 ## Status
 
+2026-08-09 04:10 밀린 작업 처리:
+
+- `baseline-col` 결함 수정: 최종 refit 모델 marker, test-season Pool baseline,
+  `fpipe.predict()` 제출 baseline 세 경로를 모두 배선했다.
+- H1 dynamic hierarchy 완료: 2022→2023R source +8.031이었으나 미학습 2024
+  raw -19.086 / centered -19.032. 투수 상태 상관 +.1154, 타자 -.0889. 기각.
+- OR1 원인: group64 pair 전개가 4070에서 2748MB 추가 요구 중 free 2317MB로 CUDA OOM.
+  A100 native segmentation fault도 같은 메모리 폭증으로 판정. group64 BANNED.
+- 실행 중: A100 `OR2_rank16` 2000iter/es500/refit 정식 미학습 표면.
+- 4070 `Aimersor2_rank16p` 빠른 게이트는 refit 중 Windows native access violation
+  (`0xC0000005`)로 산출물 없이 종료. 빈 4070에는 수정된 baseline 경로의
+  `BC1_offset` 단일시드 제출 표면 게이트를 예약 작업 `Aimersbc1_offset`으로 시작했다.
+  두 현재 작업 모두 노트북과 분리돼 있다.
+
 2026-08-09 03:47 신규 모델 배치:
 
 - MLP-PLR 최초 sigma=.1: A100 val2023 `257.06`, 미학습 2024 `641.29`로 탈락.
@@ -52,14 +66,15 @@ Codex
 GPBoost/random-slope 실패 때문에 동적 계층모형은 후순위 대조군이다. 테스트 행끼리 graph
 message/state를 갱신하지 않는다.
 
-`RUNNING_CODEX_SOLO` — 직교 가설 O1 기각 뒤 O3 ranking 파일럿을 실행 중이다.
-A100에서 `OR1_rank` seed42가 PairLogitPairwise 순위 멤버를 측정한다.
-현행 v18 제출본은 동결돼 있다. 아래의 과거
-`READY_FOR_CLAUDE` 블록은 역사 기록이며 현재 배턴이 아니다.
+### 역사 기록 — 03:02 종료된 OR1 group64
+
+아래 블록은 OR1 group64가 종료되기 전 기록이다. 현재 배턴은 문서 맨 위의
+`OR2_rank16`이며, 현행 v18 제출본은 동결돼 있다. 아래의 과거
+`READY_FOR_CLAUDE` 블록 역시 역사 기록이며 현재 배턴이 아니다.
 
 - 노트북: 문서·검문 도구·결과 판정 전용.
-- A100: `OR1_rank` 단일시드 실행 중. val2023→test2024, 64행 시간순 그룹.
-- 4070: 유휴. `SK2_k40` 제출 표면 8시드 판정 완료.
+- A100(당시): `OR1_rank` group64는 native segmentation fault로 산출물 없이 종료.
+- 4070(당시): group64 재현에서 CUDA OOM을 확인. 현재 상태는 문서 맨 위 참조.
 - 제출: `TH2_hl2`가 제출 표면 승격 게이트에 실패해 새 zip을 만들지 않았다.
   현행 `blendv9_0808_0126.zip`을 유지한다. 4070 재검증에서 행 독립 세 항목
   최대차이 0, zip 종합검증 exit 0, 245,789행 29초/600초를 통과했다.

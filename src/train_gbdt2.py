@@ -455,6 +455,8 @@ def run_cat(args, train, features, is_val):
         fp.pop("bagging_temperature", None)
     final = CatBoostClassifier(**fp)
     final.fit(full)
+    if args.baseline_col:
+        final._baseline_col = args.baseline_col
     return final, p, best_iter
 
 
@@ -524,6 +526,13 @@ def run_rank(args, train, features, is_val):
         model._rank_calib = calib
         return model, p, best_iter
 
+    # CatBoost GPU ranker keeps its pair buffers alive with the fitted model.
+    # Constructing the refit ranker while ``model`` and both Pools still exist
+    # caused group16 to request another ~2.75 GB and OOM on the 4070; group64
+    # native-crashed even on A100.  Only p/calib/best_iter are needed below.
+    import gc
+    del model, tr, va, raw_sorted
+    gc.collect()
     full, _ = _rank_pool(train, features, np.ones(len(train), dtype=bool),
                          args.rank_group_size)
     final = CatBoostRanker(
@@ -1230,6 +1239,14 @@ def main():
                 pt = _rank_probability(model.predict(Xt), model._rank_calib)
             elif getattr(model, "_fm_multilabel", False):
                 pt = model.predict_proba(Xt)[:, 0]
+            elif getattr(model, "_baseline_col", None):
+                from catboost import Pool
+                _bc = model._baseline_col
+                _qt = np.clip(test_df[_bc].astype(float).fillna(0.5),
+                              1e-4, 1 - 1e-4)
+                _tp = Pool(Xt, cat_features=CAT_COLS)
+                _tp.set_baseline(np.log(_qt / (1 - _qt)).to_numpy())
+                pt = model.predict_proba(_tp)[:, 1]
             elif hasattr(model, "predict_proba"):
                 pt = model.predict_proba(Xt)[:, 1]
             else:
@@ -1280,6 +1297,7 @@ def main():
         joblib.dump({"model": model, "features": features, "cat_cols": CAT_COLS,
                      "best_iteration": best_iter, "val_bss": score,
                      "fpipe": art, "resid_col": args.resid_col,
+                     "baseline_col": args.baseline_col,
                      "fm_success": getattr(model, "_fm_success", None),
                      "season_means": season_means},
                     f"./model/{args.model}_{args.tag}.pkl", compress=3)

@@ -4,7 +4,7 @@
 > **역사는 여기 없다** → [docs/EXPERIMENTS_LOG.md](docs/EXPERIMENTS_LOG.md)
 > 닫힌 질문 → [docs/SETTLED.md](docs/SETTLED.md) · 실행 기록 → `LEDGER.tsv`
 
-갱신 2026-08-09 (O1 posterior 기각·O3 pairwise ranking 실행 중)
+갱신 2026-08-09 (H1 동적 계층 기각·OR2 rank-group16 실행 중)
 
 ## Objective
 
@@ -107,24 +107,19 @@ F리그 분리 · isotonic 계열 전반 · 시드 확장
 
 # Current Hypothesis
 
-신규 모델 파일럿은 현재까지 음수다. MLP-PLR sigma=.1은 미학습 641.29, content
-two-tower는 미학습 675.32 / 제출 표면 699.67이다. 둘 다 6시드 확장 기준에 크게
-못 미친다. PLR 원 논문의 핵심 주파수 스케일 sigma=1,10만 양 머신에서 마지막으로
-분리 실행 중이며 sigma1 미학습 결과도 517.60으로 악화했다.
+H1 dynamic hierarchy는 source 2022→2023R +8.03이 target 2024 -19.09로 반전해 닫혔다.
+OR1 segmentation fault는 PairLogitPairwise group64의 pair 메모리 폭증으로 확인했다.
+group16은 50iter smoke를 통과해 A100 정식 `OR2_rank16`을 실행 중이다. 4070의
+`OR2_rank16p`는 refit 중 Windows native access violation로 끝나 A100 결과만 쓴다.
+baseline-col의 refit/test/제출 누락은 수정했고 4070 `BC1_offset`으로 재검정한다.
 
-추가 결과: PLR sigma10 미학습 426.58, 4070 sigma1 val2024 -103.63. 주파수 스케일
-튜닝으로 회복되지 않고 방향도 악화하므로 PLR 6시드 확장은 하지 않는다.
-4070 sigma10은 val2024 -1053.72로 종료되어 PLR 축을 완전히 닫는다.
+신규 모델 파일럿은 모두 음수로 종료했다. MLP-PLR은 미학습 최고 641.29였고
+sigma1 517.60, sigma10 426.58로 악화했다. content two-tower도 미학습 675.32 /
+제출 표면 699.67에 그쳐 두 축 모두 6시드 확장 없이 닫았다.
 
-G0 단일시드 결과: A100 미학습 2024 `866.90`로 동일 seed3 AB `868.83` 대비 -1.93,
-4070 val2024 `902.06`으로 동일 seed42 VB2 `911.22` 대비 -9.16. topology-only graph
-feature는 두 표면 모두 음수여서 G1 GraphSAGE 승격을 보류한다. 관계형 후속이 필요하면
-message passing보다 콘텐츠 기반 저랭크 투수-타자 상호작용을 먼저 검정한다.
-
-2026-08-09 03:21: G0 topology-only graph feature를 구현하고 두 파일럿을 분리 실행했다.
-A100 `G0A_graph`는 미학습 2024 판정 표면, 4070 `G0V_graph`는 val2024 제출 표면이다.
-노트북 종료와 무관하게 각각 `setsid/nohup`, `tools/run4070.sh` 예약 작업으로 동작한다.
-OR1_rank는 segmentation fault로 산출물 없이 종료됐으며 G0 뒤에 원인을 조사한다.
+G0 topology-only graph는 A100 미학습 2024 `866.90`(동일 seed AB 대비 -1.93),
+4070 제출 표면 `902.06`(동일 seed VB2 대비 -9.16)으로 종료했다. 두 표면 모두
+음수라 G1 GraphSAGE 승격 없이 그래프 축을 닫았다.
 
 > **Claude 최종 판정: 증류 기각.** 판정 표면 `+38.43` 의 85% 가 교사만 본 F 구체제
 > 행이었고(`DT5_seq` 로 +4.6~7.0 붕괴), 제출 표면에서는 base 대비 −10.19 에 블렌드
@@ -140,8 +135,11 @@ OR1_rank는 segmentation fault로 산출물 없이 종료됐으며 G0 뒤에 원
 
 0. **O1 기각:** `OG1_cell14` 6시드. 2023 R 반분 source에서는 cells가 scalar보다
    최소 +101.32였으나 미학습 2024 R route에서 −52.38. posterior 잔차가 시즌 비전이.
-1. **A100 실행 중:** `OR1_rank` seed42. PairLogitPairwise 순위 멤버의 미학습 2024
-   단독 성능과 base/cell 대비 다양성 margin을 본다. 통과해야 6시드로 확장한다.
+1. **A100 실행 중:** `OR2_rank16` seed42. group64는 pair 전개 메모리 폭증으로
+   금지했다. 4070 빠른 게이트는 refit 중 native crash로 끝나 A100 정식 미학습
+   표면만 판정에 쓴다.
+2. **4070 실행 중:** `BC1_offset` seed42. 실행 근거 없이 닫혔고 target/제출
+   baseline 경로도 누락됐던 `skill_pc_hat` 로짓 오프셋을 수정 코드로 재검정한다.
 
 1. **완료:** `TH2_hl2`, 4070 val2024 8시드, drop 없음. 지문 일치(exit 0),
    오류 없음. `VB2_base` 대비 paired +0.164(SE 1.760, t=.093)으로 승격 실패.

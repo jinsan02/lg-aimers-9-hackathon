@@ -310,7 +310,16 @@ def predict(pack, test):
         for c in pack["cat_cols"]:
             X[c] = X[c].astype("category")
         return np.asarray(model.predict(xgb.DMatrix(X, enable_categorical=True)))
-    proba = model.predict_proba(design(src, pack))
+    X = design(src, pack)
+    baseline_col = pack.get("baseline_col") or getattr(model, "_baseline_col", "")
+    if baseline_col:
+        from catboost import Pool
+        q = np.clip(src[baseline_col].astype(float).fillna(0.5), 1e-4, 1 - 1e-4)
+        pool = Pool(X, cat_features=pack["cat_cols"])
+        pool.set_baseline(np.log(q / (1 - q)).to_numpy())
+        proba = model.predict_proba(pool)
+    else:
+        proba = model.predict_proba(X)
     if pack.get("fm_success"):
         # E124: 실패모드 셀 다중분류. P(성공) = 성공 비트를 가진 셀들의 합.
         # 셀에 타깃 비트를 넣었으므로 이 합산은 근사가 아니라 정확하다.

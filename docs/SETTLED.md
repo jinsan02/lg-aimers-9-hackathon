@@ -100,3 +100,6 @@ FLAG mtnn-cell-consistent | CLOSED | 현행 블렌드 증분 +1.36 | 일반 MLP�
 FLAG cell-posterior-stack | CLOSED | 2023R source 최소 +101.32 → 2024R route −52.38 | 14셀 전체 확률을 성공합 스칼라 대신 ridge stack에 넣었다. 같은 시즌 전·후반에서는 거대한 이득처럼 보였지만 source-only arm/alpha를 미학습 다음 시즌에 적용하면 반전했다(전체 적용 −169.80). **실패형태 posterior의 클래스별 calibration과 성공 잔차 관계가 시즌을 넘지 않는다.**
 FLAG mlp-plr | CLOSED | 미학습 최고 641.29 / sigma1 517.60 / sigma10 426.58 | TE·skill을 제외한 92개 수치+9개 범주 피처에 periodic-linear-ReLU 임베딩을 적용했다. 주파수 스케일을 0.1→1→10으로 올릴수록 악화했고 CatBoost 868.83과 격차가 너무 커 블렌드 여지가 없다.
 FLAG content-two-tower | CLOSED | 미학습 675.32 / 제출 표면 699.67 | raw ID 없이 투수·타자 asof 콘텐츠 tower와 저랭크 곱/거리 상호작용을 학습해 콜드스타트는 해결했지만 두 표면 모두 CatBoost와 190점 이상 차이다. 관계 구조보다 기존 asof·TE 트리가 훨씬 강하다.
+FLAG dynamic-hier-offset | CLOSED | 2022→2023R +8.03 → 2024 -19.09 | 이전 시즌 CatBoost OOF 잔차로 투수·타자 상태를 만들고 source에서 수축·계수를 고정했다. 투수 상태 연도 상관 +.115, 타자 -.089라 다음 시즌에 유지되는 잠재효과가 아니며 source 선택 이득이 반전했다.
+FLAG --rank-group-size 64 | BANNED | 4070 CUDA OOM / A100 segmentation fault | PairLogitPairwise는 그룹 안 쌍을 전개한다. 4070은 추가 2748MB 요구 시 2317MB만 남아 명시적 OOM, A100도 장시간 뒤 native crash. group16 이하만 허용한다.
+FLAG --baseline-col skill_pc_hat | REOPENED | 기존 중립 판정 무효 | 기존 CLOSED에는 LEDGER 실행 행이 없고 refit 모델 marker·test-season Pool·fpipe 제출 baseline이 누락돼 target/제출 예측이 오프셋 없이 계산됐다. 세 경로 수정 뒤 BC1으로 다시 측정한다.
