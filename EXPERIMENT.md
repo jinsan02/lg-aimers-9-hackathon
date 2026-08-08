@@ -4,7 +4,7 @@
 > **역사는 여기 없다** → [docs/EXPERIMENTS_LOG.md](docs/EXPERIMENTS_LOG.md)
 > 닫힌 질문 → [docs/SETTLED.md](docs/SETTLED.md) · 실행 기록 → `LEDGER.tsv`
 
-갱신 2026-08-08 22:40 (Codex 단독 운영·TA1_anchor 실행 중)
+갱신 2026-08-08 23:20 (Codex 단독 운영·TH2_hl2 4070 실행 중)
 
 ## Objective
 
@@ -100,13 +100,17 @@ F리그 분리 · isotonic 계열 전반 · 시드 확장
 
 ## Codex 단독 실행 큐 (임시 운영)
 
-1. **A100 / 진행 중:** `TA1_anchor`, 6시드, `val2023→test2024`,
-   `--drop-f-pre 2022`, 기준 `AB_base`. 순수 과거 앵커만 추가하고 missing은 분리했다.
+1. **4070 / 진행 중:** `TH2_hl2`, val2024 8시드, drop 없음. 기존 `VB2_base`와
+   같은 제출 표면에서 TE halflife=2 하나만 변경했다.
 2. **4070 / 완료:** 기존 예측만으로 logit blend·세그먼트 resolution·연도 전이 검문.
    logit `+0.021`, 타자경험 `-47.618`, 투수×타자손(k=100) `-191.952`로 모두 GPU 승격 실패.
 3. `TW1_window`는 앙상블 +3.75, 페어 +3.42(SE 2.40, t=1.42), blend +3.78로
    보류. 추가시드보다 `TA1_anchor` 신규 축을 우선한다.
-4. RMSE, 기존 TabM 단순 재블렌드, 현재 형태의 skill-hand는 닫힌/중복 축이라 재실행하지 않는다.
+4. `TA1_anchor`는 앙상블 +1.07, 페어 -0.58(SE 2.40, t=-.24), blend +2.06으로
+   약해 후순위 보류. 다음 신규 GPU 축으로 승격하지 않는다.
+5. RMSE, 기존 TabM 단순 재블렌드, 현재 형태의 skill-hand는 닫힌/중복 축이라 재실행하지 않는다.
+6. `TH1_hl2`는 A100 판정 표면에서 앙상블 +7.15, paired +6.03(SE 1.82,
+   t=3.32), blend +7.29로 채택. `TH2_hl2`가 제출 표면 전이 여부를 결정한다.
 
 Claude 검토는 현재 진행 조건이 아니다. 사용자가 복귀를 지시하기 전까지 Codex가 수치와
 규칙을 근거로 다음 큐까지 결정한다.

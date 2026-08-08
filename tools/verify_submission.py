@@ -53,7 +53,8 @@ def main(zip_path):
         else fail("script.py가 zip 루트에 없음")
     tops = {n.split("/")[0] for n in names}
     extra = tops - {"script.py", "requirements.txt", "model",
-                    "features.py", "target_enc.py", "season_std.py", "skill.py"}
+                    "features.py", "target_enc.py", "season_std.py", "skill.py",
+                    "fpipe.py"}
     bad += fail(f"예상 못한 최상위 항목: {extra}") if extra else ok("최상위 구성 정상")
     n_model = sum(1 for n in names if n.startswith("model/"))
     bad += ok(f"모델 {n_model}개 동봉")
