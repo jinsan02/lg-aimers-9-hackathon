@@ -1,5 +1,13 @@
 # 잔여 축 안건 — 2026-08-08 조사 결과
 
+## G0. 동결 과거 관계 그래프 gate — 2026-08-09 설계 완료
+
+상세 설계와 누수 경계는 [`docs/HIERARCHY_GNN_PLAN.md`](docs/HIERARCHY_GNN_PLAN.md)에 둔다.
+구조 감사상 2024 exact-pair hit 51.2%, 활성 투수 이웃 Jaccard 중앙값 0.360이며, 19.9%의
+행은 과거 미관측 투수다. static ID-GCN은 제외하고 topology-only 피처 gate를 먼저 검정한
+뒤 통과할 때만 inductive GraphSAGE로 확장한다. 기존 GPBoost 랜덤효과·투수×손 잔차 전이
+실패 때문에 동적 계층모형은 대조군으로 후순위다.
+
 ## 2026-08-09 직교 가설 재설계 — 기존 큐 소진 뒤
 
 ### O1. 실패형태 posterior stacking — **기각**

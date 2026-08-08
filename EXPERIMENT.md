@@ -175,6 +175,14 @@ Claude가 코드·LEDGER·동일 머신/표면 조건을 확인한 뒤 최종 �
 
 # Decision Log
 
+## 2026-08-09 관계형 신규 축
+
+상세 설계는 [`docs/HIERARCHY_GNN_PLAN.md`](docs/HIERARCHY_GNN_PLAN.md)에 고정했다.
+2024 과거 그래프 감사에서 exact-pair hit 51.2%, 투수 hit 80.1%, 활성 투수 이웃 Jaccard
+중앙값 0.360을 확인했다. 첫 실험은 full GNN이 아니라 동결 topology-only graph feature의
+미학습 2024 gate이며, 통과할 때만 inductive GraphSAGE로 확장한다. 테스트 행 사이 message
+passing 또는 temporal state 갱신은 행 독립 위반으로 금지한다.
+
 | 날짜 | 결정 |
 |---|---|
 | 08-07 | 오프셋의 정체는 SHIFT 가 아니라 **구조적 이득**(한 시즌 더 학습) |

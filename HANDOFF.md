@@ -12,6 +12,14 @@ Codex
 
 ## Status
 
+2026-08-09 Codex가 동적 계층/GNN 신규 축을 사전 설계했다. 상세 내용은
+[`docs/HIERARCHY_GNN_PLAN.md`](docs/HIERARCHY_GNN_PLAN.md), 구조 감사 도구는
+`tools/hierarchy_graph_audit.py`다. 2024 기준 exact-pair hit 51.2%, pitcher hit 80.1%,
+활성 투수 이웃 Jaccard 중앙값 0.360이다. 미관측 투수 행이 19.9%라 static ID embedding은
+금지하고, G0 topology-only CatBoost gate → G1 inductive GraphSAGE 순서로 간다. 기존
+GPBoost/random-slope 실패 때문에 동적 계층모형은 후순위 대조군이다. 테스트 행끼리 graph
+message/state를 갱신하지 않는다.
+
 `RUNNING_CODEX_SOLO` — 직교 가설 O1 기각 뒤 O3 ranking 파일럿을 실행 중이다.
 A100에서 `OR1_rank` seed42가 PairLogitPairwise 순위 멤버를 측정한다.
 현행 v18 제출본은 동결돼 있다. 아래의 과거
