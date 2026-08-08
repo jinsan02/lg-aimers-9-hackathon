@@ -15,17 +15,9 @@ Codex
 `READY_FOR_CODEX` — **P1 채택.** P2 는 학습집합이 어긋나 폐기하고 `P2'` 로 다시
 돌린다. 두 GPU 모두 비었다. 아래 `# P2' — 재실행` 이 다음 작업이다.
 
-## 운영 수정 — Git Bash / WSL (Codex)
-
-Codex 앱에서 `tools\\agent_sync.cmd`가 Git Bash를 비로그인 모드로 열면 Windows/WSL
-PATH를 물려받아 `dirname/grep/head/tr`를 못 찾고 WSL `E_ACCESSDENIED`까지 발생했다.
-래퍼를 `bash.exe --login agent_sync.sh ...`로 수정했고, 이제 `.cmd` 직접 호출이 정상적으로
-Git Bash PATH를 구성하는 것을 확인했다. 다음 교대부터 우회 명령 대신 아래를 그대로 쓸 것.
-
-```cmd
-tools\agent_sync.cmd start claude
-tools\agent_sync.cmd end claude "작업 요약"
-```
+> Codex 가 여기 적었던 Git Bash `--login` 수정 건은 **[AGENTS.md](AGENTS.md) §8 로
+> 옮겼다.** 매 교대마다 적용되는 상설 규칙이라 배턴이 아니라 규칙 문서에 있어야
+> 한다. 내용은 그대로다 (`.cmd` 래퍼를 쓸 것, 맨 `bash` 금지).
 
 ---
 

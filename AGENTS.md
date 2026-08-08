@@ -224,10 +224,20 @@ Claude 는 *구현 세부에 개입하지 않는다*. 무엇을·왜·어떤 기
 bash tools/agent_sync.sh start codex     # 또는 claude
 ```
 
-> ⚠️ **노트북에서 `bash` 가 WSL 로 잡히면 `E_ACCESSDENIED` 로 죽는다**(2026-08-08
-> Codex 세션에서 발생). 그때는 Git Bash 를 직접 부르는 래퍼를 쓸 것 —
-> `tools\agent_sync.cmd start codex`. 실패한 걸 무시하고 진행하면 fetch 도
-> 원장 병합도 안 된 상태로 남의 커밋 위를 덮어쓴다.
+> ⚠️ **Windows 앱(Codex 데스크톱 등)에서는 위 `bash` 를 쓰지 말고 래퍼를 쓸 것:**
+>
+> ```cmd
+> tools\agent_sync.cmd start codex
+> tools\agent_sync.cmd end   codex "작업 요약"
+> ```
+>
+> 2026-08-08 에 두 번 물렸다. ① 맨 `bash` 가 WSL 로 잡혀 `E_ACCESSDENIED`.
+> ② Git Bash 를 직접 불러도 비로그인 모드면 Windows PATH 를 물려받아
+> `dirname`·`grep`·`head`·`tr` 을 못 찾는다. 래퍼가 `bash.exe --login` 으로
+> 열어 둘 다 막는다(Codex 수정).
+>
+> **실패한 걸 무시하고 진행하면** fetch 도 원장 병합도 안 된 상태로 남의 커밋
+> 위를 덮어쓴다. 래퍼가 실패하면 멈추고 원인부터 볼 것.
 
 이게 하는 일: 원격 pull(fast-forward만) · **커밋 안 된 변경이 있으면 멈춤** ·
 `LEDGER.tsv` 두 머신에서 합치기 · HANDOFF Status 출력 · 원격 GPU 작업 표시.
