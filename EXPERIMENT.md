@@ -107,6 +107,11 @@ F리그 분리 · isotonic 계열 전반 · 시드 확장
 
 # Current Hypothesis
 
+G0 단일시드 결과: A100 미학습 2024 `866.90`로 동일 seed3 AB `868.83` 대비 -1.93,
+4070 val2024 `902.06`으로 동일 seed42 VB2 `911.22` 대비 -9.16. topology-only graph
+feature는 두 표면 모두 음수여서 G1 GraphSAGE 승격을 보류한다. 관계형 후속이 필요하면
+message passing보다 콘텐츠 기반 저랭크 투수-타자 상호작용을 먼저 검정한다.
+
 2026-08-09 03:21: G0 topology-only graph feature를 구현하고 두 파일럿을 분리 실행했다.
 A100 `G0A_graph`는 미학습 2024 판정 표면, 4070 `G0V_graph`는 val2024 제출 표면이다.
 노트북 종료와 무관하게 각각 `setsid/nohup`, `tools/run4070.sh` 예약 작업으로 동작한다.
