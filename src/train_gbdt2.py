@@ -711,6 +711,10 @@ def main():
                     help="경력 공백 피처 (군 복무 복귀 등) — train 이력 lookup")
     ap.add_argument("--feat-roster", action="store_true",
                     help="시즌 이전 투수 이력 기반 신규/복귀/F-R 전환 피처")
+    ap.add_argument("--feat-id-cohort", action="store_true",
+                    help="ID 앞 3자리의 등록/데뷔 코호트만 수치 피처로 사용")
+    ap.add_argument("--id-cohort-roles", default="pb", choices=["p", "b", "pb"],
+                    help="ID 코호트를 붙일 축: p=투수, b=타자, pb=둘 다")
     ap.add_argument("--feat-abs", action="store_true",
                     help="ABS(자동 볼판정) 측정 체제 플래그")
     ap.add_argument("--feat-rules", action="store_true",

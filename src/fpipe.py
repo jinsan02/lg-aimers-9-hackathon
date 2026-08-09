@@ -25,7 +25,7 @@ import pandas as pd
 #   2. 시즌내 복원(std) → 궤적(profile) → 폼 → 도메인 교차 → 창분해 → 카운트
 #   3. 타깃 인코딩(TE) → 교차항(cross)
 #   4. 실력 추정(skill)   ← TE 산출 컬럼을 입력으로 쓰므로 **반드시 TE 뒤**
-STEP_ORDER = ("tm", "v2", "roster", "graph", "std", "te", "skill")
+STEP_ORDER = ("tm", "v2", "id_cohort", "roster", "graph", "std", "te", "skill")
 
 TM_PREFIX = ("tm_", "tmx_", "sct_")
 TM_KEYS = ("pitcher_id", "season", "balls_before", "strikes_before")
@@ -87,6 +87,15 @@ def fit(train, args, is_fit, tm_table=None, verbose=True):
         new_cols += cols
         new_cats += [c for c in NEW_CAT if c in cols]
         say(f"피처 v2/v3: +{len(cols)}개")
+
+    # Leading ID digits follow chronological registration/debut cohorts.  Keep
+    # only this coarse, extrapolating signal; never expose identity-like suffixes.
+    art["id_cohort"] = (getattr(args, "id_cohort_roles", "pb")
+                        if getattr(args, "feat_id_cohort", False) else "")
+    if art["id_cohort"]:
+        train, cols = _apply_id_cohort(train, art["id_cohort"])
+        new_cols += cols
+        say(f"player ID cohort: +{len(cols)}")
 
     # 1.25 roster transition — 시즌 S는 S 이전 등장 이력만 본다.
     if getattr(args, "feat_roster", False):
@@ -212,6 +221,8 @@ def transform(df, art):
     if art.get("priors") is not None:
         from features import add_features
         df, _ = add_features(df, art["priors"])
+    if art.get("id_cohort"):
+        df, _ = _apply_id_cohort(df, art["id_cohort"])
     if art.get("roster") is not None:
         import roster_transition as rt
         df, _ = rt.add_features(df, art["roster"])
@@ -237,6 +248,22 @@ def transform(df, art):
 
 
 # ── fit/transform 이 공유하는 실제 호출부 (인자 불일치를 구조적으로 막는다) ──
+
+def _apply_id_cohort(df, roles="pb"):
+    """Expose only the chronological prefix of each row's own player IDs."""
+    out = df.copy()
+    cols = []
+    for role in ("pitcher", "batter"):
+        if role[0] not in roles:
+            continue
+        src = f"{role}_id"
+        if src not in out:
+            continue
+        name = f"{role}_id_cohort"
+        out[name] = (pd.to_numeric(out[src], errors="coerce") // 100).astype(np.float32)
+        cols.append(name)
+    return out, cols
+
 
 def _apply_std(df, std):
     import season_std as ss
