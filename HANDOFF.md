@@ -12,6 +12,14 @@ Codex
 
 ## Status
 
+2026-08-09 저녁 브레인스토밍 완료 — 실행 전 계획:
+
+- 종합안은 `docs/BRAINSTORM_20260809.md`. P0 rolling-origin 표면 보강 뒤 P1 outcome-aware
+  PB residual matrix factorization, P2 recent-state empirical Bayes를 양 GPU에 나눠 검정한다.
+- 신규 정직 감사에서 historical lineup은 최고 `+0.444`지만 early `+8.911`/late
+  `−10.591`, mechanics는 최고 `−0.245`이며 `+18.801/−25.268`로 반전해 CLOSED.
+- 현재 GPU 작업은 없다. 오늘 제출 횟수는 소진됐으므로 새 제출 패키지는 만들지 않는다.
+
 2026-08-09 18:18 v12 career-middle 교체 LB 실패 — Codex 최종 판정:
 
 - 현행 챔피언은 `v11_pb_posix_0809.zip`, LB `1101.8020672065`다.
