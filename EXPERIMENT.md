@@ -4,7 +4,7 @@
 > **역사는 여기 없다** → [docs/EXPERIMENTS_LOG.md](docs/EXPERIMENTS_LOG.md)
 > 닫힌 질문 → [docs/SETTLED.md](docs/SETTLED.md) · 실행 기록 → `LEDGER.tsv`
 
-갱신 2026-08-09 (RT1 roster-transition·PG1 pitcher×league 실행 중)
+갱신 2026-08-09 (RT1 단일시드 양 표면 통과·다중시드 승격 후보)
 
 ## Objective
 
@@ -148,6 +148,19 @@ G0 topology-only graph는 A100 미학습 2024 `866.90`(동일 seed AB 대비 -1.
 - PG1은 이미 구현돼 있으나 현행에서 빠진 `pitcher_id×game_type` expanding TE를
   단독 변경으로 더한다. 둘 다 단일시드 게이트이며 자동 다중시드 확장은 하지 않는다.
 - 로그: A100 `out/rt_pg_a100.log`, 4070 `out/rt_pg_4070.log`.
+
+### Codex 1차 분석 (잠정)
+
+| 축 | A100 미학습 2024 (동일 seed3) | 4070 val2024 (동일 seed42) | 잠정 의견 |
+|---|---:|---:|---|
+| RT1 roster | `884.49−868.83 = +15.66` | `915.53−911.22 = +4.30` | 양 표면 양수, 다중시드 승격 후보 |
+| PG1 pitcher×league TE | `858.11−868.83 = −10.72` | `912.55−911.22 = +1.33` | 전이 불일치, 확장 가치 낮음 |
+
+RT1은 A100 centered `+15.72`, 4070 centered `+8.14`, 예측 차이 RMS는 각각
+`.00634/.00528`이다. 4070의 전체 `+4.30` 중 F→R 기여가 `+3.43`으로 가설과
+맞았으나 시즌 전반 `+6.91`, 후반 `−2.61`로 갈렸다. A100에서는 same-cont가
+`+13.57`을 차지해 기전이 동일하지 않다. 따라서 단일시드로 제출하지 않고, RT1만
+동일 표면 6/8시드 페어 확장 후 t값과 현행 base+cell 블렌드 증분을 확인한다.
 
 ## Codex 단독 실행 큐 (임시 운영)
 
