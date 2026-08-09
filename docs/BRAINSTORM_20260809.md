@@ -153,3 +153,31 @@ PBMF는 알려진 선수의 신규 pair에서 `+1.256 → −0.730`으로 뒤집
 즉 recent-middle+PB는 모든 역사에 통용되는 보편 법칙이 아니라 최신 체제에서 실제 LB로
 확인된 신호다. 그 위 확장은 최신 표면만 양수인 것으로는 부족하며, 이번 후보들은 최신
 2023→2024조차 대부분 음수라 종료가 명확하다.
+
+## 후속 core-resolution 감사 — 2026-08-09 밤
+
+브레인스토밍 P1~P5 종료 뒤, 후처리 상수나 야구 proxy가 아닌 챔피언 OOF 잔차의
+resolution을 직접 개선하는 두 감사를 추가했다.
+
+1. `tools/posterior_resolution_audit.py`: 현재시즌 투수 success/middle의 누적 성공수와
+   시행수를 복원해 k80 binomial posterior mean·표준편차·precision을 만들고, K0
+   (recent-middle+PB) 위 zero-mean Ridge head를 source 시즌 OOF 잔차에만 적합했다.
+   전역 intercept/slope 및 target 시즌 적합은 쓰지 않았다.
+2. `tools/audit_tm_linkage.py`: 공식 Trackman과 train의 공통 행 단독 키를 전수 확인했다.
+   기존 키에서 빠진 유일한 열은 `batter_hand`였고, 이를 추가한 histogram-overlap
+   identity match가 기존 고신뢰 매핑을 보존하는지 검증했다.
+
+| 감사 | 2021→22 | 2022→23 | 2023→24 | 결론 |
+|---|---:|---:|---:|---|
+| posterior residual head (full) | −8.037 | −123.482 | −76.637 | 기각 |
+| 같은 head 고정 5% 축소 | +1.462 | −3.060 | −0.083 | 기각 |
+| Trackman `batter_hand` 키 | — | — | 행 커버 +0.1549% | 인프라 반영 |
+
+posterior head의 source 자기진단 이득은 +65.965/+109.994/+127.945였지만 다음 시즌에는
+반전했다. 최신 전이 5% arm도 early `+0.969`, late `−1.458`이라 단순 과대 보정 문제가
+아니라 조건부 잔차 관계의 비정상성이다. 따라서 GPU 다중시드로 확장하지 않는다.
+
+Trackman은 기존 730명 매핑이 train 행의 99.6376%를 이미 덮고 있었다. batter hand를
+추가하면 기존 공통 730명 identity가 100% 일치한 채 25명·2,285행을 더 복구해 99.7925%
+가 된다. 그러나 추가 표면은 0.1549%에 불과하고 Trackman 값 자체가 여러 실험에서 닫혀
+있으므로, 이것만으로 새 모델을 학습하지 않고 링커 재현 코드만 개선한다.

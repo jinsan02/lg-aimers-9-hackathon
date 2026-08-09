@@ -12,6 +12,20 @@ Codex
 
 ## Status
 
+2026-08-09 21시 core-resolution 후속 감사 완료:
+
+- current-season success/middle 누적을 k80 binomial posterior mean·sd·precision으로
+  복원하고 K0 rolling OOF 위 zero-mean Ridge residual head를 검정했다.
+- full head 증분은 2021→22/2022→23/2023→24 `−8.037/−123.482/−76.637`, 고정 5%
+  축소도 `+1.462/−3.060/−0.083`. 최신 early `+0.969`, late `−1.458`로 전이 실패.
+  `posterior-uncertainty-residual-head` CLOSED, GPU 확장·제출 없음.
+- Trackman의 “14%”는 미매칭률이 아니라 옛 map 정확도 추정이었다. 기존 map2는 train
+  행 99.6376%를 덮었다. 유일하게 빠진 공통 row-local 키 `batter_hand`를 추가하니 기존
+  730명 identity 100% 보존 + 25명 복구, 행 커버 99.7925%. `src/link_pitchers.py` 반영.
+- 재현 도구: `tools/posterior_resolution_audit.py`, `tools/audit_tm_linkage.py`.
+  결과 상세는 `docs/BRAINSTORM_20260809.md`, 닫힌 축은 `docs/SETTLED.md`.
+- A100·4070 모두 학습 작업 없음. 현행 제출 챔피언 v11/LB 1101.802 유지.
+
 2026-08-09 19:45 리더보드 1288 출현 대응 및 합법 데이터 구조 감사:
 
 - 공식 규칙에는 점수 자동 컷이 없다. 1288은 약 18분째 공개 1위였으나 최종 순위는

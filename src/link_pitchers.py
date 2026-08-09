@@ -41,20 +41,28 @@ def key_code(df):
     """상황 튜플을 하나의 정수 코드로 (해시 대신 자릿수 조합 - 충돌 없음)."""
     tb = (df["top_bottom"].astype(str).str[0].str.upper() == "T").astype(np.int64)
     inn = df["inning"].clip(1, 15).astype(np.int64)
-    return (((((((df["season"].astype(np.int64) - 2018) * 13
-                 + df["game_month"].astype(np.int64)) * 8
-                + df["game_dayofweek"].astype(np.int64)) * 16
-               + inn) * 2 + tb) * 4
-             + df["balls_before"].clip(0, 3).astype(np.int64)) * 3
-            + df["strikes_before"].clip(0, 2).astype(np.int64)) * 3 \
-        + df["outs_before"].clip(0, 2).astype(np.int64)
+    x = df["season"].astype(np.int64) - 2018
+    # Sequential mixed-radix encoding is easier to audit than one deeply
+    # parenthesized expression and is exactly the implementation used by the
+    # independent linkage audit.
+    for value, width in (
+        (df["game_month"].astype(np.int64), 13),
+        (df["game_dayofweek"].astype(np.int64), 8),
+        (inn, 16), (tb, 2),
+        (df["balls_before"].clip(0, 3).astype(np.int64), 4),
+        (df["strikes_before"].clip(0, 2).astype(np.int64), 3),
+        (df["outs_before"].clip(0, 2).astype(np.int64), 3),
+        (df["bhand"].astype(np.int64), 2),
+    ):
+        x = x * width + value
+    return x
 
 
 def main():
     tr = pd.read_csv(f"{DATA}/train.csv", encoding="utf-8-sig",
-                     usecols=KEYS + ["pitcher_id", "pitcher_hand"])
+                     usecols=KEYS + ["pitcher_id", "pitcher_hand", "batter_hand"])
     tm = pd.read_csv(f"{DATA}/trackman_history.csv", encoding="utf-8-sig",
-                     usecols=KEYS + ["pitcher_trackman_id", "pitcher_hand"])
+                     usecols=KEYS + ["pitcher_trackman_id", "pitcher_hand", "batter_hand"])
     print(f"train {len(tr):,} | trackman {len(tm):,}")
 
     # train 은 정수 코드(1/2), trackman 은 Right/Left. 인코딩이 다르므로
@@ -67,6 +75,14 @@ def main():
 
     tr["hand"] = norm_hand(tr["pitcher_hand"], "train")
     tm["hand"] = norm_hand(tm["pitcher_hand"], "trackman")
+    def norm_batter_hand(s):
+        if pd.api.types.is_numeric_dtype(s):
+            return s.map({1: 0, 2: 1}).fillna(-1).astype(np.int8)
+        return (s.astype(str).str.upper().str[0]
+                .map({"L": 0, "R": 1}).fillna(-1).astype(np.int8))
+
+    tr["bhand"] = norm_batter_hand(tr["batter_hand"])
+    tm["bhand"] = norm_batter_hand(tm["batter_hand"])
     tr["k"] = key_code(tr)
     tm["k"] = key_code(tm)
 
