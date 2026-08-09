@@ -260,12 +260,16 @@ def main():
 
     with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED) as zf:
         for src, arc in include:
+            if "\\" in arc:
+                raise ValueError(f"zip arcname must use POSIX '/': {arc}")
             zf.write(os.path.join(ROOT, src), arc)
 
     size_mb = os.path.getsize(out_path) / 1e6
     print(f"생성 완료: {out_path} ({size_mb:.1f} MB)")
     with zipfile.ZipFile(out_path) as zf:
         for info in zf.infolist():
+            if "\\" in info.filename:
+                raise RuntimeError(f"Linux-incompatible zip path: {info.filename}")
             print(f"  {info.filename}  ({info.file_size / 1e6:.2f} MB)")
 
 

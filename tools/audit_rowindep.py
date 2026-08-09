@@ -25,12 +25,11 @@ import sys
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, "src")
-
-
 def main():
     name = sys.argv[1] if len(sys.argv) > 1 else "script_blend_v9.py"
-    spec = importlib.util.spec_from_file_location("_sub", os.path.join("src", name))
+    path = name if os.path.isfile(name) else os.path.join("src", name)
+    sys.path.insert(0, os.path.dirname(os.path.abspath(path)))
+    spec = importlib.util.spec_from_file_location("_sub", path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
 

@@ -49,6 +49,16 @@ def main(zip_path):
     bad += ok(f"용량 {size:.1f} MB")
     with zipfile.ZipFile(zip_path) as zf:
         names = zf.namelist()
+        bad_slash = [n for n in names if "\\" in n]
+        unsafe = [n for n in names if n.startswith(("/", "\\")) or
+                  ".." in n.replace("\\", "/").split("/")]
+    # DACON extracts on Linux.  Windows Compress-Archive writes backslashes
+    # into the central directory; Windows accepts them as separators but Linux
+    # creates literal names such as ``model\\foo.pkl`` and /app/model is absent.
+    bad += fail(f"zip 내부 Windows 백슬래시 경로: {bad_slash[:3]}") if bad_slash \
+        else ok("zip 내부 경로 POSIX 슬래시")
+    bad += fail(f"위험한 zip 경로: {unsafe[:3]}") if unsafe \
+        else ok("zip 경로 traversal 없음")
     bad += ok("script.py 루트에 존재") if "script.py" in names \
         else fail("script.py가 zip 루트에 없음")
     tops = {n.split("/")[0] for n in names}
@@ -56,7 +66,7 @@ def main(zip_path):
                     "features.py", "target_enc.py", "season_std.py", "skill.py",
                     "fpipe.py"}
     bad += fail(f"예상 못한 최상위 항목: {extra}") if extra else ok("최상위 구성 정상")
-    n_model = sum(1 for n in names if n.startswith("model/"))
+    n_model = sum(1 for n in names if n.startswith("model/") and not n.endswith("/"))
     bad += ok(f"모델 {n_model}개 동봉")
 
     print("\n=== B~E. 압축 해제 후 실제 실행 ===")

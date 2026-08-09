@@ -109,6 +109,11 @@ SPECS = {
     "ph":   ["pitcher_id", "batter_hand"],
     "b":    ["batter_id"],
     "pi":   ["pitcher_id", "inning_bucket"],
+    # Batter performance against the opposing pitching team.  The season
+    # expanding table only uses seasons < S, so this is available before the
+    # pitch and remains row independent at inference time.
+    "bo":   ["batter_id", "pitcher_team_id"],
+    "pb":   ["pitcher_id", "batter_id"],
     "pbs":  ["pitcher_id", "base_state"],          # 주자 상황별 투구 변화
     "ps":   ["pitcher_id", "strikes_before"],      # 2스트라이크 승부 성향 (pc보다 조밀)
     "pg":   ["pitcher_id", "game_type"],           # 1군/퓨처스 레벨차
