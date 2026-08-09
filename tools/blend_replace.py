@@ -42,6 +42,16 @@ def score(y, p):
                             / (r * (1 - r))))
 
 
+def fixed_submission_score(y, p, slope=1.0416, shift=0.0052):
+    """현행 제출의 고정 SLOPE/SHIFT까지 적용한 참고 점수."""
+    r = float(y.mean())
+    q = np.clip(p, 1e-6, 1 - 1e-6)
+    z = np.log(q / (1 - q))
+    q = 1.0 / (1.0 + np.exp(-slope * z))
+    q = np.clip(q - shift, 0, 1)
+    return float(1e5 * (1 - ((q - y) ** 2).mean() / (r * (1 - r))))
+
+
 def main():
     if len(sys.argv) != 4:
         print(__doc__)
@@ -58,6 +68,8 @@ def main():
     se = dif.std(ddof=1) / np.sqrt(len(dif))
     print(f"paired {ct}-{bt}: mean {dif.mean():+.3f} SE {se:.3f} "
           f"t={dif.mean()/se:+.3f} n={len(dif)}")
+    print("paired seeds: " + ", ".join(
+        f"{s}:{d:+.3f}" for s, d in zip(common, dif)))
 
     current = .45 * b + .55 * z
     variants = {
@@ -70,6 +82,13 @@ def main():
     cur = score(y, current)
     for name, p in variants.items():
         print(f"{name:<18} {score(y,p):9.3f} delta {score(y,p)-cur:+8.3f}")
+
+    print("\n현행 고정 SLOPE/SHIFT 적용 (참고):")
+    cur_fixed = fixed_submission_score(y, current)
+    for name, p in variants.items():
+        s = fixed_submission_score(y, p)
+        print(f"{name:<18} {s:9.3f} delta {s-cur_fixed:+8.3f}")
+    print(f"\nbase-candidate RMS {np.sqrt(np.mean((b-c)**2)):.6f}")
 
     raw = pd.read_csv("./data/train.csv", usecols=["season", "game_month"])
     month = raw.loc[raw.season == 2024, "game_month"].to_numpy()

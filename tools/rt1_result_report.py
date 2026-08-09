@@ -1,6 +1,7 @@
 """RT1 단일시드 결과를 동일 머신 기준선과 세그먼트별로 분해한다."""
 
 import argparse
+import glob
 import os
 import sys
 
@@ -14,8 +15,14 @@ import roster_transition as rt
 
 
 def pred(path):
-    z = np.load(path)
-    return np.asarray(z["pred"], dtype=float)
+    paths = sorted(glob.glob(path))
+    if not paths:
+        raise FileNotFoundError(path)
+    vals = [np.asarray(np.load(p)["pred"], dtype=float) for p in paths]
+    if len({len(v) for v in vals}) != 1:
+        raise ValueError(f"예측 길이 불일치: {paths}")
+    print(f"prediction ensemble: {path} -> {len(paths)} files")
+    return np.mean(vals, axis=0)
 
 
 def score(p, y):
