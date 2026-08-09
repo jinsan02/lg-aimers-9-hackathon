@@ -4,7 +4,7 @@
 > **역사는 여기 없다** → [docs/EXPERIMENTS_LOG.md](docs/EXPERIMENTS_LOG.md)
 > 닫힌 질문 → [docs/SETTLED.md](docs/SETTLED.md) · 실행 기록 → `LEDGER.tsv`
 
-갱신 2026-08-09 (RT1 6/8시드 확장 실패·v18 유지)
+갱신 2026-08-09 (BR1 실패·OB1 Ordered 단일시드 실행 중·v18 유지)
 
 ## Objective
 
@@ -139,6 +139,17 @@ G0 topology-only graph는 A100 미학습 2024 `866.90`(동일 seed AB 대비 -1.
 > 필요한 +11을 낼 근거 있는 축이 없다. 현행 v18을 보존하고 새 직교 가설이 필요하다.
 
 # Next Experiment
+
+## OB1 Ordered boosting — 양 표면 단일시드 게이트 실행 중
+
+현재 CatBoost는 ordered target statistics는 사용하지만 대규모 데이터의 boosting
+scheme은 기본 `Plain`이다. `--boosting-type Ordered`를 검증·refit 양쪽에 같은
+단일 플래그로 배선했다. 피처·손실·가중은 기준선과 동일하다.
+
+- A100: `OB1A_ordered`, seed3, val2023→test2024, `--drop-f-pre 2022`
+- 4070: `OB1V_ordered`, seed42, val2024, drop 없음
+- 두 precheck exit 0. 한 표면이라도 명확히 음수면 확장하지 않는다.
+- 실행 전 BR1 고정 리그 보정은 합법 점수 `+0.239`, 후반 `−3.145`로 탈락했다.
 
 ## 2026-08-09 04:37 야간 분리 실행
 

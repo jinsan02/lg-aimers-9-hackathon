@@ -408,6 +408,8 @@ def run_cat(args, train, features, is_val):
         task_type=args.device, devices="0",
         loss_function=args.loss, eval_metric=args.eval_metric,
         early_stopping_rounds=args.es, random_seed=args.seed, verbose=200)
+    if args.boosting_type:
+        params["boosting_type"] = args.boosting_type
     params.update(ex)
     if params.get("task_type") == "CPU":
         params.pop("devices", None)
@@ -449,6 +451,8 @@ def run_cat(args, train, features, is_val):
         loss_function=("CrossEntropy" if "_soft" in train.columns
                        else "Logloss"),
         random_seed=args.seed, verbose=0)
+    if args.boosting_type:
+        fp["boosting_type"] = args.boosting_type
     fp.update(ex)
     if fp.get("task_type") == "CPU":
         fp.pop("devices", None)
@@ -626,6 +630,8 @@ def main():
     ap.add_argument("--border-count", type=int, default=254)
     ap.add_argument("--bagging-temp", type=float, default=1.0)
     ap.add_argument("--random-strength", type=float, default=1.0)
+    ap.add_argument("--boosting-type", default="", choices=["", "Plain", "Ordered"],
+                    help="CatBoost boosting scheme; empty keeps the library default")
     # E142(Optuna) 재현용. tune.py 가 탐색한 7축 중 유일하게 여기 없던 축이다.
     # 0 이면 CatBoost 기본값을 그대로 둔다(파라미터 자체를 넘기지 않는다).
     ap.add_argument("--cat-min-leaf", type=int, default=0)
