@@ -12,6 +12,17 @@ Codex
 
 ## Status
 
+2026-08-09 저녁 브레인스토밍 실행 완료 — 전 후보 게이트 탈락:
+
+- A100에 P0 `2021→2022` R-only surface 생성: `H21_base` target BSS `629.33`,
+  `H21_cell` `627.46`. 기존 두 표면과 합쳐 3-transition 감사 완료.
+- K0 대비 증분: PBMF `−2.639/+0.350/+0.551`, recent-middle
+  `−3.288/+3.017/−1.247`, recent-success `−2.694/+8.318/−5.633`, workload
+  `+6.332/+1.262/−2.167`, intent×execution `+0.390/+3.502/−2.919`, familiar-PB
+  adaptive-k `−4.466/−2.123/−0.107`.
+- team call-style 연도 corr 중앙값 `.227 < .25`. 모두 SETTLED에 CLOSED 추가.
+- 다중시드·제출 패키지로 승격한 후보 없음. 양 GPU 현재 유휴.
+
 2026-08-09 저녁 브레인스토밍 완료 — 실행 전 계획:
 
 - 종합안은 `docs/BRAINSTORM_20260809.md`. P0 rolling-origin 표면 보강 뒤 P1 outcome-aware
