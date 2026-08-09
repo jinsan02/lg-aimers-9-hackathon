@@ -106,3 +106,5 @@ FLAG --baseline-col skill_pc_hat | REOPENED | 기존 중립 판정 무효 | 기�
 FLAG --baseline-col skill_pc_hat | CLOSED | BC1_offset 899.31 vs VB2_base_s42 911.22 | 누락됐던 refit/test/fpipe baseline 경로를 모두 고친 같은 4070·seed42 재검정에서도 −11.91. skill 추정치를 로짓 출발점으로 강제하면 CatBoost가 이미 학습한 수준 효과와 중복된다.
 FLAG F-2023-ABS-first-year-analogue | BANNED | 공식 연혁 + reverse .0497→.2988 | KBO는 퓨처스리그 ABS를 2020년부터 운영했다. F 2022→2023 성공률 .7087→.4729와 reverse 6배 급증은 ABS 최초 도입이 아니라 데이터/타깃 체제 단절이다. 이를 R 2024→2025의 1년차→2년차 아날로그로 쓰지 않는다.
 FLAG --model rank full-refit | BANNED | group16 양 머신 native crash | no-refit 50iter smoke는 되지만 validation ranker를 폐기하고 full ranker를 만드는 단계에서 4070과 A100 모두 native crash했다. 별도 프로세스 2단 refit을 구현하기 전에는 재실행하지 않는다.
+FLAG --boosting-type Ordered | CLOSED | A100 −38.08 / 4070 −10.73 | ordered target statistics와 별개로 boosting scheme 자체를 Plain→Ordered로 바꿨다. A100 미학습 2024와 4070 제출 표면이 모두 같은 머신 단일시드 기준선보다 크게 낮아 다중시드 가치가 없다.
+FLAG --feat-window + --failmode-cells | CLOSED | A100 +0.51 / 4070 −5.85 | binary base에서 약한 양수였던 최근 1/3/5경기 산포를 depth5 실패모드 셀에 넣었으나 제출 표면에서 악화했다. ZD5와 centered RMS도 .0025라 새로운 실패형태 다양성이 없다.

@@ -4,7 +4,7 @@
 > **역사는 여기 없다** → [docs/EXPERIMENTS_LOG.md](docs/EXPERIMENTS_LOG.md)
 > 닫힌 질문 → [docs/SETTLED.md](docs/SETTLED.md) · 실행 기록 → `LEDGER.tsv`
 
-갱신 2026-08-09 (BR1 실패·OB1 Ordered 단일시드 실행 중·v18 유지)
+갱신 2026-08-09 (RC1 양 표면 단일시드 통과·RC2 다중시드 실행 중·v18 유지)
 
 ## Objective
 
@@ -140,7 +140,7 @@ G0 topology-only graph는 A100 미학습 2024 `866.90`(동일 seed AB 대비 -1.
 
 # Next Experiment
 
-## OB1 Ordered boosting — 양 표면 단일시드 게이트 실행 중
+## OB1 Ordered boosting — 양 표면 실패
 
 현재 CatBoost는 ordered target statistics는 사용하지만 대규모 데이터의 boosting
 scheme은 기본 `Plain`이다. `--boosting-type Ordered`를 검증·refit 양쪽에 같은
@@ -148,8 +148,25 @@ scheme은 기본 `Plain`이다. `--boosting-type Ordered`를 검증·refit 양�
 
 - A100: `OB1A_ordered`, seed3, val2023→test2024, `--drop-f-pre 2022`
 - 4070: `OB1V_ordered`, seed42, val2024, drop 없음
-- 두 precheck exit 0. 한 표면이라도 명확히 음수면 확장하지 않는다.
+- 두 precheck exit 0. A100 `830.75−868.83=−38.08`, 4070
+  `900.49−911.22=−10.73`으로 모두 음수. 확장하지 않는다.
 - 실행 전 BR1 고정 리그 보정은 합법 점수 `+0.239`, 후반 `−3.145`로 탈락했다.
+
+## FW1 cell-window — 다음 단일시드 게이트
+
+binary base에서 `--feat-window`는 6시드 앙상블 +3.75로 방향은 양수였으나
+t=1.42였다. 최근 1/3/5경기 산포가 성공 이진값보다 실패형태
+(middle/ball/reverse) 분류에 더 직접적으로 작용하는지, 현행 depth5 cell에
+`--feat-window` 하나만 추가해 양 표면 단일시드로 먼저 본다.
+
+결과는 A100 동일 seed3 `DW_cell` 대비 centered `+0.51`, 4070 동일 seed42
+`ZD5` 대비 `−5.85`다. 두 번째 표면이 음수라 확장하지 않는다.
+
+## RC2 cell-roster — 다중시드 확장 중
+
+RT1 이진모델과 ZD5를 사후 블렌드하는 대신, 로스터 전환 12피처를 depth5 실패모드
+셀 내부에 직접 넣었다. RC1 단일시드는 A100 `+3.40`, 4070 `+4.45`로 양 표면 +3을
+통과했다. A100 6시드/4070 8시드를 채운 뒤 t≥2.4와 현행 블렌드 증분을 판정한다.
 
 ## 2026-08-09 04:37 야간 분리 실행
 
