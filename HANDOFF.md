@@ -12,6 +12,27 @@ Codex
 
 ## Status
 
+2026-08-11 로컬 전수 데이터 감사 완료:
+
+- 원격 서버 없이 공개 train 1,475,092행/47입력과 Trackman 1,793,078행/30컬럼 전부를
+  읽었다. 3개 rolling-origin 전이에서 단변수 전체, 2024 모든 1,081쌍, 상위 235쌍의
+  역사 전이, 선택적 3중 조합, 121피처 모델 잔차의 모든 단/쌍을 감사했다.
+- 결측 대안 7개는 seed42에서 native보다 `-6.58~-12.07`. 최선 대안 indicator도
+  seed3/4/5 평균 `-1.665`, 앙상블 `-1.348`. 원본 NaN native + 파생 prior/n0 유지.
+- 두 전이의 전체/전반/후반/R/F가 전부 양수인 잔차 쌍은 PB 하나뿐:
+  `pitcher_id×batter_id +1.874/+4.595`. 이미 v11에 포함돼 새 후보가 아니다.
+- recent×career 명시 피처 약 `-9.3`, league×runner `-11.91`, 안정 3중 조합 0개.
+  CTR3도 seed42 `+3.338` 뒤 추가 3시드 평균 `+0.791`, t=.419로 탈락했다.
+- Trackman 전년도 투수 요약 21개는 커버 약 77%이나 모든 최소 raw 전이 음수.
+- 상세/재현: `docs/FULL_DATA_AUDIT_20260811.md`, `tools/full_dataset_audit.py`,
+  `tools/full_residual_audit.py`, `out/full_audit/column_audit_summary.csv`.
+- 새 제출 패키지 없음. 로컬 GPU 유휴. 현행 챔피언 v11/LB 1101.802 유지.
+- 08-09 마지막 Codex 세션 뒤 미추적 상태였던 `run_br2/ci1/da*/lr5/rs*/ce1` 등
+  35개 런처와 후보 판정·패키징 도구 8개를 회수해 검토했다. 해당 태그는 LEDGER와
+  model/out에 0건이므로 **실행 결과가 아니라 미실행 준비 큐**다. 실험 명령 30개는
+  precheck exit 0, 16개 bash 스크립트는 `bash -n` 통과, Python 도구는 py_compile
+  통과했다. 5개 4070 launcher는 훈련 플래그가 없는 호출 래퍼라 precheck 대상이 아니다.
+
 2026-08-09 21시 core-resolution 후속 감사 완료:
 
 - current-season success/middle 누적을 k80 binomial posterior mean·sd·precision으로

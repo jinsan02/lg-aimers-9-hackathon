@@ -432,6 +432,38 @@ def add_form(df):
     return df, made
 
 
+def add_recent_relation(df, mode="reverse"):
+    """Explicit career-style x recent-control relations from the full audit.
+
+    A time-honest 47-column pair screen found that career reverse/success rate
+    combined with prev1/3/5 success was one of the few pairs whose raw BSS and
+    incremental lookup gain were positive in 2022, 2023 and 2024.  A depth-8
+    tree can approximate products but needs several splits, so expose only the
+    audited low-rank relation rather than a broad polynomial expansion.
+    """
+    made = []
+    recent = [f"asof_pitcher_prev{g}_game_success_rate" for g in (1, 3, 5)]
+    if not all(c in df.columns for c in recent):
+        return df, made
+    if mode in ("reverse", "both") and "asof_pitcher_reverse_rate" in df:
+        z = df["asof_pitcher_reverse_rate"].to_numpy(np.float64) - 0.5
+        for g, c in zip((1, 3, 5), recent):
+            nm = f"rel_prev{g}_success_x_reverse"
+            df[nm] = (df[c].to_numpy(np.float64) - 0.5) * z
+            made.append(nm)
+    if mode in ("career", "both") and "asof_pitcher_success_rate" in df:
+        z = df["asof_pitcher_success_rate"].to_numpy(np.float64)
+        for g, c in zip((1, 3, 5), recent):
+            v = df[c].to_numpy(np.float64)
+            nm = f"rel_prev{g}_success_minus_career"
+            df[nm] = v - z
+            made.append(nm)
+            nm = f"rel_prev{g}_success_x_career"
+            df[nm] = (v - 0.5) * (z - 0.5)
+            made.append(nm)
+    return df, made
+
+
 def add_cross(df):
     """레버 H - 당해 시즌 실력 x 그 상황에서의 상대 배수.
 

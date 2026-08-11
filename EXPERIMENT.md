@@ -4,11 +4,29 @@
 > **역사는 여기 없다** → [docs/EXPERIMENTS_LOG.md](docs/EXPERIMENTS_LOG.md)
 > 닫힌 질문 → [docs/SETTLED.md](docs/SETTLED.md) · 실행 기록 → `LEDGER.tsv`
 
-갱신 2026-08-09 (v11 recent-middle+PB가 LB 1101.802로 현행 챔피언)
+갱신 2026-08-11 (v11 recent-middle+PB가 LB 1101.802로 현행 챔피언)
 
 ## Objective
 
 Brier Skill Score 최대화. 목표 **1120대 합법 진입**. 현재 1위 1,198.02.
+
+## 2026-08-11 로컬 전수 데이터 감사
+
+원격 없이 로컬 RTX 5060에서 공개 train 1,475,092행·공식 입력 47개와 Trackman
+1,793,078행·30개 컬럼을 전수 조사했다. 단변수 전체, 2024의 1,081개 모든 쌍,
+상위 235쌍의 3개 rolling 전이, 안정 쌍의 선택적 3중 조합, 현행 모델 잔차의 모든
+단/쌍 관계를 확인했다. 상세는 [`docs/FULL_DATA_AUDIT_20260811.md`](docs/FULL_DATA_AUDIT_20260811.md).
+
+- 결측: native NaN 876.90. 0/-1/평균/중앙값/계층 fallback/indicator는 seed42에서
+  모두 `-6.58~-12.07`; indicator 추가 seed 3/4/5 평균도 `-1.665`.
+- 잔차: 두 전이의 전체·전반·후반·R·F를 모두 통과한 쌍은
+  `pitcher_id×batter_id`뿐(`+1.874/+4.595`)이며 이미 v11 PB다.
+- 안정 recent×career 쌍을 명시적 피처로 만들면 약 `-9.3`; league×runner `-11.91`.
+- CTR complexity3은 seed42 `+3.338`이나 추가 3시드 평균 `+0.791`, t=.419,
+  앙상블 `+0.471`로 승격 실패.
+- Trackman 전년도 투수 요약 21개는 약 77% 커버지만 모든 단변수의 최소 raw BSS 음수.
+
+**새 제출 후보 없음. 현행 v11과 결측 처리(native raw + 파생 prior/n0)를 유지한다.**
 
 ---
 

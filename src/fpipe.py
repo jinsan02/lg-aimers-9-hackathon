@@ -88,6 +88,15 @@ def fit(train, args, is_fit, tm_table=None, verbose=True):
         new_cats += [c for c in NEW_CAT if c in cols]
         say(f"피처 v2/v3: +{len(cols)}개")
 
+    # Offline audit flag.  This interaction was positive on 2023->2024 but
+    # failed the historical transition and is disabled unless requested.
+    art["league_runner"] = bool(getattr(args, "feat_league_runner", False))
+    if art["league_runner"]:
+        train["league_runner"] = (train["game_type"].astype(str) + "_" +
+                                  train["num_runners_on"].astype(str))
+        new_cols.append("league_runner")
+        new_cats.append("league_runner")
+
     # Leading ID digits follow chronological registration/debut cohorts.  Keep
     # only this coarse, extrapolating signal; never expose identity-like suffixes.
     art["id_cohort"] = (getattr(args, "id_cohort_roles", "pb")
@@ -150,6 +159,10 @@ def fit(train, args, is_fit, tm_table=None, verbose=True):
             if art[name]:
                 train, c = fn(train)
                 cols += c
+        art["recent_relation"] = getattr(args, "feat_recent_relation", "")
+        if art["recent_relation"]:
+            train, c = ss.add_recent_relation(train, art["recent_relation"])
+            cols += c
         new_cols += cols
         say(f"시즌내 복원 계열: +{len(cols)}개 | 결측률 "
             f"{train[cols[1]].isna().mean() * 100:.1f}%")
@@ -221,6 +234,9 @@ def transform(df, art):
     if art.get("priors") is not None:
         from features import add_features
         df, _ = add_features(df, art["priors"])
+    if art.get("league_runner"):
+        df["league_runner"] = (df["game_type"].astype(str) + "_" +
+                               df["num_runners_on"].astype(str))
     if art.get("id_cohort"):
         df, _ = _apply_id_cohort(df, art["id_cohort"])
     if art.get("roster") is not None:
@@ -238,6 +254,8 @@ def transform(df, art):
                          ("window", ss.add_window), ("count", ss.add_count_style)):
             if art.get(name):
                 df, _ = fn(df)
+        if art.get("recent_relation"):
+            df, _ = ss.add_recent_relation(df, art["recent_relation"])
     if art.get("te") is not None:
         df, _ = _apply_te(df, art["te"])
     if art.get("skill_packs"):

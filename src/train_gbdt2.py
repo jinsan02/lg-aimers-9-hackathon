@@ -84,6 +84,75 @@ def load(tm_feats_path="", drop_f_pre=0, drop_unstable=False,
     return train, features, tm_table
 
 
+def _apply_missing_experiment(train, features, is_fit, strategy="native",
+                              scope="raw"):
+    """Offline-only missing-value arms fitted on the pre-validation rows.
+
+    CatBoost's current production behavior is ``native``: raw NaNs are passed
+    through.  These arms exist to measure whether explicit cold-start semantics
+    transfer to a future season.  A winning arm must be moved into ``fpipe``
+    before packaging so inference receives the same frozen fill tables.
+    """
+    if strategy == "native":
+        return train, []
+    raw = set(pd.read_csv(f"{DATA}/test.csv", encoding="utf-8-sig",
+                          nrows=0).columns) - {ID}
+    cols = [c for c in features if c in train.columns
+            and c not in CAT_COLS and train[c].isna().any()
+            and (scope == "all" or c in raw)]
+    made = []
+    add_ind = strategy.endswith("_ind")
+    base = strategy.removesuffix("_ind")
+    if add_ind:
+        for c in cols:
+            nm = f"missing__{c}"
+            train[nm] = train[c].isna().astype(np.int8)
+            made.append(nm)
+
+    fit = train.loc[is_fit]
+
+    def group_prior(c, keys):
+        tab = (fit.groupby(keys, dropna=False)[c].mean().rename("_fill")
+               .reset_index())
+        return train[keys].merge(tab, on=keys, how="left")["_fill"]
+
+    for c in cols:
+        if base == "native":
+            continue
+        if base == "zero":
+            fill = 0.0
+        elif base == "minus1":
+            fill = -1.0
+        elif base == "mean":
+            fill = float(fit[c].mean())
+        elif base == "median":
+            fill = float(fit[c].median())
+        elif base == "semantic":
+            fill = None
+            if "prev" in c and c.endswith("success_rate"):
+                fill = train.get("asof_pitcher_success_rate")
+            elif "prev" in c and c.endswith("middle_rate"):
+                fill = train.get("asof_pitcher_middle_rate")
+            if fill is None:
+                if c.startswith("asof_batter_"):
+                    keys = [x for x in ("game_type", "batter_hand")
+                            if x in train.columns]
+                elif c.startswith("asof_pitcher_"):
+                    keys = [x for x in ("game_type", "pitcher_hand")
+                            if x in train.columns]
+                else:
+                    keys = [x for x in ("game_type",) if x in train.columns]
+                fill = group_prior(c, keys) if keys else float(fit[c].mean())
+            # Related career fields can themselves be missing for a true debut.
+            if isinstance(fill, pd.Series):
+                fill = fill.fillna(float(fit[c].mean()))
+        else:
+            raise ValueError(f"unknown missing strategy: {strategy}")
+        train[c] = train[c].fillna(fill)
+    print(f"결측 실험 {strategy}/{scope}: {len(cols)}개 열, indicator +{len(made)}")
+    return train, made
+
+
 # 도메인상 방향이 확실한 피처들 (+1 = 클수록 성공률↑)
 MONO = {"asof_pitcher_success_rate": 1, "asof_pitcher_success_rate_shr": 1,
         "asof_pitcher_prev5_game_success_rate": 1,
@@ -408,6 +477,8 @@ def run_cat(args, train, features, is_val):
         task_type=args.device, devices="0",
         loss_function=args.loss, eval_metric=args.eval_metric,
         early_stopping_rounds=args.es, random_seed=args.seed, verbose=200)
+    if args.max_ctr_complexity:
+        params["max_ctr_complexity"] = args.max_ctr_complexity
     if args.boosting_type:
         params["boosting_type"] = args.boosting_type
     params.update(ex)
@@ -451,6 +522,8 @@ def run_cat(args, train, features, is_val):
         loss_function=("CrossEntropy" if "_soft" in train.columns
                        else "Logloss"),
         random_seed=args.seed, verbose=0)
+    if args.max_ctr_complexity:
+        fp["max_ctr_complexity"] = args.max_ctr_complexity
     if args.boosting_type:
         fp["boosting_type"] = args.boosting_type
     fp.update(ex)
@@ -635,6 +708,8 @@ def main():
     # E142(Optuna) 재현용. tune.py 가 탐색한 7축 중 유일하게 여기 없던 축이다.
     # 0 이면 CatBoost 기본값을 그대로 둔다(파라미터 자체를 넘기지 않는다).
     ap.add_argument("--cat-min-leaf", type=int, default=0)
+    ap.add_argument("--max-ctr-complexity", type=int, default=0,
+                    help="CatBoost 범주형 조합 차수. 0은 라이브러리 기본값")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--tm-feats", default="",
                     help="data/processed/tm_pitcher_feats.csv 경로")
@@ -777,14 +852,20 @@ def main():
                     help="제거할 열 이름 (쉼표). tools/feature_audit.py 결과 시험용")
     ap.add_argument("--fill-prev", action="store_true",
                     help="prev1/3/5 경기 결측을 그 시즌 리그평균으로 채운다. "
-                         "결측률이 시즌마다 1.11~5.17%로 달라 트리가 결측을 "
+                         "결측률이 시즌마다 1.11~5.17%%로 달라 트리가 결측을 "
                          "시즌 표지로 쓸 수 있다 (E115 가 그렇게 졌다)")
+    ap.add_argument("--missing-strategy", default="native",
+                    choices=["native", "zero", "minus1", "mean", "median",
+                             "semantic", "native_ind", "semantic_ind"],
+                    help="결측 대체 전이 실험. 채택 전에는 제출 패키징 금지")
+    ap.add_argument("--missing-scope", default="raw", choices=["raw", "all"],
+                    help="결측 실험 범위: 공식 입력만 또는 파생 피처까지")
     ap.add_argument("--dump-npz", default="",
                     help="피처 행렬을 npz 로 내보내고 종료 (NN 학습용). "
                          "같은 파이프라인을 두 번 구현하지 않기 위한 이음매")
     ap.add_argument("--feat-skill", action="store_true",
                     help="E116: 학습된 투수 실력 추정치를 피처로. 손으로 정한 "
-                         "k=80 수축(설명력 37.3%)보다 학습된 선형결합이 59.0%")
+                         "k=80 수축(설명력 37.3%%)보다 학습된 선형결합이 59.0%%")
     ap.add_argument("--feat-skill-pc", action="store_true",
                     help="E117: 실력 추정을 **투수x볼카운트** 단위로. 신호감사 "
                          "오라클이 투수 990.8 -> 투수x카운트 2740.9 로 최대다")
@@ -840,9 +921,14 @@ def main():
     ap.add_argument("--feat-domain", action="store_true",
                     help="E111: 야구 기전 교차항 (동일손x투수스타일, 타자위협도x주자유무). "
                          "tools/domain_probe.py 로 실측 선별한 둘만 넣는다")
+    ap.add_argument("--feat-league-runner", action="store_true",
+                    help="전수 잔차감사: game_type x num_runners_on 8범주")
     ap.add_argument("--feat-form", action="store_true",
                     help="E108: 최근 1/3/5경기 폼을 **당해 시즌 기준선** 대비로. "
                          "기존 form_delta 는 통산 대비라 체제 차이가 섞였다")
+    ap.add_argument("--feat-recent-relation", default="",
+                    choices=["", "reverse", "career", "both"],
+                    help="전수조사: 최근 성공률 x 통산 reverse/success 저랭크 관계")
     ap.add_argument("--feat-cross", action="store_true",
                     help="레버 H: std x TE dev 교차항")
     ap.add_argument("--feat-prof", action="store_true",
@@ -1091,6 +1177,9 @@ def main():
             train[c] = train[c].fillna(m)
         print(f"prev 결측 채움: {nb * 100:.2f}% -> "
               f"{train[pv].isna().mean().max() * 100:.2f}% ({len(pv)}개 열)")
+    train, _missing_cols = _apply_missing_experiment(
+        train, features, is_fit, args.missing_strategy, args.missing_scope)
+    features = features + [c for c in _missing_cols if c not in features]
     if args.drop_cols:
         rm = {c.strip() for c in args.drop_cols.split(",") if c.strip()}
         before = len(features)
