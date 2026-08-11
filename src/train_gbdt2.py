@@ -165,7 +165,7 @@ MONO = {"asof_pitcher_success_rate": 1, "asof_pitcher_success_rate_shr": 1,
 
 def _extra(args, features):
     """grow_policy / monotone 등 공통 추가 파라미터."""
-    ex = {}
+    ex = _bootstrap_only(args)
     if args.grow:
         ex["grow_policy"] = args.grow
         if args.grow in ("Depthwise", "Lossguide"):
@@ -175,6 +175,16 @@ def _extra(args, features):
         ex["monotone_constraints"] = mc
         ex["task_type"] = "CPU"          # 단조 제약은 CPU 경로
         print(f"단조 제약 적용 {sum(1 for v in mc if v)}개 피처")
+    return ex
+
+
+def _bootstrap_only(args):
+    """Bootstrap parameters shared by classifier and RMSE regressor paths."""
+    ex = {}
+    if args.bootstrap_type:
+        ex["bootstrap_type"] = args.bootstrap_type
+        if args.bootstrap_type in ("Bernoulli", "MVS", "Poisson"):
+            ex["subsample"] = args.subsample
     return ex
 
 
@@ -406,13 +416,17 @@ def run_cat(args, train, features, is_val):
 
     if args.loss == "RMSE":
         # 0/1 타깃 회귀 = MSE = Brier 그 자체. 평가지표를 직접 최소화한다.
-        reg = CatBoostRegressor(
+        rp = dict(
             iterations=args.iters, learning_rate=args.lr, depth=args.depth,
             l2_leaf_reg=args.l2, border_count=args.border_count,
             bagging_temperature=args.bagging_temp,
             random_strength=args.random_strength,
             task_type=args.device, devices="0", loss_function="RMSE",
             early_stopping_rounds=args.es, random_seed=args.seed, verbose=200)
+        rp.update(_bootstrap_only(args))
+        if args.bootstrap_type and args.bootstrap_type != "Bayesian":
+            rp.pop("bagging_temperature", None)
+        reg = CatBoostRegressor(**rp)
         reg.fit(tr, eval_set=va)
         p = reg.predict(train.loc[is_val, features])
         if bl is not None:
@@ -429,7 +443,7 @@ def run_cat(args, train, features, is_val):
             y_all = y_all * (1 - 2 * e) + e
         full = Pool(train[features], y_all, cat_features=CAT_COLS,
                     weight=_refit_weights(args, train))
-        final = CatBoostRegressor(
+        rfp = dict(
             iterations=max(int(best_iter * args.refit_mult), 1),
             learning_rate=args.lr,
             depth=args.depth, l2_leaf_reg=args.l2,
@@ -438,6 +452,10 @@ def run_cat(args, train, features, is_val):
             random_strength=args.random_strength,
             task_type=args.device, devices="0", loss_function="RMSE",
             random_seed=args.seed, verbose=0)
+        rfp.update(_bootstrap_only(args))
+        if args.bootstrap_type and args.bootstrap_type != "Bayesian":
+            rfp.pop("bagging_temperature", None)
+        final = CatBoostRegressor(**rfp)
         final.fit(full)
         return final, p, best_iter
 
@@ -482,6 +500,8 @@ def run_cat(args, train, features, is_val):
     if args.boosting_type:
         params["boosting_type"] = args.boosting_type
     params.update(ex)
+    if args.bootstrap_type and args.bootstrap_type != "Bayesian":
+        params.pop("bagging_temperature", None)
     if params.get("task_type") == "CPU":
         params.pop("devices", None)
         params.pop("bagging_temperature", None)
@@ -527,6 +547,8 @@ def run_cat(args, train, features, is_val):
     if args.boosting_type:
         fp["boosting_type"] = args.boosting_type
     fp.update(ex)
+    if args.bootstrap_type and args.bootstrap_type != "Bayesian":
+        fp.pop("bagging_temperature", None)
     if fp.get("task_type") == "CPU":
         fp.pop("devices", None)
         fp.pop("bagging_temperature", None)
@@ -706,6 +728,11 @@ def main():
     ap.add_argument("--l2", type=float, default=10.0)
     ap.add_argument("--border-count", type=int, default=254)
     ap.add_argument("--bagging-temp", type=float, default=1.0)
+    ap.add_argument("--bootstrap-type", default="",
+                    choices=["", "Bayesian", "Bernoulli", "MVS", "Poisson"],
+                    help="CatBoost row bootstrap; empty keeps the library default")
+    ap.add_argument("--subsample", type=float, default=0.8,
+                    help="row fraction for Bernoulli/MVS/Poisson bootstrap")
     ap.add_argument("--random-strength", type=float, default=1.0)
     ap.add_argument("--boosting-type", default="", choices=["", "Plain", "Ordered"],
                     help="CatBoost boosting scheme; empty keeps the library default")

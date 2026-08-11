@@ -6,6 +6,45 @@
 > 사용자 제공 리더보드에서 확인한 최고점은 1288.180881(2026-08-09)이다.
 > 1점 = 기준선 대비 0.001% 개선.
 
+## 2026-08-12 SR1·MDU1 core residual 검정과 제출 소스 감사
+
+- SR1은 honest K0(recent-middle+exact-PB)의 R리그 잔차를 얕고 강하게 수축한
+  CatBoostRegressor로 학습했다. 2022 잔차 학습→2023 검증에서 `best_iter=0`이었고,
+  고정 2% 결합은 source 2023 전체/R 전반/R 후반 `−0.038/−0.015/−0.068`, 강한
+  4070 아날로그 2024 `−0.014/−0.004/−0.032`였다. raw 피처 잔차학습은 CLOSED.
+- MDU1은 base와 cell 예측 차이의 signed/absolute q-bin을 전년도 잔차에 맞추고 다음
+  시즌에 고정 적용했다. signed-q8 25%는 2023 `−2.349`, strong 2024 `−2.106`;
+  abs-q8은 2023 `−0.303`, strong 전체 `+0.252`이나 R `−1.747`, 후반 `−0.848`로
+  핵심 표면을 훼손했다. disagreement shrink/routing은 CLOSED.
+- 제출 ZIP 직접 감사 결과 `v11_pb_posix_0809.zip/script.py`는
+  `out/v11_script_reference.py`와 정규화 후 완전 동일했고 실제 recent-middle+PB였다.
+  `v12_career_pb_0809.zip/script.py`는 당시 `src/script_blend_v11.py`와 동일한
+  career-middle+PB였다. LB 기록에는 영향이 없으나 재패키징 사고를 막기 위해 소스를
+  `script_blend_v11.py`(실제 v11)와 `script_blend_v12.py`(career)로 바로잡았다.
+- 재현: `tools/strong_residual_pilot.py`, `tools/member_disagreement_audit.py`.
+
+### EV1 — 동일 base 계열 시드 분산
+
+- source 2023 R과 target 2024에서 공통 seed 42/7/13/3의 행별 표준편차를 같은 정의로
+  계산했다. 평균은 `.003203→.003390`, p90은 `.005545→.005814`로 분포 자체는 안정적이었다.
+- source q8 residual map을 strong 2024 K0에 동결 적용하면 25%부터 전체 `−0.966`.
+- 분산이 큰 행을 0.5 쪽으로 수축하는 1자유도 구조는 25%에서 전체 `+1.369`이지만
+  R `+0.823`, 전반 `+4.255`, 후반 `−2.401`; 50%는 후반 `−6.240`이었다.
+- +3 gate 미달과 전후반 반전으로 CLOSED. 재현: `tools/ensemble_variance_audit.py`.
+
+### BTP1 — Bernoulli row bootstrap
+
+- 현행 CatBoost의 나머지 설정을 고정하고 기본 bootstrap만 Bernoulli, subsample 0.8로
+  변경했다. 같은 로컬 RTX 5060·seed42·2023→2024 표면이다.
+- 단독 BSS는 `598.11/862.71`, MVA_native `611.74/876.90` 대비
+  `−13.63/−14.19`였다.
+- K0 core 내부 base의 10/25/50/100%만 교체해 다양성을 살려도 source
+  `−0.159/−0.497/−1.324/−3.969`, target `−0.107/−0.413/−1.314/−4.575`.
+  10% target은 R `−0.414`, F `+2.192`, 전반 `−0.378`, 후반 `+0.248`로
+  F의 약한 다양성이 전체 이점으로 남지 않았다.
+- Bernoulli bootstrap과 subsample 연속 탐색은 CLOSED. 재현:
+  `tools/bootstrap_core_audit.py`, 산출 `cat_BTP1_*_preds.npz`.
+
 ## 2026-08-11~12 masked-pitch auxiliary MLP
 
 - 구종 3분류는 strict 1:1로 복원된 과거 학습행의 masked auxiliary label로만 사용했다.

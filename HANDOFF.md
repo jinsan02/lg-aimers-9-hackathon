@@ -12,6 +12,25 @@ Codex
 
 ## Status
 
+2026-08-12 SR1·MDU1 및 제출 소스 감사 완료:
+
+- SR1 strong residual learner는 R-only honest K0 residual에서 `best_iter=0`. 고정 2%
+  결합 source 2023 `−0.038`, strong 2024 `−0.014`; 전·후반 모두 비양수로 CLOSED.
+- MDU1 base/cell disagreement routing은 signed-q8 25%가 `−2.349/−2.106`, abs-q8도
+  source `−0.303`, strong R `−1.747`; CLOSED.
+- v11/v12 제출 ZIP을 직접 해시·내용 대조했다. 제출된 v11은 정상 recent-middle+PB이고
+  v12는 career-middle+PB라 LB 기록 오류는 없다. 잘못 남아 있던 소스 이름을 복구:
+  `src/script_blend_v11.py`=실제 v11, `src/script_blend_v12.py`=실제 v12.
+- 현행 챔피언 v11/LB `1101.8020672065` 유지. 신규 제출 후보 없음.
+- PB matrix factorization은 이미 CLOSED(`−2.639/+0.350/+0.551`)라 중복 실행을 막았다.
+  EV1 동일 base 계열 공통 4시드 분산도 완료: q8 25% `−0.966`; uncertainty shrink
+  25% 전체 `+1.369`이나 early `+4.255` / late `−2.401`. +3 미달·반전으로 CLOSED.
+- BTP1 Bernoulli bootstrap 0.8 단일시드 완료: MVA 대비 단독 `−13.63/−14.19`, K0
+  base 10% 교체 `−0.159/−0.107`. target R `−0.414`, F `+2.192`; 전체 음수로 CLOSED.
+- 신규 제출 후보 없음. v11/LB `1101.8020672065` 유지.
+- 상세: `docs/RECORD_AUDIT_20260812.md`; 재현 도구:
+  `tools/strong_residual_pilot.py`, `tools/member_disagreement_audit.py`.
+
 2026-08-12 core 보존형 신규 탐색 완료:
 
 - weak-signal salvage: 5000-cell source-selected routing target 최고 `+0.133`, predicted

@@ -1,5 +1,77 @@
 # 제출·실험 기록 정합성 감사 — 2026-08-12
 
+## SR1·MDU1: champion 보존형 core 잔차 검정
+
+### SR1 — 강수축 raw-feature residual learner
+
+R리그만 사용해 2022 K0 잔차를 학습하고 2023에 고정 검증한 뒤, 2022+2023으로
+재적합해 2024 local/strong 아날로그를 평가했다. CatBoostRegressor는 `best_iter=0`에서
+멈췄다. 고정 2% 결합의 BSS 증분은 다음과 같다.
+
+| 표면 | 전체 | R 전반 | R 후반 |
+|---|---:|---:|---:|
+| source 2023 | −0.038 | −0.015 | −0.068 |
+| target local 2024 | −0.012 | −0.004 | −0.027 |
+| target strong 2024 | −0.014 | −0.004 | −0.032 |
+
+공식 raw 피처에 K0가 남긴 일반화 가능한 잔차가 보이지 않는다. 하이퍼파라미터를 늘리면
+best-iter 0을 source 선택편의로 바꿀 뿐이므로 종료한다.
+
+### MDU1 — base/cell disagreement 기반 수축·routing
+
+base−cell 차이의 signed q8, absolute q8, sign×abs q4, base probability×signed q4를
+전년도 K0 잔차로 맞추고 다음 시즌에 고정 적용했다. signed-q8 25%는 source 2023
+`−2.349`, strong 2024 `−2.106`; abs-q8 25%는 source `−0.303`, strong 전체
+`+0.252`이나 R `−1.747`, R 후반 `−0.848`이었다. disagreement는 예측 불확실성의
+안정된 방향 정보가 아니므로 추가 bin/scale 탐색 없이 종료한다.
+
+## v11/v12 제출 스크립트 소스 감사
+
+- `submissions/v11_pb_posix_0809.zip/script.py`는 정규화 후
+  `out/v11_script_reference.py`와 완전 동일하다. `asof_pitcher_prev5_game_middle_rate`와
+  `matchup_constants_2024.npz`를 쓰는 실제 recent-middle+PB 챔피언이다.
+- `submissions/v12_career_pb_0809.zip/script.py`는 감사 전
+  `src/script_blend_v11.py`와 완전 동일했다. `asof_pitcher_middle_rate`와
+  `final_constants_2024.npz`를 쓰는 실패한 career-middle+PB다.
+- 따라서 기존 LB 점수에는 패키징 오류가 없다. 저장소 소스 이름만 잘못되어 있었고,
+  `src/script_blend_v11.py`를 실제 v11로 복원하고 career 버전을
+  `src/script_blend_v12.py`로 분리했다. 두 파일은 각각 제출 ZIP과 다시 완전 동일함을 확인했다.
+
+## EV1 — 동일 base 계열 시드 분산
+
+base-cell 차이가 아니라 동일 depth8 base의 random seed 4개가 만드는 행별 표준편차를
+epistemic uncertainty로 검정했다. source 2023 R과 target 2024의 평균 분산은
+`.003203→.003390`, p90 `.005545→.005814`로 안정적이었다.
+
+| 고정 보정 | 전체 | R | F | 전반 | 후반 |
+|---|---:|---:|---:|---:|---:|
+| q8 k5000 ×.25 | −0.966 | −1.089 | −0.043 | −0.987 | −0.939 |
+| 0.5방향 수축 ×.25 | +1.369 | +0.823 | +5.466 | +4.255 | −2.401 |
+| 0.5방향 수축 ×.50 | +1.357 | +0.392 | +8.594 | +7.171 | −6.240 |
+
+분산 크기는 이전되지만 어떤 방향으로 보정해야 하는지는 후반기에 반전한다. 제출형 +3과
+전후반 비악화 조건을 모두 못 넘으므로 추가 seed·bin·scale 탐색 없이 종료한다.
+
+재현: `tools/ensemble_variance_audit.py`.
+
+## BTP1 — CatBoost Bernoulli bootstrap
+
+기본 Bayesian bootstrap 대신 Bernoulli subsample 0.8만 단일 변경했다. 로컬 RTX 5060,
+seed42, drop-F-pre 2022, val2023→test2024로 MVA_native와 동일 표면이다.
+
+| 비교 | source 2023 | target 2024 |
+|---|---:|---:|
+| 단독 BTP1−MVA_native | −13.63 | −14.19 |
+| K0에서 base 10% 교체 | −0.159 | −0.107 |
+| base 25% 교체 | −0.497 | −0.413 |
+| base 50% 교체 | −1.324 | −1.314 |
+| base 100% 교체 | −3.969 | −4.575 |
+
+10% target 세그먼트도 R `−0.414`, F `+2.192`, 전반 `−0.378`, 후반 `+0.248`이다.
+F 다양성은 있으나 행 비중과 크기가 작고 R 손실을 못 갚는다. 기본 bootstrap을 유지한다.
+
+재현: `tools/bootstrap_core_audit.py`; 학습 태그 `BTP1`.
+
 ## LB 제출 원장
 
 사용자가 전달한 실제 평가 서버 결과를 기준으로 최근 제출을 다시 대조했다.

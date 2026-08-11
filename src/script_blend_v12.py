@@ -1,4 +1,4 @@
-"""v10 recent-middle champion plus frozen pitcher-batter matchup residuals."""
+"""Final candidate: career-middle calibration plus frozen pitcher-batter residuals."""
 
 import os
 
@@ -20,29 +20,23 @@ WEIGHTS = ([(os.path.join(SCRIPT_DIR, "model", f"cat_v14f_s{s}.pkl"),
            + [(os.path.join(SCRIPT_DIR, "model", f"cat_ZD5_s{s}.pkl"),
                _W_CELL/len(_C)) for s in _C])
 
-MID_COL = "asof_pitcher_prev5_game_middle_rate"
-THRESHOLDS = np.asarray([0.114286, 0.141026, 0.159091, 0.174312,
-                         0.188889, 0.203837, 0.227273], dtype=np.float64)
-OFFSETS = np.asarray([0.009128596327376929, 0.0014582307357119428,
-                      0.0016645796882829116, 0.0031305197564435523,
-                      0.00028882666473504875, -0.005475006685108483,
-                      -0.00413854957909932, -0.005074360453772326])
-NAN_OFFSET = -0.008102692247033697
-MATCHUP_PATH = os.path.join(SCRIPT_DIR, "model", "matchup_constants_2024.npz")
+MID_COL = "asof_pitcher_middle_rate"
+FINAL_PATH = os.path.join(SCRIPT_DIR, "model", "final_constants_2024.npz")
 
 
 def middle_adjustment(test):
+    z = np.load(FINAL_PATH)
     x = pd.to_numeric(test[MID_COL], errors="coerce").to_numpy(np.float64)
     finite = np.isfinite(x)
-    adj = np.full(len(test), NAN_OFFSET, dtype=np.float64)
-    adj[finite] = OFFSETS[np.searchsorted(THRESHOLDS, x[finite], side="right")]
+    adj = np.full(len(test), float(z["nan_offset"][0]), dtype=np.float64)
+    adj[finite] = z["offsets"][np.searchsorted(z["thresholds"], x[finite], side="right")]
     return adj
 
 
 def pb_adjustment(test):
-    z = np.load(MATCHUP_PATH)
+    z = np.load(FINAL_PATH)
     table = {(int(p), int(b)): float(v) for p, b, v in
-             zip(z["pb0_pitcher"], z["pb0_batter"], z["pb0_offset"])}
+             zip(z["pb_pitcher"], z["pb_batter"], z["pb_offset"])}
     pitcher = pd.to_numeric(test["pitcher_id"], errors="coerce").fillna(-1).astype(np.int64)
     batter = pd.to_numeric(test["batter_id"], errors="coerce").fillna(-1).astype(np.int64)
     adj = np.fromiter((table.get((int(p), int(b)), 0.) for p, b in zip(pitcher, batter)),
@@ -71,7 +65,7 @@ def blend(test):
     p = base_blend(test)
     mid = middle_adjustment(test)
     pb = pb_adjustment(test)
-    print(f"recent-middle mean={mid.mean():+.6f}; "
+    print(f"career-middle mean={mid.mean():+.6f}; "
           f"pitcher-batter coverage={(pb != 0).mean()*100:.1f}% mean={pb.mean():+.6f}")
     return np.clip(p+mid+pb, 0, 1)
 

@@ -24,6 +24,10 @@ FLAG lb-probing | BANNED | 규칙·심사 | LB 점수를 보고 상수를 되맞
 
 ## CLOSED — 측정으로 닫힘. 새 근거(표면·구조 변화) 있을 때만 재개
 
+FLAG strong-champion-residual-learner | CLOSED | SR1 best_iter=0; 고정 2% source 2023 −0.038, strong 2024 −0.014 | K0의 honest residual을 raw 공식 피처로 다시 학습해도 시즌을 넘는 잔차 구조가 없다. 얕고 강하게 수축한 CatBoostRegressor조차 첫 트리에서 멈췄으며 R 전·후반이 모두 비양수다.
+FLAG base-cell-disagreement-routing | CLOSED | MDU1 signed-q8 25% source −2.349 / strong target −2.106; abs-q8 source −0.303 / strong R −1.747 | base와 cell의 예측 차이는 불확실성처럼 보이지만 residual 방향·크기 매핑이 다음 시즌으로 이전되지 않는다. q-bin·부호×크기·확률구간 조합을 더 고르는 것은 source 선택편의다.
+FLAG within-base-seed-variance | CLOSED | EV1 q8 25% −0.966; shrink 25% 전체 +1.369, early +4.255 / late −2.401 | 동일 base 계열 공통 4시드의 행별 표준편차 분포는 2023→24에 안정적이지만, residual 방향은 후반기에 반전한다. 앙상블 분산은 epistemic uncertainty의 크기 진단일 뿐 제출 가능한 보정 방향이 아니다.
+FLAG --bootstrap-type Bernoulli | CLOSED | BTP1 standalone −13.63/−14.19; core base 10% 교체 −0.159/−0.107 | 기본 Bayesian bootstrap을 0.8 Bernoulli 행 샘플링으로 바꾸면 R에서 과소성능하고, F 다양성(+2.19 at 10%)도 전체 core에 남지 않는다. 동일 source/target에서 모든 교체비율이 음수라 다른 subsample 연속탐색은 하지 않는다.
 FLAG --model lgb | CLOSED | 미학습표면 margin −7.1 | 자기검증(−9.8)과 미학습(−7.1) 양쪽에서 음수. D 가 9.8 → 59.9 로 **더 나빠졌다** — 표면 효과가 이쪽엔 없다.
 FLAG --feat-frac | CLOSED | 미학습표면 이득 +0.60 | 부분공간 0.7. margin +8.8 로 양수지만 무시할 크기.
 FLAG gpboost | CLOSED | 랜덤효과 분산 ~0 | 우리 피처(asof·TE·skill)를 다 넣으면 투수 랜덤효과 분산이 0.0042 로 죽는다. 피처 42개를 빼고 랜덤효과로 대체하면 −265.

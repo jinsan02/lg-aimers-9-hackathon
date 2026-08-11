@@ -11,6 +11,23 @@
 Brier Skill Score 최대화. 1차 목표 **1120대 합법 진입**. 사용자 제공 리더보드에서
 최근 확인한 최고점은 1,288.180881이며 실시간 현재값은 별도 확인 전이다.
 
+## 2026-08-12 SR1·MDU1 — 제출 후보 없음, 소스 정합성 복구
+
+- 강한 K0의 honest residual을 raw 공식 피처로 학습한 SR1은 `best_iter=0`; 고정 2%
+  결합이 source 2023 `−0.038`, strong 2024 `−0.014`였다.
+- base/cell disagreement q-bin 보정 MDU1은 signed arm이 `−2.349/−2.106`, abs arm도
+  source `−0.303` 및 strong R `−1.747`로 이전되지 않았다. 두 축 모두 CLOSED.
+- 실제 v11 제출 ZIP은 recent-middle+PB로 정상이다. 다만 `src/script_blend_v11.py`가
+  v12 career-middle 내용으로 남아 있던 인프라 위험을 발견해, 실제 ZIP과 동일한 v11로
+  복구하고 career 버전을 `src/script_blend_v12.py`로 분리했다. LB 해석에는 영향 없음.
+- PB 저랭크 수축은 사전검문에서 이미 CLOSED(`−2.639/+0.350/+0.551`)임을 재확인해
+  중복 실행하지 않는다. 다음 신규 검정은 base/cell 간 차이와 구별되는 **동일 base 계열의
+  시드 간 예측분산**이었다. EV1 q8은 `−0.966`, 구조적 수축은 최고 전체 `+1.369`이나
+  전반 `+4.255` / 후반 `−2.401`로 반전해 CLOSED. 신규 제출 후보는 없다.
+- 이어서 코어 학습의 미시도 축인 Bernoulli bootstrap 0.8을 단일 변경했다. BTP1 단독은
+  MVA 대비 `−13.63/−14.19`; K0 base 10% 교체도 `−0.159/−0.107`이었다. 기본 Bayesian
+  bootstrap을 유지하며 subsample 추가 탐색은 하지 않는다.
+
 ## 2026-08-12 core 보존형 신규 탐색 — 제출 후보 없음
 
 K0(recent-middle+exact-PB)를 보존한 약신호 salvage, FT-Transformer, BrierScore
