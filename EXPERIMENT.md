@@ -10,6 +10,18 @@
 
 Brier Skill Score 최대화. 목표 **1120대 합법 진입**. 현재 1위 1,198.02.
 
+## 2026-08-11 SBS 다음 구종·멀티태스크 gate
+
+선수 map2와 행 단독 상황키로 main:Trackman 현재구종 1:1 라벨을 전체 75.1668%,
+2023/2024 77.1225%/76.5947% 복원했다. 실제 구종 oracle은 로컬 기준선 대비
+`+120.693`, 구종×count는 `+141.909`로 강했지만, 미학습 2024에 합법적으로 예측한
+구종확률로 주변화하면 `−13.043~−28.871`이었다. 대회 47열 전부를 쓴 구종 head도
+정확도 53.606%, 기대보정과 실제 제구잔차 상관 ≤.0017이다.
+
+따라서 SBS식 직전구종 sequence는 행독립상 제외하고, predicted-pitch marginalization은
+CLOSED다. full multitask NN도 새 행단독 구종 신호가 생기기 전에는 승격하지 않는다.
+상세: [`docs/SBS_PITCH_MULTITASK_RESEARCH_20260811.md`](docs/SBS_PITCH_MULTITASK_RESEARCH_20260811.md).
+
 ## 2026-08-11 로컬 피처 엔지니어링 후속
 
 평가 서버와 Python/pandas/numpy/sklearn/joblib 버전을 맞춘 노트북 RTX 5060에서

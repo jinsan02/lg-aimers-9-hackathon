@@ -12,6 +12,21 @@ Codex
 
 ## Status
 
+2026-08-11 SBS 다음 구종·제구 멀티태스크 조사 완료:
+
+- SBS 2017 모델은 약 22만 구 기반 다음 구종 예측기이며 공개 60~80% 적중률은 제구/BSS와
+  직접 비교할 수 없다. Trackman 2024 3분류는 행단독 50.925%, 직전 2구 포함 52.701%.
+- 선수 map2까지 조인하자 main:Trackman 1:1 현재구종 라벨을 전체 75.1668%,
+  2023/2024 77.1225%/76.5947% 복원했다. 복수행 그룹은 정렬하지 않았다.
+- 실제 구종 oracle은 `MVA_native=876.899` 대비 +120.693, 구종×count +141.909이지만
+  합법적인 구종확률 주변화는 Trackman head `-13.043/-25.091`, 대회 47열 head
+  `-14.843/-28.871`. strongest pitch head accuracy 53.606%, 잔차상관 ≤.0017.
+- 예측 구종 주변화 CLOSED, SBS sequence는 행독립상 제출 불가. masked multitask residual은
+  구현 가능하지만 새 행단독 구종 정보가 없으므로 GPU 미승격. 챔피언/제출후보 변화 없음.
+- 상세: `docs/SBS_PITCH_MULTITASK_RESEARCH_20260811.md`; 재현 도구
+  `tools/pitch_aux_feasibility.py`, `tools/audit_joint_pitch_labels.py`,
+  `tools/pitch_type_control_gate.py`.
+
 2026-08-11 로컬 평가환경 피처 엔지니어링 후속 완료:
 
 - Python 3.11.15, pandas 2.0.3, numpy 1.26.4, sklearn 1.8.0, joblib 1.5.3으로
