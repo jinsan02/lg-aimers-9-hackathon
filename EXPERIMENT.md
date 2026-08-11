@@ -10,6 +10,19 @@
 
 Brier Skill Score 최대화. 목표 **1120대 합법 진입**. 현재 1위 1,198.02.
 
+## 2026-08-11 로컬 피처 엔지니어링 후속
+
+평가 서버와 Python/pandas/numpy/sklearn/joblib 버전을 맞춘 노트북 RTX 5060에서
+`MVA_native=876.90`을 고정 기준으로 9개 단일변경을 실행했다. 소규모 피처 삭제는
+`-4.99~-45.21`, recent-pair q-bin/TE는 `-35.63/-7.84`, exact-PB 모델 TE는
+`-17.56`, count 12상태 범주는 `-9.57`, 투수·타자 quality-min은 `-10.95`였다.
+다중시드로 승격할 후보와 새 제출 패키지는 없다.
+
+과거 타석 깊이 proxy, 구종/실패 entropy, 홈·원정 합성도 CPU 두 전이 게이트를
+통과하지 못했다. 상세와 재현 경로는
+[`docs/LOCAL_FEATURE_AUDIT_20260811.md`](docs/LOCAL_FEATURE_AUDIT_20260811.md)에 있다.
+현행 v11/LB 1101.802를 유지한다.
+
 ## 2026-08-11 로컬 전수 데이터 감사
 
 원격 없이 로컬 RTX 5060에서 공개 train 1,475,092행·공식 입력 47개와 Trackman

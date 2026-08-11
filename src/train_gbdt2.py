@@ -923,6 +923,17 @@ def main():
                          "tools/domain_probe.py 로 실측 선별한 둘만 넣는다")
     ap.add_argument("--feat-league-runner", action="store_true",
                     help="전수 잔차감사: game_type x num_runners_on 8범주")
+    ap.add_argument("--feat-count-cat", action="store_true",
+                    help="볼-스트라이크의 정확한 12상태를 저카디널리티 범주로 추가")
+    ap.add_argument("--feat-quality-min", action="store_true",
+                    help="당해 시즌 투수/타자 상대 제구율의 matchup bottleneck 최소값")
+    ap.add_argument("--feat-recent-pair-bin", default="",
+                    choices=["", "reverse3", "career3", "both"],
+                    help="3전이 안정 관계를 fit-only 2D quantile 범주로 표현")
+    ap.add_argument("--recent-pair-bin-q", type=int, default=8,
+                    help="2D recent-pair 범주의 축별 quantile 수")
+    ap.add_argument("--recent-pair-bin-te-only", action="store_true",
+                    help="2D bin key는 숨기고 season-expanding TE만 모델에 제공")
     ap.add_argument("--feat-form", action="store_true",
                     help="E108: 최근 1/3/5경기 폼을 **당해 시즌 기준선** 대비로. "
                          "기존 form_delta 는 통산 대비라 체제 차이가 섞였다")
@@ -1184,6 +1195,10 @@ def main():
         rm = {c.strip() for c in args.drop_cols.split(",") if c.strip()}
         before = len(features)
         features = [c for c in features if c not in rm]
+        # Keep CatBoost's categorical declaration aligned with the actual
+        # matrix.  Numeric-only ablations hid this bug until a categorical
+        # feature was screened by --drop-cols.
+        CAT_COLS[:] = [c for c in CAT_COLS if c in features]
         print(f"열 제거 {before - len(features)}개 -> 총 {len(features)}개 "
               f"({sorted(rm & set(train.columns))})")
 

@@ -124,6 +124,10 @@ SPECS = {
     # 시즌 누적이면 그룹당 표본이 충분하다 (k=50 수축이 꼬리를 눌러준다).
     "pchh": ["pitcher_id", "balls_before", "strikes_before", "batter_hand"],
     "pcb":  ["pitcher_id", "balls_before", "strikes_before", "base_state"],
+    # Label-free q-bin keys are created by fpipe before this stage.  Their TE
+    # uses only seasons < S and is normally hidden from CatBoost itself.
+    "rp":   ["pairbin_reverse_prev3"],
+    "cp":   ["pairbin_career_prev3"],
 }
 
 
@@ -155,6 +159,8 @@ def apply_dev(df, te_cols):
     base = {"te_pitcher_ratio", "te_batter_ratio"}
     made = []
     for c in [c for c in te_cols if c.endswith("_ratio") and c not in base]:
+        if c.startswith("te_pairbin_"):
+            continue
         # 그 키가 투수 기준인지 타자 기준인지로 분모를 고른다
         b = "te_batter_ratio" if c.startswith("te_batter") else "te_pitcher_ratio"
         if b not in df.columns:

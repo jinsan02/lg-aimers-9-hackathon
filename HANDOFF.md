@@ -12,6 +12,20 @@ Codex
 
 ## Status
 
+2026-08-11 로컬 평가환경 피처 엔지니어링 후속 완료:
+
+- Python 3.11.15, pandas 2.0.3, numpy 1.26.4, sklearn 1.8.0, joblib 1.5.3으로
+  평가 서버 핵심 버전을 맞추고 RTX 5060에서만 같은 머신 비교했다.
+- `MVA_native=876.90` 대비 실제 GPU 단일변경 9개가 전부 음수였다. 삭제 4개
+  `-4.99~-45.21`, recent-pair 범주/TE `-35.63/-7.84`, PB core TE `-17.56`,
+  count-cat `-9.57`, quality-min `-10.95`.
+- CPU 사전 게이트의 PA-depth 최선은 `+0.089/+0.565`; entropy와 홈·원정 합성은
+  음수. quality-min 잔차 map `+9.75/+11.84`도 실제 재학습에서 반전했다.
+- `--drop-cols`로 범주형을 제거할 때 CAT_COLS가 남아 죽는 기존 버그를 수정했다.
+- 상세: `docs/LOCAL_FEATURE_AUDIT_20260811.md`; 새 도구
+  `tools/loss_feature_audit.py`, `tools/pa_depth_proxy_audit.py`.
+- 승격·제출 후보 없음. 로컬 GPU 유휴. 현행 v11/LB 1101.802 유지.
+
 2026-08-11 로컬 전수 데이터 감사 완료:
 
 - 원격 서버 없이 공개 train 1,475,092행/47입력과 Trackman 1,793,078행/30컬럼 전부를

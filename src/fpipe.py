@@ -97,6 +97,36 @@ def fit(train, args, is_fit, tm_table=None, verbose=True):
         new_cols.append("league_runner")
         new_cats.append("league_runner")
 
+    # Exact 12-state count geometry.  The raw ball/strike columns and the
+    # pitcher-by-count TE remain available; this one low-cardinality key lets
+    # CatBoost express the global joint state without spending two tree levels.
+    art["count_cat"] = bool(getattr(args, "feat_count_cat", False))
+    if art["count_cat"]:
+        train["count_cat"] = (train["balls_before"].astype(str) + "_" +
+                              train["strikes_before"].astype(str))
+        new_cols.append("count_cat")
+        new_cats.append("count_cat")
+
+    # Label-free 2D discretisation of the only continuous relations that were
+    # positive in all three rolling transitions.  Edges are fitted strictly on
+    # is_fit rows and frozen in the artifact; test rows are transformed one by
+    # one and never affect the bins.  This differs from the failed raw product:
+    # CatBoost can shrink each coarse state as a category without spending
+    # several tree levels approximating two continuous axes.
+    pair_mode = getattr(args, "feat_recent_pair_bin", "")
+    pair_q = int(getattr(args, "recent_pair_bin_q", 8))
+    art["recent_pair_bin"] = _fit_recent_pair_bins(
+        train, is_fit, pair_mode, pair_q) if pair_mode else None
+    if art["recent_pair_bin"] is not None:
+        train, cols = _apply_recent_pair_bins(train, art["recent_pair_bin"])
+        pair_te_only = bool(getattr(args, "recent_pair_bin_te_only", False))
+        art["recent_pair_bin"]["te_only"] = pair_te_only
+        if not pair_te_only:
+            new_cols += cols
+            new_cats += cols
+        say(f"recent pair q{pair_q}({pair_mode}): "
+            f"{'TE key only' if pair_te_only else '+' + str(len(cols))}")
+
     # Leading ID digits follow chronological registration/debut cohorts.  Keep
     # only this coarse, extrapolating signal; never expose identity-like suffixes.
     art["id_cohort"] = (getattr(args, "id_cohort_roles", "pb")
@@ -159,6 +189,17 @@ def fit(train, args, is_fit, tm_table=None, verbose=True):
             if art[name]:
                 train, c = fn(train)
                 cols += c
+        # Matchup bottleneck: both components are already time-honest,
+        # current-season posterior rates.  min() exposes which side supplies
+        # the lower execution environment without removing either component.
+        art["quality_min"] = bool(getattr(args, "feat_quality_min", False))
+        if art["quality_min"]:
+            p = "std_asof_pitcher_success_rate"
+            b = "std_asof_batter_success_rate"
+            if p not in train or b not in train:
+                raise KeyError("--feat-quality-min requires pitcher/batter std success")
+            train["quality_min"] = np.minimum(train[p], train[b])
+            cols.append("quality_min")
         art["recent_relation"] = getattr(args, "feat_recent_relation", "")
         if art["recent_relation"]:
             train, c = ss.add_recent_relation(train, art["recent_relation"])
@@ -190,10 +231,14 @@ def fit(train, args, is_fit, tm_table=None, verbose=True):
         for spec in args.te.split(","):
             spec = spec.strip()
             keys = te_mod.SPECS[spec]
+            # Pair-bin TE is a group-level success prior, not a
+            # pitcher-vs-context ratio.  Its expectation must therefore be the
+            # season baseline rather than the same bin group itself.
+            _strat = (not args.te_flat) and spec not in ("rp", "cp")
             tables.append((keys, te_mod.build_te(
                 train, keys, k=_kmap.get(spec, _kdef),
                 half_life=args.te_halflife,
-                strat=not args.te_flat)))
+                strat=_strat)))
         art["te"] = {"tables": tables, "dev": args.te_dev,
                      "cross": bool(args.feat_cross and args.feat_std)}
         train, cols = _apply_te(train, art["te"])
@@ -237,6 +282,11 @@ def transform(df, art):
     if art.get("league_runner"):
         df["league_runner"] = (df["game_type"].astype(str) + "_" +
                                df["num_runners_on"].astype(str))
+    if art.get("count_cat"):
+        df["count_cat"] = (df["balls_before"].astype(str) + "_" +
+                           df["strikes_before"].astype(str))
+    if art.get("recent_pair_bin") is not None:
+        df, _ = _apply_recent_pair_bins(df, art["recent_pair_bin"])
     if art.get("id_cohort"):
         df, _ = _apply_id_cohort(df, art["id_cohort"])
     if art.get("roster") is not None:
@@ -254,6 +304,10 @@ def transform(df, art):
                          ("window", ss.add_window), ("count", ss.add_count_style)):
             if art.get(name):
                 df, _ = fn(df)
+        if art.get("quality_min"):
+            df["quality_min"] = np.minimum(
+                df["std_asof_pitcher_success_rate"],
+                df["std_asof_batter_success_rate"])
         if art.get("recent_relation"):
             df, _ = ss.add_recent_relation(df, art["recent_relation"])
     if art.get("te") is not None:
@@ -281,6 +335,55 @@ def _apply_id_cohort(df, roles="pb"):
         out[name] = (pd.to_numeric(out[src], errors="coerce") // 100).astype(np.float32)
         cols.append(name)
     return out, cols
+
+
+def _fit_recent_pair_bins(df, is_fit, mode="reverse3", q=8):
+    """Fit frozen quantile edges for audited career/recent relations."""
+    if q < 2:
+        raise ValueError("recent pair bins require q >= 2")
+    recent = "asof_pitcher_prev3_game_success_rate"
+    specs = {
+        "reverse3": [("pairbin_reverse_prev3", "asof_pitcher_reverse_rate", recent)],
+        "career3": [("pairbin_career_prev3", "asof_pitcher_success_rate", recent)],
+        "both": [
+            ("pairbin_reverse_prev3", "asof_pitcher_reverse_rate", recent),
+            ("pairbin_career_prev3", "asof_pitcher_success_rate", recent),
+        ],
+    }
+    if mode not in specs:
+        raise ValueError(f"unknown recent pair-bin mode: {mode}")
+    out = []
+    probs = np.linspace(0, 1, q + 1)[1:-1]
+    for name, a, b in specs[mode]:
+        if a not in df or b not in df:
+            raise KeyError(f"missing pair-bin inputs: {a}, {b}")
+        edges = []
+        for c in (a, b):
+            x = pd.to_numeric(df.loc[is_fit, c], errors="coerce").to_numpy(float)
+            x = x[np.isfinite(x)]
+            edges.append(np.unique(np.quantile(x, probs)) if len(x) else np.array([]))
+        out.append({"name": name, "a": a, "b": b,
+                    "edges_a": edges[0], "edges_b": edges[1]})
+    return {"mode": mode, "q": q, "specs": out}
+
+
+def _apply_recent_pair_bins(df, pack):
+    out = df.copy()
+    made = []
+
+    def code(s, edges):
+        x = pd.to_numeric(s, errors="coerce").to_numpy(float)
+        z = np.zeros(len(x), dtype=np.int16)  # 0 is missing/cold-start
+        ok = np.isfinite(x)
+        z[ok] = np.searchsorted(edges, x[ok], side="right") + 1
+        return z.astype(str)
+
+    for spec in pack["specs"]:
+        ca = code(out[spec["a"]], np.asarray(spec["edges_a"], float))
+        cb = code(out[spec["b"]], np.asarray(spec["edges_b"], float))
+        out[spec["name"]] = np.char.add(np.char.add(ca, "_"), cb)
+        made.append(spec["name"])
+    return out, made
 
 
 def _apply_std(df, std):
