@@ -10,6 +10,21 @@
 
 Brier Skill Score 최대화. 목표 **1120대 합법 진입**. 현재 1위 1,198.02.
 
+## 2026-08-11 masked 구종 보조학습 — 제출 후보 준비 완료
+
+예측 구종을 제구 확률에 직접 주변화하는 경로는 계속 CLOSED다. 대신 strict 1:1로 복원한
+현재 구종을 과거행의 masked auxiliary label로만 쓰고, 추론에서는 제구 head만 출력하는
+공유 MLP가 새로 통과했다. 제구 단독망 대비 6시드 paired 평균은 2021→22/2022→23/
+2023→24 각각 `+89.858/+72.361/+18.432`, t=`7.882/4.980/4.083`이다.
+
+v11 유사 route에 가중치 10%를 고정해 source correction을 다음 연도로 넘기면 전체 증분은
+`+14.891/+140.131/+9.390`; 최신 전이는 R/F `+8.984/+12.457`, 전/후반
+`+9.840/+8.803`이다. 2019–2024 full-fit 6시드와 일관된 recent-middle/PB 상수를 만들었고
+`submissions/v13_pitch_mtl_0811.zip`을 준비했다. 압축 해제 smoke와 행 독립 감사(한 행씩,
+역순, 절반 배치)가 모두 통과했으며 최대 차이는 0이다. LB 미관측이므로 현재 챔피언은
+여전히 v11이고 v13은 **제출 대기 후보**다. 상세:
+[`docs/PITCH_MASKED_MTL_20260811.md`](docs/PITCH_MASKED_MTL_20260811.md).
+
 ## 2026-08-11 SBS 다음 구종·멀티태스크 gate
 
 선수 map2와 행 단독 상황키로 main:Trackman 현재구종 1:1 라벨을 전체 75.1668%,
@@ -19,7 +34,8 @@ Brier Skill Score 최대화. 목표 **1120대 합법 진입**. 현재 1위 1,198
 정확도 53.606%, 기대보정과 실제 제구잔차 상관 ≤.0017이다.
 
 따라서 SBS식 직전구종 sequence는 행독립상 제외하고, predicted-pitch marginalization은
-CLOSED다. full multitask NN도 새 행단독 구종 신호가 생기기 전에는 승격하지 않는다.
+CLOSED다. 다만 구종을 최종 확률에 직접 넣지 않는 masked auxiliary representation은
+별도 실험으로 재개해 위 제출 후보까지 승격했다.
 상세: [`docs/SBS_PITCH_MULTITASK_RESEARCH_20260811.md`](docs/SBS_PITCH_MULTITASK_RESEARCH_20260811.md).
 
 ## 2026-08-11 로컬 피처 엔지니어링 후속

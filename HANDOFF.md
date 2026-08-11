@@ -12,6 +12,21 @@ Codex
 
 ## Status
 
+2026-08-11 masked 구종 auxiliary 제출 후보 완료:
+
+- 과거 strict 1:1 매칭행의 현재 구종만 3분류 masked CE로 사용하고, 추론은 대회 현재행
+  피처에서 제구 head 하나만 출력한다. Trackman·구종 라벨은 ZIP에 포함하지 않았다.
+- 제구 단독 MLP 대비 6시드 paired mean/t: 2021→22 `+89.858/7.882`, 2022→23
+  `+72.361/4.980`, 2023→24 `+18.432/4.083`.
+- v11 유사 source-fit recent-middle+PB route에 NN 10% 고정 추가 시 target 증분
+  `+14.891/+140.131/+9.390`. 최신 R/F와 전/후반 모두 양수. 2022 F만 `−34.751` 위험.
+- 직접 pitch-conditioned MoE는 seed42 730.93으로 masked auxiliary 753.25보다 약해 종료.
+- 최종 2019–2024 full-fit 6시드 완료. 후보는 `submissions/v13_pitch_mtl_0811.zip`
+  (122.54 MB, 33 entries, 역슬래시/pycache 0).
+- 압축 해제 smoke 정상, 20,000행 5.31초, `audit_rowindep.py` 세 검사 최대차 0.
+- 현재 챔피언은 LB가 확인된 v11(1101.802). v13은 오프라인 PASS/LB 미관측 제출 대기.
+- 상세: `docs/PITCH_MASKED_MTL_20260811.md`.
+
 2026-08-11 SBS 다음 구종·제구 멀티태스크 조사 완료:
 
 - SBS 2017 모델은 약 22만 구 기반 다음 구종 예측기이며 공개 60~80% 적중률은 제구/BSS와
@@ -21,8 +36,8 @@ Codex
 - 실제 구종 oracle은 `MVA_native=876.899` 대비 +120.693, 구종×count +141.909이지만
   합법적인 구종확률 주변화는 Trackman head `-13.043/-25.091`, 대회 47열 head
   `-14.843/-28.871`. strongest pitch head accuracy 53.606%, 잔차상관 ≤.0017.
-- 예측 구종 주변화 CLOSED, SBS sequence는 행독립상 제출 불가. masked multitask residual은
-  구현 가능하지만 새 행단독 구종 정보가 없으므로 GPU 미승격. 챔피언/제출후보 변화 없음.
+- 예측 구종 주변화 CLOSED, SBS sequence는 행독립상 제출 불가. 이 결론은 유지하되 직접
+  주변화하지 않는 masked auxiliary representation은 위 후속 실험에서 통과했다.
 - 상세: `docs/SBS_PITCH_MULTITASK_RESEARCH_20260811.md`; 재현 도구
   `tools/pitch_aux_feasibility.py`, `tools/audit_joint_pitch_labels.py`,
   `tools/pitch_type_control_gate.py`.

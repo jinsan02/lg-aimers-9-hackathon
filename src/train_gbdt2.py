@@ -863,6 +863,12 @@ def main():
     ap.add_argument("--dump-npz", default="",
                     help="피처 행렬을 npz 로 내보내고 종료 (NN 학습용). "
                          "같은 파이프라인을 두 번 구현하지 않기 위한 이음매")
+    ap.add_argument("--dump-pitch-aux", action="store_true",
+                    help="dump NPZ에 strict 1:1 Trackman 현재구종 보조라벨을 추가. "
+                         "학습 전용이며 추론 피처로는 절대 사용하지 않는다")
+    ap.add_argument("--dump-full-fit", action="store_true",
+                    help="dump 전용: 검증 홀드아웃 없이 현재 train 전체로 "
+                         "fpipe/vocab을 fit한다 (최종 제출 재학습용)")
     ap.add_argument("--feat-skill", action="store_true",
                     help="E116: 학습된 투수 실력 추정치를 피처로. 손으로 정한 "
                          "k=80 수축(설명력 37.3%%)보다 학습된 선형결합이 59.0%%")
@@ -1018,6 +1024,14 @@ def main():
     # 타깃을 쓰는 표 적합에서는 검증 시즌과 test 시즌을 **둘 다** 뺀다
     is_fit = ~is_val & ~train.get("_is_test",
                                   pd.Series(False, index=train.index))
+    if args.dump_full_fit:
+        if not args.dump_npz:
+            raise ValueError("--dump-full-fit requires --dump-npz")
+        if args.test_season:
+            raise ValueError("--dump-full-fit cannot be combined with --test-season")
+        is_fit = pd.Series(True, index=train.index)
+        is_val = pd.Series(False, index=train.index)
+        print(f"최종 제출 full-fit dump: 전체 {len(train):,}행으로 artifact/vocab fit")
     # 피처 생성은 fpipe 가 전담한다 — 추론(script_blend_v6)이 쓰는
     # fpipe.transform 과 **같은 파일에 나란히** 있어서 순서가 어긋날 수 없다.
     ctx_tables = role_table = mgr_table = None
@@ -1233,13 +1247,23 @@ def main():
         is_test = train.get("_is_test", pd.Series(False, index=train.index))
         print(f"보조 라벨 {aux.shape} | 복원률 "
               f"{np.isfinite(aux).all(1).mean() * 100:.2f}%")
-        np.savez(args.dump_npz, Xn=Xn, Xc=Xc,
-                 y=train[TARGET].to_numpy(np.float32),
-                 aux=aux, aux_names=np.array(fm.MODES),
-                 cell=cell.to_numpy(np.int16),
-                 cell_names=np.array(cell_names),
-                 cell_success=np.array(sorted(cell_success), np.int16),
-                 is_val=is_val.to_numpy(), is_test=is_test.to_numpy())
+        payload = dict(
+            Xn=Xn, Xc=Xc, y=train[TARGET].to_numpy(np.float32),
+            aux=aux, aux_names=np.array(fm.MODES),
+            cell=cell.to_numpy(np.int16), cell_names=np.array(cell_names),
+            cell_success=np.array(sorted(cell_success), np.int16),
+            is_val=is_val.to_numpy(), is_test=is_test.to_numpy(),
+            row_id=train[ID].astype(str).to_numpy(),
+            season=train["season"].to_numpy(np.int16),
+        )
+        if args.dump_pitch_aux:
+            from joint_pitch import TYPES as pitch_names
+            from joint_pitch import labels_for_rows
+            payload["pitch"] = labels_for_rows(train[ID])
+            payload["pitch_names"] = np.asarray(pitch_names)
+            print(f"구종 보조라벨 복원률 "
+                  f"{(payload['pitch'] >= 0).mean() * 100:.2f}%")
+        np.savez(args.dump_npz, **payload)
         joblib.dump({"num": num, "cat_cols": CAT_COLS, "vocab": vocab,
                      "features": features, "fpipe": art},
                     args.dump_npz.replace(".npz", "_meta.pkl"), compress=3)
