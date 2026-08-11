@@ -12,20 +12,21 @@ Codex
 
 ## Status
 
-2026-08-11 masked 구종 auxiliary 제출 후보 완료:
+2026-08-11 masked 구종 auxiliary v13 LB 실패 및 v14 수정:
 
-- 과거 strict 1:1 매칭행의 현재 구종만 3분류 masked CE로 사용하고, 추론은 대회 현재행
-  피처에서 제구 head 하나만 출력한다. Trackman·구종 라벨은 ZIP에 포함하지 않았다.
-- 제구 단독 MLP 대비 6시드 paired mean/t: 2021→22 `+89.858/7.882`, 2022→23
-  `+72.361/4.980`, 2023→24 `+18.432/4.083`.
-- v11 유사 source-fit recent-middle+PB route에 NN 10% 고정 추가 시 target 증분
-  `+14.891/+140.131/+9.390`. 최신 R/F와 전/후반 모두 양수. 2022 F만 `−34.751` 위험.
-- 직접 pitch-conditioned MoE는 seed42 730.93으로 masked auxiliary 753.25보다 약해 종료.
-- 최종 2019–2024 full-fit 6시드 완료. 후보는 `submissions/v13_pitch_mtl_0811.zip`
-  (122.54 MB, 33 entries, 역슬래시/pycache 0).
-- 압축 해제 smoke 정상, 20,000행 5.31초, `audit_rowindep.py` 세 검사 최대차 0.
-- 현재 챔피언은 LB가 확인된 v11(1101.802). v13은 오프라인 PASS/LB 미관측 제출 대기.
-- 상세: `docs/PITCH_MASKED_MTL_20260811.md`.
+- v13 LB `1099.4652219091`, v11 대비 `−2.336845`. 실행 41초, 패키지 오류 없음.
+- 원래 rolling은 artifact/vocab/QT≤S−2, 모델≤S−1, target S였지만 v13은 전처리까지
+  2024 full-fit해 검증 구조를 바꿨다.
+- 제출형 full-fit 과거 재현: 2022→23 paired `−198.662`(t=−3.758), 2023→24
+  `−123.688`(t=−6.348). 두 전이 동시 양수인 단순 행단독 서브그룹도 0개.
+- QT만 이전 연도에 동결하면 최신 ensemble 손실은 `−107.674→−13.998`; fpipe 갱신도
+  원래 `+21.592`를 `−13.998`로 뒤집는다. old/new middle/PB 상관 .9989/.9998이라
+  후처리는 원인이 아니다. `masked-pitch-auxiliary-full-fit` CLOSED.
+- 원래 검증 구조를 2025로 평행 이동한 v14: 전처리≤2023, 모델≤2024. NN 10%,
+  slope/shift, middle/PB는 불변. `submissions/v14_pitch_mtl_lag_0811.zip`.
+- v14 ZIP 33 entries/122.50 MB, 역슬래시/pycache 0, 압축 해제 smoke 및 행독립 최대차 0.
+  LB 미관측이며 현재 챔피언은 v11(1101.802).
+- 상세: `docs/PITCH_MTL_LB_FAILURE_20260811.md`.
 
 2026-08-11 SBS 다음 구종·제구 멀티태스크 조사 완료:
 

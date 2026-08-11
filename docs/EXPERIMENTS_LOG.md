@@ -12,9 +12,12 @@
   t=`7.882/4.980/4.083` (2021→22/2022→23/2023→24).
 - v11 유사 correction route에 고정 10% 결합: `+14.891/+140.131/+9.390`.
 - 직접 pitch-conditioned MoE는 masked auxiliary보다 약해 종료했다.
-- full-fit 후보 `submissions/v13_pitch_mtl_0811.zip` 생성. 압축 해제 smoke 및 행 독립
-  3검사(한 행/역순/반쪽) 최대 차이 0. LB는 아직 제출하지 않아 공란이다.
-- 상세 수치·기전·위험: `docs/PITCH_MASKED_MTL_20260811.md`.
+- full-fit v13 LB `1099.4652219091`, v11 대비 `−2.336845`. 제출형 과거 재현도
+  `−198.662/−123.688`로 반전해 full-fit 경로를 CLOSED 처리했다.
+- 원래 rolling처럼 전처리를 한 시즌 더 과거에 동결한 v14
+  `submissions/v14_pitch_mtl_lag_0811.zip` 생성. 가중치·후처리는 불변, smoke와 행 독립
+  감사 통과, LB 미관측.
+- 상세 수치·기전·위험: `docs/PITCH_MTL_LB_FAILURE_20260811.md`.
 
 ## 점수판 (2024 홀드아웃 BSS)
 

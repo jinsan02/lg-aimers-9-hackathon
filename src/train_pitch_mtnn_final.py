@@ -53,6 +53,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--npz", required=True)
     ap.add_argument("--test", default="data/test.csv")
+    ap.add_argument("--historical-test-season", type=int, default=0,
+                    help="0보다 크면 data/train.csv의 해당 시즌을 미래 test로 변환해 평가")
+    ap.add_argument("--train-all", action="store_true",
+                    help="lagged-artifact 최종 refit: NPZ의 val 표시도 학습에 포함")
     ap.add_argument("--out-dir", default="model/pitch_mtl")
     ap.add_argument("--pred-out", default="out/pitch_mtnn_full_test_preds.npz")
     ap.add_argument("--seeds", default="3,4,5,6,8,13")
@@ -62,13 +66,15 @@ def main():
     ap.add_argument("--wd", type=float, default=1e-5)
     ap.add_argument("--drop", type=float, default=0.15)
     ap.add_argument("--qbins", type=int, default=32)
+    ap.add_argument("--qt-max-season", type=int, default=0,
+                    help="진단용: QuantileTransformer만 이 시즌 이하에서 fit")
     ap.add_argument("--pitch-w", type=float, default=0.1)
     args = ap.parse_args()
 
-    if args.pitch_w <= 0:
-        raise ValueError("final candidate requires a positive masked pitch loss")
+    if args.pitch_w < 0:
+        raise ValueError("--pitch-w must be nonnegative")
     z = np.load(args.npz, allow_pickle=True)
-    if z["is_val"].any() or z["is_test"].any():
+    if (z["is_val"].any() or z["is_test"].any()) and not args.train_all:
         raise ValueError("final trainer requires a --dump-full-fit NPZ")
     xn_raw = np.nan_to_num(z["Xn"].astype(np.float32), nan=0.0,
                            posinf=0.0, neginf=0.0)
@@ -81,14 +87,28 @@ def main():
     print(f"full train {len(y):,} | pitch coverage {(pitch >= 0).mean()*100:.2f}%")
     qt = QuantileTransformer(output_distribution="normal", n_quantiles=1000,
                              subsample=300_000, random_state=0)
-    xn = qt.fit_transform(xn_raw).astype(np.float32)
+    if args.qt_max_season:
+        qt_fit = z["season"].astype(int) <= args.qt_max_season
+        if not qt_fit.any():
+            raise ValueError("--qt-max-season selected no rows")
+        qt.fit(xn_raw[qt_fit])
+        xn = qt.transform(xn_raw).astype(np.float32)
+        print(f"QT fit through {args.qt_max_season}: {qt_fit.sum():,} rows")
+    else:
+        xn = qt.fit_transform(xn_raw).astype(np.float32)
     xq = np.clip((xn * 4 + args.qbins / 2).astype(np.int64),
                  0, args.qbins - 1)
     cards = [len(meta["vocab"][c]) + 1 for c in meta["cat_cols"]]
     if any(xc[:, i].max(initial=-1) >= card for i, card in enumerate(cards)):
         raise ValueError("categorical code exceeds frozen vocabulary")
 
-    test = pd.read_csv(args.test, encoding="utf-8-sig")
+    if args.historical_test_season:
+        test = pd.read_csv("data/train.csv", encoding="utf-8-sig")
+        test = test[test["season"] == args.historical_test_season].reset_index(drop=True)
+        test_y = test["control_success"].to_numpy(np.float64)
+    else:
+        test = pd.read_csv(args.test, encoding="utf-8-sig")
+        test_y = None
     test_f = fpipe.transform(test.copy(), meta["fpipe"])
     xt_raw = np.nan_to_num(test_f[meta["num"]].to_numpy(np.float32),
                            nan=0.0, posinf=0.0, neginf=0.0)
@@ -116,7 +136,8 @@ def main():
 
     for seed in [int(s) for s in args.seeds.split(",") if s.strip()]:
         torch.manual_seed(seed)
-        net = MTNet(xn.shape[1], cards, n_aux=0, n_pitch=3,
+        n_pitch = 3 if args.pitch_w > 0 else 0
+        net = MTNet(xn.shape[1], cards, n_aux=0, n_pitch=n_pitch,
                     drop=args.drop, qbins=args.qbins).to(device)
         opt = torch.optim.AdamW(net.parameters(), lr=args.lr,
                                 weight_decay=args.wd)
@@ -134,7 +155,7 @@ def main():
                 logit, _, pitch_logit = net(xn_t[j], xc_t[j], xq_t[j])
                 loss = bce(logit, y_t[j])
                 mp = mask_t[j]
-                if mp.any():
+                if n_pitch and mp.any():
                     loss = loss + args.pitch_w * ce(pitch_logit[mp], p_t[j][mp])
                 loss.backward()
                 opt.step()
@@ -152,10 +173,13 @@ def main():
               flush=True)
 
     pred = np.mean(preds, axis=0)
-    np.savez_compressed(args.pred_out, row_id=test["row_id"].astype(str).to_numpy(),
-                        pred=pred, members=np.stack(preds),
-                        seeds=np.asarray([int(s) for s in args.seeds.split(",")
-                                          if s.strip()]))
+    payload = dict(row_id=test["row_id"].astype(str).to_numpy(), pred=pred,
+                   members=np.stack(preds),
+                   seeds=np.asarray([int(s) for s in args.seeds.split(",")
+                                     if s.strip()]))
+    if test_y is not None:
+        payload["y"] = test_y
+    np.savez_compressed(args.pred_out, **payload)
     print(f"saved {args.pred_out} | ensemble mean={pred.mean():.6f} "
           f"sd={pred.std():.6f}")
 
