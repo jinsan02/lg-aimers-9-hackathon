@@ -12,7 +12,29 @@ Codex
 
 ## Status
 
-2026-08-11 masked 구종 auxiliary v13 LB 실패 및 v14 수정:
+2026-08-12 기록 감사 및 HFC1 core-resolution gate:
+
+- 최근 LB 원장을 v10 `1100.0891947834`, v11 `1101.8020672065`, v12
+  `1083.5307698831`, v13 `1099.4652219091`, `v14_pitch_mtl_lag`
+  `1099.2989837237`로 대조했다. v14 관련 모든 현재 문서의 CANDIDATE 표현을 CLOSED로 수정.
+- HFC1 hierarchical failure chain은 동일 로컬 seed42에서 flat 14-cell 대비 2023
+  `−0.149`, 미학습 2024 `−71.655`; 고정 25% blend도 `+15.135→−2.519` 반전.
+  다중시드·제출 승격 없이 종료한다.
+- CRS0 `random_strength=0`은 MVA_native 대비 val `−7.79`, unseen 2024 `−15.78`.
+- 로컬 후보 59개 base-only 고정 블렌드 스캔에서 CatBoost 최대 이득은 두 표면 모두
+  +1 미만이었다. MLP만 컸지만 실제 v13/v14 LB가 이미 반증했으므로 재제출하지 않는다.
+- 정식 MVCELL_s42를 재생성: base/cell/core(.45/.55) unseen 2024 =
+  `876.899/890.63/900.175`. 실제 core 위 모든 Cat 파생은 2024 음수, PMT1 6시드 평균
+  10%도 `+12.345/+2.793`으로 gate 미달.
+- 예측 구종확률 파생 PUG1/PUP2: entropy·margin 실패. 최선 fastball×breaking q4가
+  2023 반분 `+2.797`, 2024 `+2.602`; offspeed 단독은 `+1.376/+3.212`. 두 표면 +3
+  동시 통과가 없어 모델 피처 재학습 없이 CLOSED.
+- cell iteration 3000→5000: best_iter 3928, val +1.63이나 unseen cell −8.67.
+  현행 core에서 새 cell 10/25/50/100% 치환은 test `−0.178/−0.483/−1.093/−2.688`.
+  기존 3000 iter가 전이 정규화 역할을 하므로 유지.
+- 상세·파일별 정합성 목록: `docs/RECORD_AUDIT_20260812.md`.
+
+2026-08-11~12 masked 구종 auxiliary v13·v14 LB 실패 및 축 종료:
 
 - v13 LB `1099.4652219091`, v11 대비 `−2.336845`. 실행 41초, 패키지 오류 없음.
 - 원래 rolling은 artifact/vocab/QT≤S−2, 모델≤S−1, target S였지만 v13은 전처리까지
@@ -22,10 +44,14 @@ Codex
 - QT만 이전 연도에 동결하면 최신 ensemble 손실은 `−107.674→−13.998`; fpipe 갱신도
   원래 `+21.592`를 `−13.998`로 뒤집는다. old/new middle/PB 상관 .9989/.9998이라
   후처리는 원인이 아니다. `masked-pitch-auxiliary-full-fit` CLOSED.
-- 원래 검증 구조를 2025로 평행 이동한 v14: 전처리≤2023, 모델≤2024. NN 10%,
-  slope/shift, middle/PB는 불변. `submissions/v14_pitch_mtl_lag_0811.zip`.
+- 원래 검증 구조를 2025로 평행 이동한 `v14_pitch_mtl_lag`: 전처리≤2023, 모델≤2024.
+  NN 10%, slope/shift, middle/PB는 불변. `submissions/v14_pitch_mtl_lag_0811.zip`.
 - v14 ZIP 33 entries/122.50 MB, 역슬래시/pycache 0, 압축 해제 smoke 및 행독립 최대차 0.
-  LB 미관측이며 현재 챔피언은 v11(1101.802).
+  LB `1099.2989837237`(42초), v11 대비 `−2.5030834828`, v13 대비
+  `−0.1662381854`. 패키지 오류가 아니라 모델 일반화 실패다.
+- v13 full-fit과 v14 lagged-artifact가 모두 거의 같은 폭으로 하락했다. 원래 rolling의
+  구종 보조 증분은 2024→25에 전이되지 않았으므로 이 축의 추가 weight/gate/refit은 CLOSED.
+  현재 챔피언은 v11(1101.8020672065).
 - 상세: `docs/PITCH_MTL_LB_FAILURE_20260811.md`.
 
 2026-08-11 SBS 다음 구종·제구 멀티태스크 조사 완료:
