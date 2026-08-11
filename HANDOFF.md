@@ -12,6 +12,25 @@ Codex
 
 ## Status
 
+2026-08-12 core 보존형 신규 탐색 완료:
+
+- weak-signal salvage: 5000-cell source-selected routing target 최고 `+0.133`, predicted
+  pitch-proba는 K0 뒤 고정 combo `+1.526`; 모두 gate 미달.
+- FT-Transformer FTT1: val2023 `499.903`, unseen2024 `712.940`, K0 2% target
+  `+0.098`이나 source `−8.566`. CLOSED.
+- BrierScore early-stop BSE1: 기준과 best_iter 826 동일, unseen `876.87 vs 876.90`.
+- XGBoost 현재 121피처 경로의 test DMatrix 버그와 refit_mult 무시를 수정했다.
+  refit×1.5는 단독 `816.32→828.82`로 개선.
+- 약한 local K0에서는 고정 XGB 10%가 세 전이 `+2.640/+20.294/+3.749`, 최신
+  6시드 개별 `+3.092~+4.157`이었으나, 강한 4070 VB2×8+ZD5×6 아날로그에서는
+  2/5/10% `−0.053/−0.369/−1.526`. refit×1.5도 최선 2% `+0.094`, R/late 음수.
+  **제출 후보 아님**, 현행 v11 유지.
+- `matchup_constants_2024.npz`를 2024 검증에 되붙인 BSS 1402 중간 계산은 직접 누수로
+  무효 처리하고 BANNED 기록. 역사 상수는 source-2023에서 새로 fit해야 한다.
+- 상세: `docs/RECORD_AUDIT_20260812.md`; 재현:
+  `tools/weak_signal_salvage.py`, `tools/xgb_core_transfer.py`,
+  `src/train_fttransformer.py`. 로컬 GPU 현재 유휴.
+
 2026-08-12 기록 감사 및 HFC1 core-resolution gate:
 
 - 최근 LB 원장을 v10 `1100.0891947834`, v11 `1101.8020672065`, v12

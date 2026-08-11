@@ -78,6 +78,13 @@ submit.zip
 3. 2순위: RealMLP(pytabkit), FT-Transformer — 앙상블 다양성 확보
 4. 최종: GBDT(4070) + NN(A100) 확률 평균/스태킹, Brier 직접 최적화(BCE와 근접하므로 logloss 학습 후 캘리브레이션 점검)
 
+## 2026-08-12 실제 FT-Transformer 파일럿
+
+현재 121피처 NPZ에 수치 field token + 범주 embedding token + CLS, dim32,
+2 Transformer layers, 4 heads로 직접 학습했다. val2023 최고 `499.903`, refit 후
+unseen2024 `712.940`; 현행 K0와 RMS `.022445`이나 2% blend도 source `−8.566`,
+target `+0.098`이었다. FT-Transformer 추가 튜닝은 종료한다.
+
 ## 참고 링크
 
 - TabM: https://github.com/yandex-research/tabm (PyPI: https://pypi.org/project/tabm/)

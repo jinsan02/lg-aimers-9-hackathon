@@ -11,6 +11,18 @@
 Brier Skill Score 최대화. 1차 목표 **1120대 합법 진입**. 사용자 제공 리더보드에서
 최근 확인한 최고점은 1,288.180881이며 실시간 현재값은 별도 확인 전이다.
 
+## 2026-08-12 core 보존형 신규 탐색 — 제출 후보 없음
+
+K0(recent-middle+exact-PB)를 보존한 약신호 salvage, FT-Transformer, BrierScore
+early-stop, 현재 121피처 XGBoost를 로컬 RTX 5060에서 순차 검증했다. FT는 unseen
+`712.940`, Brier early-stop은 기준과 같은 best_iter 826/점수 차 −0.03으로 종료했다.
+
+XGBoost 10%는 약한 local single-seed K0에서 세 전이 `+2.640/+20.294/+3.749`로
+유망했고 최신 6시드도 개별 `+3.092~+4.157`이었다. 그러나 실제 챔피언에 가까운
+4070 VB2×8+ZD5×6 아날로그에서는 2/5/10%가 `−0.053/−0.369/−1.526`으로 사라졌다.
+refit×1.5 개선본도 최선 2% `+0.094`(R/late 음수)라 제출하지 않는다. 현행 v11을 유지한다.
+상세: [`docs/RECORD_AUDIT_20260812.md`](docs/RECORD_AUDIT_20260812.md).
+
 ## 2026-08-12 HFC1 실패모드 계층 분해 — 1시드 gate 기각
 
 flat 14-cell과 같은 NPZ·로컬 GPU·seed42에서 실패모드 joint를 네 조건부 이진 모델로

@@ -132,3 +132,44 @@ Trackman≤2022로 2023, Trackman≤2023으로 2024의 행단독 3구종 확률�
 old/new cell 예측 RMS는 val/test `.003022/.002882`로 차이는 작지만 모든 고정 치환이
 다음 시즌 음수다. 3000 상한은 최적점을 못 찾은 것처럼 보여도 시즌 전이 관점에서는
 유효한 정규화다. 기존 3000 tree cell을 유지하고 추가 iteration 탐색은 닫는다.
+
+## 약신호 salvage · 새 core geometry 후속
+
+현행 recent-middle+exact-PB의 정직한 rolling 아날로그 `K0` 위에서만 증분을 다시
+측정했다. 5000-iter cell을 source-2023 양수 세그먼트에만 적용한 10개 gate는 target
+최고가 7회 이후 inning 그룹의 `+0.133`뿐이었다. 예측 구종확률도 K0 뒤에는
+offspeed 최대 `+0.822`, fastball×breaking `+1.346`, 고정 등가결합 `+1.526`으로
+축소됐다. 약한 신호끼리 합치거나 세그먼트 routing해도 제출 gate를 넘지 못한다.
+
+새 출력 기하로 compact FT-Transformer(수치 field token, 범주 embedding token,
+CLS, dim32·2 layers·4 heads)를 현재 121피처 exact NPZ에 학습했다. val2023 최고는
+epoch2 `499.903`, refit 후 미학습 2024는 `712.940`; K0와 RMS `.022445`였지만
+2% blend가 source `−8.566`, target `+0.098`, 5%부터 target도 음수였다. 다양성보다
+성능 격차가 커서 단일 파일럿으로 종료한다.
+
+## Brier early-stop · 현재 121피처 XGBoost
+
+Logloss 학습은 그대로 두고 early stopping metric만 `BrierScore`로 바꾼 BSE1은
+기준과 best_iter가 정확히 같은 `826`이었다. val/test도 `611.77/876.87` 대
+`611.74/876.90`으로 사실상 동일해 조기종료 목적 불일치는 남은 레버가 아니다.
+
+XGBoost는 과거 feat-v2 시절 블렌드 기여 기록은 있었지만 E99/E95/skill_pc가 포함된
+현재 121피처로는 미실행이었다. 테스트 예측에 pandas를 직접 넘겨 죽던 DMatrix 버그를
+수정하고 세 rolling 전이를 새로 만들었다. 또한 refit이 `refit_mult`를 무시하던 결함을
+수정했다(`1.0→1.5`: 2024 단독 `816.318→828.82`).
+
+K0에 XGB seed42를 10% 고정 결합하면 2021→22/2022→23/2023→24가 각각
+`+2.640/+20.294/+3.867`; 최신 6시드 개별 증분은 `+3.092~+4.157`, 평균
+`+3.711`, 앙상블 `+3.749`였다. 그러나 이는 약한 로컬 single-seed Cat core에서의
+보완 효과였다. 실제 출하 자산과 가까운 4070 `VB2_base` 8시드 + `ZD5` 6시드에
+source-2023 K0를 동결 적용한 강한 아날로그는 BSS `973.157`이었다. 그 위 XGB6은
+2/5/10%가 `−0.053/−0.369/−1.526`; refit1.5 XGB도 2% `+0.094`뿐이며
+R `−0.287`, late `−0.247`였다. 따라서 다중시드 착시가 아니라 챔피언이 이미 같은
+resolution을 더 잘 먹은 것이며 제출 후보로 승격하지 않는다.
+
+주의: 중간에 `matchup_constants_2024.npz`를 2024 검증행에 되붙여 BSS `1402`가 나온
+계산은 **무효**다. 이 파일은 2025 제출용으로 2024 라벨/OOF 잔차에 적합된 상수다.
+역사 검증에는 반드시 source-2023에서 새로 동결한 K0만 사용한다.
+
+재현: `tools/weak_signal_salvage.py`, `src/train_fttransformer.py`,
+`tools/xgb_core_transfer.py`, `out/weak_signal_salvage.json`.

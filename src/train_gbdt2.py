@@ -689,7 +689,11 @@ def run_xgb(args, train, features, is_val):
 
     # 전체 데이터(2024 포함) 재학습 — cat과 동일 (E18 교훈)
     dall = xgb.DMatrix(train[features], train[TARGET], enable_categorical=True)
-    final = xgb.train(params, dall, num_boost_round=max(best_iter + 1, 1))
+    # Match CatBoost's refit geometry: after validation the training set grows
+    # by roughly one season, so reusing the validation iteration count
+    # underfits the model shipped/evaluated on the unseen next season.
+    final_rounds = max(int((best_iter + 1) * args.refit_mult), 1)
+    final = xgb.train(params, dall, num_boost_round=final_rounds)
     return final, p, best_iter
 
 
@@ -1367,6 +1371,14 @@ def main():
                 for c in CAT_COLS:
                     Xt[c] = pd.Categorical(
                         Xt[c], categories=train[c].astype("category").cat.categories)
+            elif args.model == "xgb":
+                # xgboost.Booster.predict accepts only DMatrix.  Keep the
+                # categorical dtype used by run_xgb and convert once below;
+                # passing the pandas frame directly used to crash after a
+                # successful (and expensive) fit.
+                for c in CAT_COLS:
+                    Xt[c] = pd.Categorical(
+                        Xt[c], categories=train[c].astype("category").cat.categories)
             # 셀 다중분류는 열이 14개다. [:,1] 을 집으면 '성공 확률'이 아니라
             # 셀 하나의 확률이라 완전히 다른 값이 나온다 (DV_cell 이 BSS -1367,
             # rms 0.37 로 나온 원인). 검증 경로처럼 성공 셀을 합산해야 한다.
@@ -1387,6 +1399,10 @@ def main():
                 _tp = Pool(Xt, cat_features=CAT_COLS)
                 _tp.set_baseline(np.log(_qt / (1 - _qt)).to_numpy())
                 pt = model.predict_proba(_tp)[:, 1]
+            elif args.model == "xgb":
+                import xgboost as xgb
+                pt = np.clip(model.predict(
+                    xgb.DMatrix(Xt, enable_categorical=True)), 0, 1)
             elif hasattr(model, "predict_proba"):
                 pt = model.predict_proba(Xt)[:, 1]
             else:

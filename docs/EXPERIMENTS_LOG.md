@@ -1164,3 +1164,14 @@ known-new-pair 증분이 `+1.256→−0.730`으로 반전해 graph와 다른 구
 마지막으로 source 이전에도 맞붙은 familiar pair만 k500→k250으로 덜 수축했으나 세 전이가
 전부 음수였다. exact-PB가 실제 LB에서 유효하더라도 그 내부 표본을 더 공격적으로 쓰거나
 다른 pair로 전파하는 확장은 모두 실패했다.
+## 2026-08-12 core 보존형 신규 탐색
+
+- K0 위 약신호 salvage는 cell routing 최고 `+0.133`, 구종확률 고정 combo `+1.526`.
+- FTT1 FT-Transformer는 val/test `499.903/712.940`, K0 2% target `+0.098`에 그쳤다.
+- BrierScore early-stop은 best_iter 826으로 Logloss 기준과 동일, unseen 차 `−0.03`.
+- 현재 121피처 XGB는 세 약한 K0 전이에서 10% `+2.640/+20.294/+3.749`였지만,
+  실제 챔피언에 가까운 4070 VB2×8+ZD5×6 아날로그에서 2/5/10%
+  `−0.053/−0.369/−1.526`. refit×1.5도 최선 2% `+0.094`라 제출하지 않는다.
+- XGB test DMatrix 경로와 refit_mult 배선은 코드 결함으로 수정했다.
+- 2025용 `matchup_constants_2024.npz`를 2024 역사 검증에 적용한 중간 계산은 타깃 누수로
+  무효/BANNED. 현행 LB 챔피언은 v11 `1101.8020672065` 그대로다.
