@@ -12,11 +12,16 @@
 #
 # 사용: bash tools/run4070.sh <이름> <배치파일경로(Windows)> <로그경로(Windows)>
 #   예: bash tools/run4070.sh V17 C:\\aimers\\v17.bat C:\\aimers\\out\\v17.log
+#
+# The host is the 4th argument because desktop-4070 goes offline -- and it is also
+# the ProxyJump for hsu-server, so the A100 goes with it. desktop-5070 is the same
+# kind of Windows box and needs the same schtasks treatment.
+#   bash tools/run4070.sh TDEC2 C:\\aimers\\scripts\\x.bat C:\\aimers\\out\\x.log desktop-5070
 set -u
 NAME="Aimers$1"
 BAT="$2"
 LOG="$3"
-H=desktop-4070
+H="${4:-desktop-4070}"
 
 ssh $H "schtasks /delete /tn $NAME /f" > /dev/null 2>&1
 ssh $H "schtasks /create /tn $NAME /tr \"cmd /c $BAT > $LOG 2>&1\" /sc once /sd 2099/01/01 /st 03:00 /f" \

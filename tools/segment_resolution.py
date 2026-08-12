@@ -11,8 +11,11 @@ import numpy as np
 import pandas as pd
 
 
-def load(tag):
-    fs = sorted(glob.glob(f"./out/*_{tag}_s*_val_preds.npz"))
+def load(tag, split="val"):
+    # Anchor both ends: a loose "*MVCELL*" also matches MVCELL22 (a different
+    # season) and MVCELL5K. Fall back to the no-seed filename form.
+    fs = sorted(glob.glob(f"./out/*_{tag}_s*_{split}_preds.npz")
+                or glob.glob(f"./out/*_{tag}_{split}_preds.npz"))
     if not fs:
         raise FileNotFoundError(f"예측 없음: {tag}")
     z = [np.load(f, allow_pickle=True) for f in fs]
@@ -47,12 +50,18 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tag", default="v13f")
     ap.add_argument("--season", type=int, default=2024)
+    ap.add_argument("--split", default="val", choices=("val", "test"))
     args = ap.parse_args()
-    pred, y, nseed = load(args.tag)
+    pred, y, nseed = load(args.tag, args.split)
     cols = ["season", "game_type", "game_month", "asof_pitcher_n",
-            "asof_batter_n", "control_success"]
-    raw = pd.read_csv("./data/train.csv", encoding="utf-8-sig", usecols=cols)
-    raw = raw[raw.season == args.season].reset_index(drop=True)
+            "asof_batter_n", "pitcher_id", "control_success"]
+    full = pd.read_csv("./data/train.csv", encoding="utf-8-sig", usecols=cols)
+    # "cold" = this pitcher did not appear in the previous season, so every
+    # per-pitcher TE falls back to a shrunk prior. That is ~20% of 2024 rows and
+    # its resolution has never been measured.
+    prev_ids = set(full.loc[full.season == args.season - 1, "pitcher_id"])
+    raw = full[full.season == args.season].reset_index(drop=True)
+    raw["cold"] = np.where(raw.pitcher_id.isin(prev_ids), "warm", "cold")
     if len(raw) != len(y) or not np.array_equal(raw.control_success.to_numpy(), y):
         raise ValueError("원본과 예측 행 정렬 불일치")
     raw["league"] = raw.game_type
@@ -66,7 +75,7 @@ def main():
     print(f"{args.tag} {nseed}시드 | {args.season} {len(y):,}행 | "
           f"BSS {1e5*(1-se.mean()/global_base):.2f}")
     print("해상도 열은 전체 BSS 좌표의 기여도다. 세그먼트 BSS로 손실을 판단하지 않는다.")
-    for axis in ("league", "month", "pitcher_exp", "batter_exp"):
+    for axis in ("cold", "league", "month", "pitcher_exp", "batter_exp"):
         rows = []
         for value, idx in raw.groupby(axis, observed=False).groups.items():
             idx = np.asarray(idx, dtype=int)

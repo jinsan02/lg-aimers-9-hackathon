@@ -130,7 +130,7 @@ def encode(frame: pd.DataFrame, specs):
 
 class TabDecoder(nn.Module):
     def __init__(self, vocab, n_cols, numeric_mask, dim=96, layers=3,
-                 heads=8, dropout=.1):
+                 heads=8, dropout=.1, causal=True):
         super().__init__()
         self.value = nn.Embedding(vocab, dim)
         self.column = nn.Embedding(n_cols+1, dim)
@@ -144,7 +144,12 @@ class TabDecoder(nn.Module):
         self.head = nn.Linear(dim,1)
         self.register_buffer("positions", torch.arange(n_cols), persistent=False)
         self.register_buffer("numeric", torch.as_tensor(numeric_mask), persistent=False)
-        mask = torch.triu(torch.full((n_cols+1,n_cols+1), float("-inf")), diagonal=1)
+        # A causal mask over table columns has never been justified -- SCENARIO_ORDER
+        # is a chosen order, not a natural one. --no-causal-mask makes every feature
+        # token see every other, which is the only clean structural difference from
+        # the closed ft-transformer axis (that one was bidirectional with a CLS token).
+        mask = (torch.triu(torch.full((n_cols+1, n_cols+1), float("-inf")), diagonal=1)
+                if causal else None)
         self.register_buffer("causal_mask", mask, persistent=False)
         nn.init.normal_(self.value.weight, std=.02)
         nn.init.normal_(self.column.weight, std=.02)
@@ -170,11 +175,12 @@ def train_model(train, valid, specs, vocab, args, epochs, early_stop=True):
     tr, va = Arrays(train,specs), Arrays(valid,specs)
     device = torch.device("cuda")
     model = TabDecoder(vocab,len(specs),tr.numeric,args.dim,args.layers,
-                       args.heads,args.dropout).to(device)
+                       args.heads,args.dropout,
+                       causal=not args.no_causal_mask).to(device)
     opt = torch.optim.AdamW(model.parameters(),lr=args.lr,weight_decay=args.wd)
     steps = math.ceil(len(tr.y)/args.batch)
     sched = torch.optim.lr_scheduler.OneCycleLR(
-        opt,args.lr,total_steps=max(steps*epochs,1),pct_start=.1)
+        opt,args.lr,total_steps=max(steps*epochs,1),pct_start=args.pct_start)
     best = {"score":-1e30,"epoch":0,"state":None,"pred":None}
     bad = 0
     for ep in range(epochs):
@@ -238,10 +244,17 @@ def main():
     ap.add_argument("--eval-batch",type=int,default=8192)
     ap.add_argument("--epochs",type=int,default=15)
     ap.add_argument("--patience",type=int,default=3)
+    # TDEC1 stopped at epoch 2 with pct_start=.1 over 15 epochs -- warmup is 1.5
+    # epochs, so it died at peak LR and never annealed. patience 3 read that
+    # warmup wobble as divergence.
+    ap.add_argument("--pct-start",type=float,default=.1)
+    ap.add_argument("--no-causal-mask",action="store_true")
     args=ap.parse_args()
     torch.manual_seed(args.seed); np.random.seed(args.seed)
     if not torch.cuda.is_available(): raise RuntimeError("CUDA required")
-    use=SCENARIO_ORDER+[TARGET]
+    # row_id is carried only so the saved npz matches the cat-family layout --
+    # tools/loss_map.py skips any prediction file without it, silently.
+    use=SCENARIO_ORDER+[TARGET,ID]
     data=pd.read_csv(args.data,usecols=use)
     old_f=data.game_type.eq("F")&data.season.le(2022)
     fit1=data[data.season.le(2022)&~old_f].reset_index(drop=True)
@@ -262,9 +275,11 @@ def main():
     score2=bss(arr2.y,p2)
     os.makedirs("out",exist_ok=True); os.makedirs("model",exist_ok=True)
     np.savez_compressed(f"out/tdec_{args.tag}_s{args.seed}_val_preds.npz",
-                        y=val1[TARGET].to_numpy(np.float64),pred=best["pred"])
+                        y=val1[TARGET].to_numpy(np.float64),pred=best["pred"],
+                        row_id=val1[ID].to_numpy())
     np.savez_compressed(f"out/tdec_{args.tag}_s{args.seed}_test_preds.npz",
-                        y=arr2.y.astype(np.float64),pred=p2)
+                        y=arr2.y.astype(np.float64),pred=p2,
+                        row_id=test2[ID].to_numpy())
     torch.save({"state_dict":model2.state_dict(),"vocab":vocab2,
                 "numeric":Arrays(fit2.head(1),specs2).numeric,
                 "config":vars(args),"specs":spec_json(specs2)},

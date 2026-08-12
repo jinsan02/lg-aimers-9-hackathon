@@ -14,6 +14,7 @@ cd "$(dirname "$0")/.." || exit 1
 T=$(mktemp -d)
 scp -q hsu-server:~/aimers/LEDGER.tsv     "$T/a100.tsv" 2>/dev/null || true
 scp -q desktop-4070:C:/aimers/LEDGER.tsv  "$T/4070.tsv" 2>/dev/null || true
+scp -q desktop-5070:C:/aimers/LEDGER.tsv  "$T/5070.tsv" 2>/dev/null || true
 cat LEDGER.tsv "$T"/*.tsv 2>/dev/null | grep -v '^$' | sort -u > "$T/merged.tsv"
 mv "$T/merged.tsv" LEDGER.tsv
 rm -rf "$T"

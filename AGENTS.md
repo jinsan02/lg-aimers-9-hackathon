@@ -205,8 +205,21 @@ bash tools/run4070.sh <name> 'C:\aimers\X.bat' 'C:\aimers\out\X.log'
 
 On the Windows boxes `setsid nohup`, `start /b`, and `Start-Process` all die with
 the ssh session. WSL `tmux` breaks Windows exe interop
-(`UtilAcceptVsock accept4 failed 110`). `schtasks` is the only survivor, and
-`tools/run4070.sh` wraps it safely.
+(`UtilAcceptVsock accept4 failed 110`). `schtasks` is the only survivor on the
+4070, and `tools/run4070.sh` wraps it safely (host is the 4th argument).
+
+> ⚠️ **`schtasks` does not work on `desktop-5070`** (2026-08-12). The task creates,
+> `/run` reports success, and `Last Result` is `267011` — but nothing executes: no
+> GPU load, no redirect target created, not even the outer log file. The same batch
+> runs fine when invoked directly. Until that is diagnosed, launch long 5070 jobs as
+> a **backgrounded direct ssh call** and keep the laptop awake:
+>
+> ```bash
+> ssh -o ServerAliveInterval=30 desktop-5070 'cmd /c C:\aimers\scripts\X.bat'
+> ```
+>
+> Each arm inside the batch must redirect its own stdout to `out\<tag>.log` and write
+> `out\<tag>.exit`, so a dropped ssh session is detectable rather than silent.
 
 ## Environment drift
 
