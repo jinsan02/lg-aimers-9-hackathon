@@ -32,8 +32,27 @@ def _git() -> dict:
                                   timeout=10).stdout.strip()
         except Exception:
             return ""
-    return {"commit": run("git", "rev-parse", "HEAD"),
-            "dirty": bool(run("git", "status", "--porcelain"))}
+    commit = run("git", "rev-parse", "HEAD")
+    if commit:
+        return {"commit": commit, "dirty": bool(run("git", "status", "--porcelain")),
+                "source": "git"}
+    # Remote workers are deployed by scp, so C:\aimers there is not a checkout
+    # and git returns nothing. Measured 2026-08-13: the whole B0-JL baseline
+    # landed with commit "". `deploy_5070.sh` stamps the file below with the
+    # revision it copied, so the record still says which source produced the run.
+    for src, val in (("env", os.environ.get("AIMERS_SOURCE_COMMIT", "")),
+                     ("file", _read(".deployed_commit"))):
+        if val:
+            return {"commit": val, "dirty": None, "source": src}
+    return {"commit": "", "dirty": None, "source": "unknown"}
+
+
+def _read(path: str) -> str:
+    try:
+        with open(path, encoding="utf-8") as f:
+            return f.read().strip()
+    except Exception:
+        return ""
 
 
 def _versions() -> dict:
