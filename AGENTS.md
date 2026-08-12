@@ -62,8 +62,22 @@ model/  out/  submissions/
 | 별칭 | 하드웨어 | 접속 | 프로젝트 | 파이썬 |
 |---|---|---|---|---|
 | `hsu-server` | **A100 40GB** · 80 vCPU · RAM 503GB | `ssh hsu-server` (desktop-4070 경유 ProxyJump, 포트 8822) | `~/aimers` | `~/venv451/bin/python` (3.10.12) |
+| `desktop-5070` | **RTX 5070 Ti 16GB** (Blackwell) | `ssh desktop-5070` (Tailscale 100.121.174.83, 계정 `jinsan`) | `C:\aimers` | `C:\aimers\.conda\python.exe` (3.11.15) |
 | `desktop-4070` | **RTX 4070 Ti SUPER 16GB** | `ssh desktop-4070` | `C:\aimers` | `.venv\Scripts\python.exe` (3.11.15) |
 | 노트북 (여기) | RTX 5060 8GB | — | `C:\aimers` | `uv run python` (3.11.15) |
+
+### `desktop-5070` — 2026-08-12 합류. **환경이 평가 서버와 정확히 일치한다**
+
+```text
+python 3.11.15 · torch 2.7.1+cu128 (CUDA OK) · catboost 1.2.10
+pandas 2.0.3 · numpy 1.26.4 · sklearn 1.8.0     ← 평가 서버 고정 버전과 완전 일치
+```
+
+A100 은 pandas 2.3.3 / numpy 2.2.6 / sklearn 1.7.2 라 어긋난다. **제출 pkl 을 굽는
+머신으로는 5070 이 가장 안전하다.** 파이썬이 PATH 에 없으니 절대경로로 부를 것:
+`C:\aimers\.conda\python.exe`. 셸은 4070 과 같은 **cmd.exe** 다(§ 위 셸 주의).
+
+`ssh` 별칭은 노트북 `~/.ssh/config` 에 있다. Tailscale 이 켜져 있어야 붙는다.
 
 ssh 별칭은 `~/.ssh/config` 에 이미 있다. **`hsu-server` 는 `desktop-4070` 을 거쳐 간다** —
 4070 이 꺼져 있으면 A100 에도 못 붙는다.

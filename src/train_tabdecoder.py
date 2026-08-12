@@ -17,6 +17,8 @@ import argparse
 import json
 import math
 import os
+import socket
+import sys
 import time
 from dataclasses import dataclass
 
@@ -272,6 +274,25 @@ def main():
                    "selected_epoch":best["epoch"],"val2023_bss":best["score"],
                    "test2024_bss":score2},f,ensure_ascii=False,indent=2)
     print(f"FINAL unseen2024 BSS={score2:.3f} mean={p2.mean():.6f}")
+    ledger(args, best, score2)
+
+
+def ledger(args, best, test_bss):
+    """LEDGER.tsv 에 한 행 남긴다 — train_gbdt2.py 와 같은 11열 형식.
+
+    기록이 멈추면 대화 기억으로 일하게 되고 대화는 압축된다(2026-08-07 에
+    30개 실험을 잃었다). 기록 실패로 학습 결과를 날리지는 않는다.
+    """
+    try:
+        with open("./LEDGER.tsv", "a", encoding="utf-8") as lg:
+            lg.write("\t".join([
+                time.strftime("%Y-%m-%d %H:%M"), socket.gethostname(),
+                f"{args.tag}_s{args.seed}", "tdec", "2023", "2024",
+                str(args.seed), str(best["epoch"]),
+                f"{best['score']:.2f}", f"{test_bss:.2f}",
+                " ".join(sys.argv[1:])]) + "\n")
+    except Exception as e:                 # 기록 실패로 학습을 죽이지 않는다
+        print(f"  (LEDGER 기록 실패: {e})")
 
 
 if __name__=="__main__":

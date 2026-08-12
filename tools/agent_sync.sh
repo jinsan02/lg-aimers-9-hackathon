@@ -39,6 +39,14 @@ start)
   ;;
 end)
   echo "=== $WHO 작업 종료 ==="
+  # 루트 러너 금지. scripts/README.md 에 규칙을 적어뒀는데 08-08 에 30개,
+  # 08-12 에 51개가 다시 쌓였다. 규칙만으로는 안 지켜져서 여기서 막는다.
+  stray=$(ls *.sh *.bat 2>/dev/null)
+  if [ -n "$stray" ]; then
+    echo "!! 프로젝트 루트에 러너가 있다. scripts/ 로 옮기고 다시 부를 것:"
+    echo "$stray" | sed 's/^/   /'
+    exit 2
+  fi
   bash tools/ledger_sync.sh
   git add -A
   if [ -z "$(git diff --cached --name-only)" ]; then

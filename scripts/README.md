@@ -8,8 +8,21 @@
 | `scripts/` | **이번에 한 번 돌릴 것.** 실험 러너 |
 | `scripts/archive/` | 끝난 러너. 결과는 `LEDGER.tsv` / `docs/SETTLED.md` 에 있다 |
 
-프로젝트 루트에 `.sh` / `.bat` 를 두지 않는다. 08-08 에 30개가 쌓여서
-어떤 게 살아 있는 건지 구분이 안 됐다.
+프로젝트 루트에 `.sh` / `.bat` 를 두지 않는다. 08-08 에 30개, 08-12 에 다시 51개가
+쌓여서 어떤 게 살아 있는 건지 구분이 안 됐다. **규칙만으로는 두 번 다 안 지켜졌으므로
+`tools/agent_sync.sh end` 가 루트 러너를 발견하면 종료코드 2 로 막는다.**
+
+## 지금 `scripts/` 에 남아 있는 것 (2026-08-12 정리)
+
+| 파일 | 왜 살아 있나 |
+|---|---|
+| `make_final_constants.bat` | **제출 챔피언 v11 이 읽는 `model/final_constants_2024.npz` 를 만든다.** 없으면 제출을 재현 못 한다 |
+| `make_matchup_constants.bat` | 위와 같은 계열 (투수×타자 잔차 테이블) |
+| `verify_v11pb.bat` · `audit_v11pb.bat` | 현행 챔피언 검증·감사 |
+| `run_tdec1_5070.bat` | 진행 예정 (열-토큰 decoder, desktop-5070) |
+
+나머지 126개는 전부 `scripts/archive/` 로 옮겼다. 재현은 `LEDGER.tsv` 의
+명령 전문으로 하고, 파일 자체는 git 이력에 남아 있다.
 
 ## 이 스크립트들이 왜 남아 있나
 
