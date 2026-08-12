@@ -1,10 +1,10 @@
 # HANDOFF.md
 
-먼저 읽을 것: [AGENTS.md](AGENTS.md) → [EXPERIMENT.md](EXPERIMENT.md) → 이 파일
+Read first: [AGENTS.md](AGENTS.md) -> [EXPERIMENT.md](EXPERIMENT.md) -> this file
 
 ## Current Agent
 
-Codex
+Claude
 
 ## Next Agent
 
@@ -12,397 +12,52 @@ Codex
 
 ## Status
 
-2026-08-12 SR1·MDU1 및 제출 소스 감사 완료:
+`IDLE` — both the 5070 and the laptop are free. No submission queued; champion stays
+v11 (LB 1101.802). Nine axes were measured and closed on 2026-08-12/13; **one finding
+is open and has no lever yet.**
 
-- SR1 strong residual learner는 R-only honest K0 residual에서 `best_iter=0`. 고정 2%
-  결합 source 2023 `−0.038`, strong 2024 `−0.014`; 전·후반 모두 비양수로 CLOSED.
-- MDU1 base/cell disagreement routing은 signed-q8 25%가 `−2.349/−2.106`, abs-q8도
-  source `−0.303`, strong R `−1.747`; CLOSED.
-- v11/v12 제출 ZIP을 직접 해시·내용 대조했다. 제출된 v11은 정상 recent-middle+PB이고
-  v12는 career-middle+PB라 LB 기록 오류는 없다. 잘못 남아 있던 소스 이름을 복구:
-  `src/script_blend_v11.py`=실제 v11, `src/script_blend_v12.py`=실제 v12.
-- 현행 챔피언 v11/LB `1101.8020672065` 유지. 신규 제출 후보 없음.
-- PB matrix factorization은 이미 CLOSED(`−2.639/+0.350/+0.551`)라 중복 실행을 막았다.
-  EV1 동일 base 계열 공통 4시드 분산도 완료: q8 25% `−0.966`; uncertainty shrink
-  25% 전체 `+1.369`이나 early `+4.255` / late `−2.401`. +3 미달·반전으로 CLOSED.
-- BTP1 Bernoulli bootstrap 0.8 단일시드 완료: MVA 대비 단독 `−13.63/−14.19`, K0
-  base 10% 교체 `−0.159/−0.107`. target R `−0.414`, F `+2.192`; 전체 음수로 CLOSED.
-- 신규 제출 후보 없음. v11/LB `1101.8020672065` 유지.
-- 상세: `docs/RECORD_AUDIT_20260812.md`; 재현 도구:
-  `tools/strong_residual_pilot.py`, `tools/member_disagreement_audit.py`.
+### The one open thing: the F-league resolution hole
 
-2026-08-12 core 보존형 신규 탐색 완료:
+Honest rank resolution (A/B cross-fit, `tools/segment_resolution.py --split test`,
+2024):
 
-- weak-signal salvage: 5000-cell source-selected routing target 최고 `+0.133`, predicted
-  pitch-proba는 K0 뒤 고정 combo `+1.526`; 모두 gate 미달.
-- FT-Transformer FTT1: val2023 `499.903`, unseen2024 `712.940`, K0 2% target
-  `+0.098`이나 source `−8.566`. CLOSED.
-- BrierScore early-stop BSE1: 기준과 best_iter 826 동일, unseen `876.87 vs 876.90`.
-- XGBoost 현재 121피처 경로의 test DMatrix 버그와 refit_mult 무시를 수정했다.
-  refit×1.5는 단독 `816.32→828.82`로 개선.
-- 약한 local K0에서는 고정 XGB 10%가 세 전이 `+2.640/+20.294/+3.749`, 최신
-  6시드 개별 `+3.092~+4.157`이었으나, 강한 4070 VB2×8+ZD5×6 아날로그에서는
-  2/5/10% `−0.053/−0.369/−1.526`. refit×1.5도 최선 2% `+0.094`, R/late 음수.
-  **제출 후보 아님**, 현행 v11 유지.
-- `matchup_constants_2024.npz`를 2024 검증에 되붙인 BSS 1402 중간 계산은 직접 누수로
-  무효 처리하고 BANNED 기록. 역사 상수는 source-2023에서 새로 fit해야 한다.
-- 상세: `docs/RECORD_AUDIT_20260812.md`; 재현:
-  `tools/weak_signal_salvage.py`, `tools/xgb_core_transfer.py`,
-  `src/train_fttransformer.py`. 로컬 GPU 현재 유휴.
+```
+            hon/norm        pred_sd
+F   base       507.8         .0319      R  839.3   .0454     ratio .605
+F   cell       429.8         .0327      R  861.8   .0467     ratio .499
+```
 
-2026-08-12 기록 감사 및 HFC1 core-resolution gate:
+The models decline to discriminate on F and fall back toward the mean, and the cell
+member — stronger overall (890.63 vs 876.90) — is *relatively worse* there. Every
+lever tried has failed: F-only model (data-starved crash), league-conditional weight
+(`league-conditional-blend-weight`, does not transfer), Bernoulli bootstrap, shrinkage.
 
-- 최근 LB 원장을 v10 `1100.0891947834`, v11 `1101.8020672065`, v12
-  `1083.5307698831`, v13 `1099.4652219091`, `v14_pitch_mtl_lag`
-  `1099.2989837237`로 대조했다. v14 관련 모든 현재 문서의 CANDIDATE 표현을 CLOSED로 수정.
-- HFC1 hierarchical failure chain은 동일 로컬 seed42에서 flat 14-cell 대비 2023
-  `−0.149`, 미학습 2024 `−71.655`; 고정 25% blend도 `+15.135→−2.519` 반전.
-  다중시드·제출 승격 없이 종료한다.
-- CRS0 `random_strength=0`은 MVA_native 대비 val `−7.79`, unseen 2024 `−15.78`.
-- 로컬 후보 59개 base-only 고정 블렌드 스캔에서 CatBoost 최대 이득은 두 표면 모두
-  +1 미만이었다. MLP만 컸지만 실제 v13/v14 LB가 이미 반증했으므로 재제출하지 않는다.
-- 정식 MVCELL_s42를 재생성: base/cell/core(.45/.55) unseen 2024 =
-  `876.899/890.63/900.175`. 실제 core 위 모든 Cat 파생은 2024 음수, PMT1 6시드 평균
-  10%도 `+12.345/+2.793`으로 gate 미달.
-- 예측 구종확률 파생 PUG1/PUP2: entropy·margin 실패. 최선 fastball×breaking q4가
-  2023 반분 `+2.797`, 2024 `+2.602`; offspeed 단독은 `+1.376/+3.212`. 두 표면 +3
-  동시 통과가 없어 모델 피처 재학습 없이 CLOSED.
-- cell iteration 3000→5000: best_iter 3928, val +1.63이나 unseen cell −8.67.
-  현행 core에서 새 cell 10/25/50/100% 치환은 test `−0.178/−0.483/−1.093/−2.688`.
-  기존 3000 iter가 전이 정규화 역할을 하므로 유지.
-- 상세·파일별 정합성 목록: `docs/RECORD_AUDIT_20260812.md`.
+**Do not re-measure the hole. Only propose levers**, and any lever must clear the
+2023->2024 *and* 2024->2023 directions — the conditional weight looked like +1.484
+forward and was −2.119 reverse.
 
-2026-08-11~12 masked 구종 auxiliary v13·v14 LB 실패 및 축 종료:
+### Closed on 2026-08-12/13
 
-- v13 LB `1099.4652219091`, v11 대비 `−2.336845`. 실행 41초, 패키지 오류 없음.
-- 원래 rolling은 artifact/vocab/QT≤S−2, 모델≤S−1, target S였지만 v13은 전처리까지
-  2024 full-fit해 검증 구조를 바꿨다.
-- 제출형 full-fit 과거 재현: 2022→23 paired `−198.662`(t=−3.758), 2023→24
-  `−123.688`(t=−6.348). 두 전이 동시 양수인 단순 행단독 서브그룹도 0개.
-- QT만 이전 연도에 동결하면 최신 ensemble 손실은 `−107.674→−13.998`; fpipe 갱신도
-  원래 `+21.592`를 `−13.998`로 뒤집는다. old/new middle/PB 상관 .9989/.9998이라
-  후처리는 원인이 아니다. `masked-pitch-auxiliary-full-fit` CLOSED.
-- 원래 검증 구조를 2025로 평행 이동한 `v14_pitch_mtl_lag`: 전처리≤2023, 모델≤2024.
-  NN 10%, slope/shift, middle/PB는 불변. `submissions/v14_pitch_mtl_lag_0811.zip`.
-- v14 ZIP 33 entries/122.50 MB, 역슬래시/pycache 0, 압축 해제 smoke 및 행독립 최대차 0.
-  LB `1099.2989837237`(42초), v11 대비 `−2.5030834828`, v13 대비
-  `−0.1662381854`. 패키지 오류가 아니라 모델 일반화 실패다.
-- v13 full-fit과 v14 lagged-artifact가 모두 거의 같은 폭으로 하락했다. 원래 rolling의
-  구종 보조 증분은 2024→25에 전이되지 않았으므로 이 축의 추가 weight/gate/refit은 CLOSED.
-  현재 챔피언은 v11(1101.8020672065).
-- 상세: `docs/PITCH_MTL_LB_FAILURE_20260811.md`.
+| Axis | Verdict |
+|---|---|
+| `tabdecoder-47col` (4 arms) | CLOSED — margin −75~−87, weight 0.00, **rms recorded this time** |
+| `--min-season 2021` | BANNED — −95.09 (t=−46.0) |
+| `--feat-v4` | CLOSED — −18.72 (t=−6.05) |
+| `--drop-cols li,home_WE,away_WE` | CLOSED — −3.50, even with zero residual information |
+| `te-cold-start-segment` | CLOSED — cold is *better* than warm (959.1 vs 811.7) |
+| `league-conditional-blend-weight` | CLOSED — reverse direction flips |
+| `derived-feature-missingness` | CLOSED — does not explain E115 |
 
-2026-08-11 SBS 다음 구종·제구 멀티태스크 조사 완료:
+### Infrastructure changed
 
-- SBS 2017 모델은 약 22만 구 기반 다음 구종 예측기이며 공개 60~80% 적중률은 제구/BSS와
-  직접 비교할 수 없다. Trackman 2024 3분류는 행단독 50.925%, 직전 2구 포함 52.701%.
-- 선수 map2까지 조인하자 main:Trackman 1:1 현재구종 라벨을 전체 75.1668%,
-  2023/2024 77.1225%/76.5947% 복원했다. 복수행 그룹은 정렬하지 않았다.
-- 실제 구종 oracle은 `MVA_native=876.899` 대비 +120.693, 구종×count +141.909이지만
-  합법적인 구종확률 주변화는 Trackman head `-13.043/-25.091`, 대회 47열 head
-  `-14.843/-28.871`. strongest pitch head accuracy 53.606%, 잔차상관 ≤.0017.
-- 예측 구종 주변화 CLOSED, SBS sequence는 행독립상 제출 불가. 이 결론은 유지하되 직접
-  주변화하지 않는 masked auxiliary representation은 위 후속 실험에서 통과했다.
-- 상세: `docs/SBS_PITCH_MULTITASK_RESEARCH_20260811.md`; 재현 도구
-  `tools/pitch_aux_feasibility.py`, `tools/audit_joint_pitch_labels.py`,
-  `tools/pitch_type_control_gate.py`.
-
-2026-08-11 로컬 평가환경 피처 엔지니어링 후속 완료:
-
-- Python 3.11.15, pandas 2.0.3, numpy 1.26.4, sklearn 1.8.0, joblib 1.5.3으로
-  평가 서버 핵심 버전을 맞추고 RTX 5060에서만 같은 머신 비교했다.
-- `MVA_native=876.90` 대비 실제 GPU 단일변경 9개가 전부 음수였다. 삭제 4개
-  `-4.99~-45.21`, recent-pair 범주/TE `-35.63/-7.84`, PB core TE `-17.56`,
-  count-cat `-9.57`, quality-min `-10.95`.
-- CPU 사전 게이트의 PA-depth 최선은 `+0.089/+0.565`; entropy와 홈·원정 합성은
-  음수. quality-min 잔차 map `+9.75/+11.84`도 실제 재학습에서 반전했다.
-- `--drop-cols`로 범주형을 제거할 때 CAT_COLS가 남아 죽는 기존 버그를 수정했다.
-- 상세: `docs/LOCAL_FEATURE_AUDIT_20260811.md`; 새 도구
-  `tools/loss_feature_audit.py`, `tools/pa_depth_proxy_audit.py`.
-- 승격·제출 후보 없음. 로컬 GPU 유휴. 현행 v11/LB 1101.802 유지.
-
-2026-08-11 로컬 전수 데이터 감사 완료:
-
-- 원격 서버 없이 공개 train 1,475,092행/47입력과 Trackman 1,793,078행/30컬럼 전부를
-  읽었다. 3개 rolling-origin 전이에서 단변수 전체, 2024 모든 1,081쌍, 상위 235쌍의
-  역사 전이, 선택적 3중 조합, 121피처 모델 잔차의 모든 단/쌍을 감사했다.
-- 결측 대안 7개는 seed42에서 native보다 `-6.58~-12.07`. 최선 대안 indicator도
-  seed3/4/5 평균 `-1.665`, 앙상블 `-1.348`. 원본 NaN native + 파생 prior/n0 유지.
-- 두 전이의 전체/전반/후반/R/F가 전부 양수인 잔차 쌍은 PB 하나뿐:
-  `pitcher_id×batter_id +1.874/+4.595`. 이미 v11에 포함돼 새 후보가 아니다.
-- recent×career 명시 피처 약 `-9.3`, league×runner `-11.91`, 안정 3중 조합 0개.
-  CTR3도 seed42 `+3.338` 뒤 추가 3시드 평균 `+0.791`, t=.419로 탈락했다.
-- Trackman 전년도 투수 요약 21개는 커버 약 77%이나 모든 최소 raw 전이 음수.
-- 상세/재현: `docs/FULL_DATA_AUDIT_20260811.md`, `tools/full_dataset_audit.py`,
-  `tools/full_residual_audit.py`, `out/full_audit/column_audit_summary.csv`.
-- 새 제출 패키지 없음. 로컬 GPU 유휴. 현행 챔피언 v11/LB 1101.802 유지.
-- 08-09 마지막 Codex 세션 뒤 미추적 상태였던 `run_br2/ci1/da*/lr5/rs*/ce1` 등
-  35개 런처와 후보 판정·패키징 도구 8개를 회수해 검토했다. 해당 태그는 LEDGER와
-  model/out에 0건이므로 **실행 결과가 아니라 미실행 준비 큐**다. 실험 명령 30개는
-  precheck exit 0, 16개 bash 스크립트는 `bash -n` 통과, Python 도구는 py_compile
-  통과했다. 5개 4070 launcher는 훈련 플래그가 없는 호출 래퍼라 precheck 대상이 아니다.
-
-2026-08-09 21시 core-resolution 후속 감사 완료:
-
-- current-season success/middle 누적을 k80 binomial posterior mean·sd·precision으로
-  복원하고 K0 rolling OOF 위 zero-mean Ridge residual head를 검정했다.
-- full head 증분은 2021→22/2022→23/2023→24 `−8.037/−123.482/−76.637`, 고정 5%
-  축소도 `+1.462/−3.060/−0.083`. 최신 early `+0.969`, late `−1.458`로 전이 실패.
-  `posterior-uncertainty-residual-head` CLOSED, GPU 확장·제출 없음.
-- Trackman의 “14%”는 미매칭률이 아니라 옛 map 정확도 추정이었다. 기존 map2는 train
-  행 99.6376%를 덮었다. 유일하게 빠진 공통 row-local 키 `batter_hand`를 추가하니 기존
-  730명 identity 100% 보존 + 25명 복구, 행 커버 99.7925%. `src/link_pitchers.py` 반영.
-- 재현 도구: `tools/posterior_resolution_audit.py`, `tools/audit_tm_linkage.py`.
-  결과 상세는 `docs/BRAINSTORM_20260809.md`, 닫힌 축은 `docs/SETTLED.md`.
-- A100·4070 모두 학습 작업 없음. 현행 제출 챔피언 v11/LB 1101.802 유지.
-
-2026-08-09 19:45 리더보드 1288 출현 대응 및 합법 데이터 구조 감사:
-
-- 공식 규칙에는 점수 자동 컷이 없다. 1288은 약 18분째 공개 1위였으나 최종 순위는
-  09-11 코드 검증 뒤 확정된다. 다른 test 행/전체 분포 이용은 명시적으로 실격 대상이다.
-- 신규 감사에서 선수 ID 앞 3자리가 등록 코호트를 담는 사실을 확인했다. 그러나
-  `--feat-id-cohort` 파일럿은 둘 다 전이 `−3.18/+13.93/+8.13`, 4070 `−2.42`로 반전했다.
-  축 분리도 투수 A100/4070 `+1.33/−0.22`, 타자 `−0.10/−0.71`이라 CLOSED.
-- 1288−1101.802는 정규화 Brier `0.001864`, 실제 MSE 약 `0.000466` 차이라 점수만으로
-  누수라 단정할 수 없다. 다만 잔존 시간은 합법성 증거가 아니며 종료 후 코드 검증 대상이다.
-- 다음 우선순위는 다른 test 행을 전혀 보지 않는 구조만 유지한다: (1) current-season
-  binomial posterior/불확실성의 저용량 잔차 보정, (2) 기존 챔피언의 rolling OOF calibration
-  재점검, (3) 제공 trackman의 미매칭 14%를 행 단독 키로 개선할 수 있는지 사전 감사.
-
-2026-08-09 저녁 브레인스토밍 실행 완료 — 전 후보 게이트 탈락:
-
-- A100에 P0 `2021→2022` R-only surface 생성: `H21_base` target BSS `629.33`,
-  `H21_cell` `627.46`. 기존 두 표면과 합쳐 3-transition 감사 완료.
-- K0 대비 증분: PBMF `−2.639/+0.350/+0.551`, recent-middle
-  `−3.288/+3.017/−1.247`, recent-success `−2.694/+8.318/−5.633`, workload
-  `+6.332/+1.262/−2.167`, intent×execution `+0.390/+3.502/−2.919`, familiar-PB
-  adaptive-k `−4.466/−2.123/−0.107`.
-- team call-style 연도 corr 중앙값 `.227 < .25`. 모두 SETTLED에 CLOSED 추가.
-- 다중시드·제출 패키지로 승격한 후보 없음. 양 GPU 현재 유휴.
-
-2026-08-09 저녁 브레인스토밍 완료 — 실행 전 계획:
-
-- 종합안은 `docs/BRAINSTORM_20260809.md`. P0 rolling-origin 표면 보강 뒤 P1 outcome-aware
-  PB residual matrix factorization, P2 recent-state empirical Bayes를 양 GPU에 나눠 검정한다.
-- 신규 정직 감사에서 historical lineup은 최고 `+0.444`지만 early `+8.911`/late
-  `−10.591`, mechanics는 최고 `−0.245`이며 `+18.801/−25.268`로 반전해 CLOSED.
-- 현재 GPU 작업은 없다. 오늘 제출 횟수는 소진됐으므로 새 제출 패키지는 만들지 않는다.
-
-2026-08-09 18:18 v12 career-middle 교체 LB 실패 — Codex 최종 판정:
-
-- 현행 챔피언은 `v11_pb_posix_0809.zip`, LB `1101.8020672065`다.
-- v12 `v12_career_pb_0809.zip`은 `1083.5307698831`, v11 대비 `−18.2712973234`.
-- v11/v12 PB 테이블은 공통 26,355그룹, 상관 `.99917606`, 차이 RMS `.00012952`라
-  실질 변경은 career-middle lookup이다.
-- 오프라인 `+3.174`는 2023→2024 전반 `−0.292`, 후반 `+7.704`로 불안정했고,
-  2022→2023의 상대 `+23.657`도 career 절대값 `−31.003`인 실패끼리 비교였다.
-- `frozen-career-middle-q8-k200`을 SETTLED에 CLOSED로 추가했다. 오늘 제출은 소진됐고
-  LB를 이용한 부분가중/상수 재적합은 하지 않는다.
-
-2026-08-09 15:32 RC2 cell-roster 다중시드 확장 실행 중 — Codex 1차 분석 (잠정):
-
-- `FW1 window+cell`은 A100 동일 seed3 `DW_cell` 대비 centered `+0.51`, 4070
-  동일 seed42 `ZD5` 대비 `−5.85`로 종료했다.
-- `RC1 roster+cell`은 A100 `+3.40`, 4070 `+4.45`로 양 표면 단일시드 +3 게이트를
-  통과했다. 4070 centered RMS `.0027`, 단독 차이까지 반영한 블렌드 여지 `+4.67`.
-- 완료 seed3/42는 RC2 이름으로 복사해 재사용. A100은 나머지 `4,5,6,8,13`,
-  4070은 `7,13,3,4,5,6,8`을 분리 실행 중이다. 예상 완료 A100 15:55 전후,
-  4070 16:20 전후. 완료 후 동일시드 페어 t와 현행 base+cell 위 증분을 판정한다.
-
-2026-08-09 15:05 Ordered boosting 신규 단일변경 게이트 종료 — Codex 1차 분석 (잠정):
-
-- 오늘 계획의 기존 네 축을 재감사했다. RT1 다중시드, PG1/halflife TE, H1 동적
-  계층, RT1+ZD5 결합은 모두 이미 제출 게이트에서 탈락했다. 셀 d4/d6/c16도 올바른
-  미학습 표면 6시드까지 완료돼 있어 중복 실행하지 않았다.
-- 신규 합법 BR1 고정 F→R 보정은 2023 R에서 두 상수를 고정해 2024 현행
-  base(.45)+ZD5(.55)에 이식했다. 고정 SLOPE/SHIFT 점수는 `+0.239`, 전반
-  `+2.828`/후반 `−3.145`, 공통 4시드 평균 `+0.270`(SE .125, t=2.161)으로 탈락.
-  테스트 배치 평균으로 재중심화한 낙관치(+2.724)는 판정·제출에 쓰지 않는다.
-- `OB1 Ordered boosting`은 양 표면 모두 실패. A100 seed3 `830.75` 대 같은
-  `AB_base=868.83`로 `−38.08`; 4070 seed42 `900.49` 대 `VB2_base=911.22`로
-  `−10.73`. 다중시드 확장 없이 종료한다.
-- 다음 단일변경은 기존 양수지만 약했던 `--feat-window`를 강한 실패모드 셀에만
-  결합하는 `FW1_cellwin`. 기존 LEDGER에 window+failmode 조합은 없다.
-
-2026-08-09 RT1 정식 확장 완료 — Codex 1차 분석 (잠정):
-
-- A100 `RT2A_roster` 6시드: 앙상블 `+8.28`, 페어 `+7.75`, SE `3.68`,
-  `t=2.10<2.4`. 방향은 양수지만 채택 기준 미달.
-- 4070 `RT2V_roster` 8시드: 페어 `−0.001`, SE `2.279`, `t≈0`.
-  현행 base+cell의 base 완전교체 centered `+0.585`, 고정 SLOPE/SHIFT `+0.163`;
-  절반교체도 고정 변환 `+0.272`뿐이다.
-- 시간 전이는 완전교체 전반 `+2.300`, 후반 `−1.337`. ensemble 세그먼트에서
-  F→R `+0.948`은 남았지만 same-cont `−3.255`, 후반 전체 `−4.498`이 상쇄했다.
-- v14f·ZD5·RT2V 학습집합 지문 `.5401750413` 일치. 무효 비교가 아니라 실제
-  일반화 실패다. 제출 게이트 불통과로 v10 zip은 생성하지 않았고 v18을 유지한다.
-- GPU 양쪽 유휴. 재현: `scripts/run_rt2_*`, `tools/blend_replace.py`,
-  `tools/rt1_result_report.py`. Claude 복귀 시 축 종료 여부만 독립 검토 요청한다.
-
-2026-08-09 야간 큐 결과 회수 — Codex 1차 분석 (잠정):
-
-- 네 실행 정상 종료, GPU 양쪽 유휴. 동일 머신·동일 seed 기준으로 RT1은 A100
-  미학습 2024 `884.49 vs 868.83`(`+15.66`), 4070 val2024
-  `915.53 vs 911.22`(`+4.30`)로 양 표면 양수다.
-- RT1 centered 차이는 A100 `+15.72`, 4070 `+8.14`; 예측 RMS `.00634/.00528`.
-  4070에서는 F→R이 전체 이득 중 `+3.43`을 만들었지만 전반 `+6.91` / 후반
-  `−2.61`이다. A100은 same-cont 기여 `+13.57`로 개선 기전이 다르다.
-- PG1은 A100 `−10.72`, 4070 `+1.33`으로 전이 불일치. 다중시드 확장 우선순위 없음.
-- 잠정 권고: RT1만 A100 6시드·4070 8시드 페어 확장하고, t>=2.4 및 현행
-  base+cell 블렌드 증분을 본다. 현재 수치는 n=1이라 제출·SETTLED 판정에 쓰지 않는다.
-- 재현 분석: `tools/rt1_result_report.py`. Claude 복귀 시 코드의 시즌 cutoff,
-  반분 불안정 및 다중시드 승격 여부를 독립 검토 요청한다.
-
-2026-08-09 04:37 야간 큐를 노트북과 분리해 시작:
-
-- A100 PID `1642883`, GPU 38,338 MiB 확인. `RT1A_roster` seed3
-  (val2023→test2024, `--drop-f-pre 2022`) 뒤 성공 시 `PG1A_pg`를 순차 실행한다.
-  PPID 1 분리 완료, 로그 `out/rt_pg_a100.log`.
-- 4070 예약 작업 `Aimersrt_pg` 실행 상태(`0x41301`), Python 자식 PID `7700`과
-  약 5.37GB 메모리 확인. `RT1V_roster` seed42(val2024) 뒤 성공 시 `PG1V_pg`.
-  다음 자동 발화는 2099-01-01, 로그 `out/rt_pg_4070.log`.
-- RT1 새 코드 `src/roster_transition.py`는 시즌 이전 고정 이력만 사용하며 양 머신
-  cutoff/행 독립 테스트·문법검사 통과. 네 명령 모두 precheck 종료코드 0.
-- 두 체인은 단일시드 게이트까지만 수행한다. 결과를 본 뒤에만 6/8시드 승격한다.
-
-2026-08-09 ABS·R/F·신규/복귀 감사:
-
-- 상세: [`docs/REGIME_ROSTER_AUDIT.md`](docs/REGIME_ROSTER_AUDIT.md), 재현 도구
-  `tools/regime_roster_audit.py`.
-- 공식 연혁상 F ABS는 2020년부터 운영. 기존 `F 2023=ABS 1년차` 서사는 폐기한다.
-  F 2022→2023 reverse `.0497→.2988`은 정책 효과보다 데이터/타깃 체제 단절이다.
-- 새 1순위 `RT1`: 투수 직전 리그와 같은/다른 리그 과거 이력량. F→R 열세는
-  2020~2024 모두 같은 부호, 2024 VB2 과대예측 `.01608`, source 고정 centered +4.09.
-- generic 복귀는 2023→2024 부호 반전, 타자 이동은 약함, F 홈팀 변화 전이 상관 −.338.
-- `BC1_offset=899.31`, 같은 4070·seed42 `VB2_base=911.22` 대비 −11.91로 종료.
-- v18 SHIFT 0.0052의 ABS 인과 설명은 무효지만 값은 별도 단일변경 검증 전까지 유지한다.
-- A100 `OR2_rank16`도 refit 단계 native segmentation fault로 산출물 없이 종료했다.
-  group16은 양 머신 smoke/no-refit만 통과하고 full refit은 실패하므로 ranking 축을 보류한다.
-  현재 양 GPU 유휴, 다음 실제 학습 후보는 `RT1`이다.
-
-2026-08-09 04:10 밀린 작업 처리:
-
-- `baseline-col` 결함 수정: 최종 refit 모델 marker, test-season Pool baseline,
-  `fpipe.predict()` 제출 baseline 세 경로를 모두 배선했다.
-- H1 dynamic hierarchy 완료: 2022→2023R source +8.031이었으나 미학습 2024
-  raw -19.086 / centered -19.032. 투수 상태 상관 +.1154, 타자 -.0889. 기각.
-- OR1 원인: group64 pair 전개가 4070에서 2748MB 추가 요구 중 free 2317MB로 CUDA OOM.
-  A100 native segmentation fault도 같은 메모리 폭증으로 판정. group64 BANNED.
-- 실행 중: A100 `OR2_rank16` 2000iter/es500/refit 정식 미학습 표면.
-- 4070 `Aimersor2_rank16p` 빠른 게이트는 refit 중 Windows native access violation
-  (`0xC0000005`)로 산출물 없이 종료. 빈 4070에는 수정된 baseline 경로의
-  `BC1_offset` 단일시드 제출 표면 게이트를 예약 작업 `Aimersbc1_offset`으로 시작했다.
-  두 현재 작업 모두 노트북과 분리돼 있다.
-
-2026-08-09 03:47 신규 모델 배치:
-
-- MLP-PLR 최초 sigma=.1: A100 val2023 `257.06`, 미학습 2024 `641.29`로 탈락.
-- content two-tower: A100 val2023 `510.07`, 미학습 2024 `675.32`; 4070 val2024
-  `699.67`로 탈락. 6시드 확장 없음.
-- PLR 핵심 sigma 최종 게이트 실행 중: A100 `PLR_sigma1/10` 미학습 표면,
-  4070 예약 작업 `Aimersplr_sigma` 제출 표면. sigma1 A100은 미학습 `517.60`으로
-  이미 탈락했고 sigma10 및 4070 결과 대기 중.
-- 4070 venv에 평가 서버와 같은 `torch==2.7.1+cu128` 설치 완료. 예약 작업은
-  다음 자동 실행 2099-01-01이며 노트북과 분리됨.
-
-후속 확인: A100 sigma10도 미학습 `426.58`로 탈락. 4070 sigma1은 val2024
-`-103.63`으로 탈락했고 sigma10 실행 중이다. PLR은 sigma가 커질수록 악화해 축 종료가
-확실하며, sigma10 완료 후 추가 실행은 걸지 않는다.
-
-최종 확인: 4070 sigma10도 val2024 `-1053.72`로 정상 종료했다. 현재 양 GPU 유휴.
-
-2026-08-09 G0 단일시드 파일럿 완료. A100 미학습 표면은 `G0A_graph=866.90` 대
-동일 머신·seed3 `AB_base=868.83`으로 -1.93. 4070 제출 표면은
-`G0V_graph=902.06` 대 동일 머신·seed42 `VB2_base=911.22`로 -9.16이다. 두 실행 모두
-정상 종료·산출물 저장. G1 full GNN 승격 게이트는 통과하지 못했으며 6시드 확장은 보류한다.
-
-2026-08-09 03:21 KST: G0 graph 파일럿 두 대를 노트북과 완전 분리해 실행했다.
-
-- A100 `G0A_graph` seed3: val2023→test2024, `--drop-f-pre 2022`. PID 1614122,
-  GPU 38,338 MiB 사용을 확인했다. 로그 `out/g0a_graph.log`.
-- 4070 `G0V_graph` seed42: val2024 제출 표면, drop 없음. 예약 작업
-  `Aimersg0v_graph`, 상태 running(0x41301), 다음 자동 실행 2099-01-01. 로그
-  `out/g0v_graph.log`.
-- `tools/test_graph_features.py` cutoff/행 독립 테스트 통과. 두 명령 precheck 통과.
-- OR1_rank는 03:02 A100에서 segmentation fault로 종료되어 산출물이 없다. 현재 우선순위는 G0.
-
-2026-08-09 Codex가 동적 계층/GNN 신규 축을 사전 설계했다. 상세 내용은
-[`docs/HIERARCHY_GNN_PLAN.md`](docs/HIERARCHY_GNN_PLAN.md), 구조 감사 도구는
-`tools/hierarchy_graph_audit.py`다. 2024 기준 exact-pair hit 51.2%, pitcher hit 80.1%,
-활성 투수 이웃 Jaccard 중앙값 0.360이다. 미관측 투수 행이 19.9%라 static ID embedding은
-금지하고, G0 topology-only CatBoost gate → G1 inductive GraphSAGE 순서로 간다. 기존
-GPBoost/random-slope 실패 때문에 동적 계층모형은 후순위 대조군이다. 테스트 행끼리 graph
-message/state를 갱신하지 않는다.
-
-### 역사 기록 — 03:02 종료된 OR1 group64
-
-아래 블록은 OR1 group64가 종료되기 전 기록이다. 현재 배턴은 문서 맨 위의
-`OR2_rank16`이며, 현행 v18 제출본은 동결돼 있다. 아래의 과거
-`READY_FOR_CLAUDE` 블록 역시 역사 기록이며 현재 배턴이 아니다.
-
-- 노트북: 문서·검문 도구·결과 판정 전용.
-- A100(당시): `OR1_rank` group64는 native segmentation fault로 산출물 없이 종료.
-- 4070(당시): group64 재현에서 CUDA OOM을 확인. 현재 상태는 문서 맨 위 참조.
-- 제출: `TH2_hl2`가 제출 표면 승격 게이트에 실패해 새 zip을 만들지 않았다.
-  현행 `blendv9_0808_0126.zip`을 유지한다. 4070 재검증에서 행 독립 세 항목
-  최대차이 0, zip 종합검증 exit 0, 245,789행 29초/600초를 통과했다.
-
-### 2026-08-09 신규 돌파 탐색
-
-- `orthogonal_gate.py`: 현행 base/cell 조건부 가중을 검문했다. 2024 양방향에서
-  리그별 +3.37/+3.04, 타자경험 +2.85/+3.01, 셀 시드분산 +3.07/+1.83.
-  그러나 구 W 세대 2023R→2024R에서는 타자경험 −3.01, 셀분산 −1.17로 붕괴했고
-  이닝만 +1.96이었다. 단순 gate는 주력 승격하지 않는다.
-- `OG1_cell14`: scalar 성공합에서 버리던 14셀 posterior를 ridge stack에 사용한다.
-  source 2023 R 양방향 최소 +101.32였으나 미학습 2024 R route에서 −52.38.
-  같은 시즌 착시가 커 기각, 새 제출 없음.
-- `OR1_rank`: 기존 Logloss/MultiClass와 다른 pairwise 순위 목적. 단일시드 target
-  단독 성능·base와 rms·현행 base+cell 위 블렌드 margin을 게이트로 본다.
-
-- `MC1`: MLP 확률일관성 셀 모델. 6시드 단독 `701.99`, 현행 AB+DW 위
-  자기적합 증분 `+1.36`, 반분 한쪽 가중 0으로 종료.
-- `TM1`: 현재 121피처 정식 TabM. 편향제거 `821.81`, rms `.0121`, margin 음수로 종료.
-- `TMC1`: TabM 출력만 14셀 softmax로 바꾸고 성공셀 합에 BCE를 공동 적용.
-  파일럿 `+16.58`은 6시드에서 사라졌다. 단독 `839.34`, AB 대비 +1.48,
-  AB+DW 동시 가중 `0.000`; 전반→후반도 0으로 종료.
-- `SK2_k40`: 지문 일치(exit 0). `SK2−VB2 = -1.954`, SE `2.377`, t=`-0.822`.
-  현행 블렌드의 base 완전교체 `-0.564`, 절반교체 `+0.194`; 절반교체도
-  전반기 `+0.417` / 후반기 `-0.305`로 전이되지 않아 기각했다.
-
-### 2026-08-08 Codex 단독 1차 검문
-
-| 안건 | 결과 | 조치 |
-|---|---:|---|
-| 확률평균 → logit 평균 (`VB2_base`+`ZD5`, w=.55) | centered `+0.021` | 종료 |
-| 타자 경험 구간 2023→2024 고정 보정 | 전체 `-47.618`, R `-51.097`, F `+3.416` | 종료 |
-| 투수×타자손 잔차 2023→2024 (`BI2023`→`BI2024`, k=100) | `-191.952`, 공통그룹 상관 `+.011`, 행 커버 75.6% | GPU 승격 금지 |
-| 과거 TE halflife 2 | val-only `+7.255`, paired t=2.120 | 잘못된 표면·기준 미달, 후순위 |
-| RMSE 손실 | E55 blend weight 0, E93 `+2.44` (t=.80) | 중복 안건, 종료 |
-
-`TW1_window`: 앙상블 `+3.75`, 페어평균 `+3.42`, SE `2.40`, t=`1.42`,
-최적 blend 이득 `+3.78` — 채택 기준 미달로 보류. `TA1_anchor`를 우선 판정한다.
-
-`TA1_anchor`: 앙상블 `+1.07`, 페어평균 `-0.58`, SE `2.40`, t=`-0.24`,
-최적 blend 이득 `+2.06` — 신규 주력축으로는 약해 후순위 보류.
-
-`TH1_hl2`: 앙상블 `+7.15`, 페어평균 `+6.03`, SE `1.82`, t=`3.32`,
-최적 blend 이득 `+7.29` — A100 판정 표면 채택. 제출 표면 `TH2_hl2`로 승격.
-
-`TH2_hl2`: 지문 일치(exit 0), 8시드 완료, 오류 없음. 그러나 제출 표면에서
-`TH2−VB2 = +0.164`, SE `1.760`, t=`0.093`; 현행 블렌드 대비 최선의 고정 대체도
-`+0.610`. 전반기 선택→후반기 `-1.573`, 후반기 선택→전반기 `-1.112`로 가중이
-전이되지 않아 **제출 기각**. 새 zip 없음.
-
-`READY_FOR_CLAUDE` — P2'(4070)와 P2'-C(A100) 완료, 필수 지문 검사 통과,
-산출물 회수와 Codex 1차 분석까지 완료했다. 아래 `# Codex → Claude 인계 결과`를
-독립 검토해 최종 판정과 P3 계획을 확정할 것.
-
-- P2'-B(A100)는 **구조적으로 무효**이며 이번 비교에서도 완전히 제외했다.
-- 결정적 숫자는 `DX2_seq − VB2_base = -4.28 (t=-3.62)`와
-  `DT5_seq − DT3_seq = -32.50 (t=-37.10)`이다.
-
-> Codex 가 여기 적었던 Git Bash `--login` 수정 건은 **[AGENTS.md](AGENTS.md) §8 로
-> 옮겼다.** 매 교대마다 적용되는 상설 규칙이라 배턴이 아니라 규칙 문서에 있어야
-> 한다. 내용은 그대로다 (`.cmd` 래퍼를 쓸 것, 맨 `bash` 금지).
+- `desktop-5070` joined (RTX 5070 Ti 16GB). **Its package versions match the
+  evaluation server exactly** — bake submission pkl files there, not on the A100.
+- **`schtasks` does not work on the 5070** (Last Result 267011, nothing executes).
+  Use a backgrounded direct ssh call; see AGENTS.md §3.
+- `tools/ledger_sync.sh` now collects the 5070 (391 rows across 4 machines).
+- `tools/run4070.sh` takes the host as its 4th argument.
+- New: `tools/league_weight_gate.py`. `tools/segment_resolution.py` gained
+  `--split` and a `cold` axis.
 
 ---
 
