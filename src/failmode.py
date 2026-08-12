@@ -61,22 +61,40 @@ def _pitch_labels(df, modes=MODES):
         v = pd.Series(S).groupby(pid).diff().to_numpy()
         v = np.where(ok, np.round(v), np.nan)
         v = np.where((v == 0) | (v == 1), v, np.nan)   # 0/1 아니면 버린다
-        # 차분은 '앞 행의 투구' 결과이므로 한 칸 당겨 그 행의 라벨로 만든다
-        out[m] = pd.Series(v, index=d.index).shift(-1)
+        # 차분은 '앞 행의 투구' 결과이므로 한 칸 당겨 그 행의 라벨로 만든다.
+        # **투수 안에서** 당겨야 한다. 전역 shift 였을 때 투수 경계 99,078행
+        # (6.72%) 이 다음 투수의 첫 차분을 가져왔고, middle 라벨만 31,293행
+        # (2.12%) 이 실제로 틀렸다 (2026-08-13 실측). groupby 를 빼먹으면
+        # 셀 다중분류가 학습하는 보조 기하 전체가 조용히 어긋난다.
+        out[m] = pd.Series(v, index=d.index).groupby(pid).shift(-1)
     return pd.DataFrame(out).reindex(df.index)
 
 
 def build_cells(train, modes=MODES, verbose=True, context="",
-                min_share=MIN_SHARE):
+                min_share=MIN_SHARE, fit_mask=None):
     """(성공, 실투, 볼, 반대) 조합을 다중분류 셀로 만든다.
 
     셀에 **타깃 자신을 포함**하는 것이 핵심이다. 실패모드만으로는 타깃이
     재현되지 않기 때문이다(최선의 합집합이 84.1%). 타깃 비트를 넣으면
     P(성공) = sum_{셀의 성공비트=1} P(셀) 이 **정확히** 성립한다.
 
+    `fit_mask` 를 주면 **분할 안전 모드**로 동작한다:
+      - 라벨을 fit / 나머지 파티션 안에서 각각 따로 복원한다. 안 그러면 fit 의
+        마지막 행이 검증 시즌 첫 행의 asof 상태로 라벨을 받는다 (val2024 에서
+        310행, val2023 에서 319행 — 2026-08-13 실측).
+      - 희소 taxonomy 를 **fit 에서 동결**한 뒤 검증에 적용한다. 현재
+        min_share=.005 에서는 fit-only 와 전체가 12셀로 같지만 구조적 결함이다.
+      - fit taxonomy 에 없던 검증 셀은 성공 비트를 보존한 `0xxx`/`1xxx` 로
+        보낸다. NaN 으로 두지 않는다.
+
     반환: (셀 코드 Series, 셀 이름 리스트, 성공 셀 인덱스 집합)
     """
-    lab = _pitch_labels(train, modes)
+    if fit_mask is not None:
+        fit_mask = pd.Series(np.asarray(fit_mask, bool), index=train.index)
+        lab = pd.concat([_pitch_labels(train[fit_mask], modes),
+                         _pitch_labels(train[~fit_mask], modes)]).reindex(train.index)
+    else:
+        lab = _pitch_labels(train, modes)
     y = train[TARGET].to_numpy(np.int8)
     parts = [pd.Series(y, index=train.index).astype(str)]
     known = pd.Series(True, index=train.index)
@@ -102,13 +120,24 @@ def build_cells(train, modes=MODES, verbose=True, context="",
         cell = cell.str.cat(train[c].astype(str), sep="|")
 
     # 드문 셀과 복원 실패 행은 **성공 비트만 남기고** 묶는다 → 합산식이 보존된다
-    share = cell.value_counts(normalize=True)
     # 맥락을 붙이면 셀 수가 배로 늘어 기본 임계(0.5%)에서 대부분 뭉개진다.
-    rare = set(share[share < min_share].index)
-    cell = cell.where(~cell.isin(rare) & known,
-                      pd.Series(y, index=train.index).astype(str) + "xxx")
+    fallback = pd.Series(y, index=train.index).astype(str) + "xxx"
+    if fit_mask is None:
+        share = cell.value_counts(normalize=True)
+        rare = set(share[share < min_share].index)
+        cell = cell.where(~cell.isin(rare) & known, fallback)
+        names = sorted(cell.unique())
+    else:
+        # taxonomy 는 fit 에서만 정한다.
+        share = cell[fit_mask].value_counts(normalize=True)
+        keep = set(share[share >= min_share].index)
+        cell = cell.where(cell.isin(keep) & known, fallback)
+        # 이름 목록도 fit 기준. 검증에만 있는 셀은 위에서 이미 예약 셀로 갔다.
+        names = sorted(set(cell[fit_mask].unique()) | {"0xxx", "1xxx"})
+        unseen = ~cell.isin(names)
+        if unseen.any():                       # 있으면 안 되지만 조용히 두지 않는다
+            cell = cell.where(~unseen, fallback)
 
-    names = sorted(cell.unique())
     code = cell.map({v: i for i, v in enumerate(names)}).astype(np.int16)
     succ = {i for i, v in enumerate(names) if v[0] == "1"}
     if verbose:

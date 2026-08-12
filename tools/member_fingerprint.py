@@ -28,20 +28,29 @@ def main(tags):
     if not tags:
         tags = sorted({f.split("cat_")[1].rsplit("_s", 1)[0]
                        for f in glob.glob("./model/cat_*_s*.pkl")})
-    rows = []
+    rows, missing = [], []
     for t in tags:
         fs = sorted(glob.glob(f"./model/cat_{t}_s*.pkl"))
         if not fs:
             print(f"not found: {t}")
+            missing.append(t)
             continue
-        d = joblib.load(fs[0])
-        p = d["model"].get_all_params()
-        rows.append((t, len(fs),
-                     d["fpipe"]["priors"]["asof_pitcher_success_rate"],
-                     len(d["features"]),
-                     tuple(round(p[k], 6) if isinstance(p.get(k), float)
-                           else p.get(k) for k in KEYS),
-                     d["best_iteration"], d["val_bss"]))
+        # Every seed is checked, not just the first. A single mismatched seed is
+        # exactly the case this tool exists to catch, and reading fs[0] alone
+        # would let it exit 0.
+        prints, hypers = set(), set()
+        for f in fs:
+            d = joblib.load(f)
+            p = d["model"].get_all_params()
+            prints.add(d["fpipe"]["priors"]["asof_pitcher_success_rate"])
+            hypers.add(tuple(round(p[k], 6) if isinstance(p.get(k), float)
+                             else p.get(k) for k in KEYS))
+        if len(prints) > 1:
+            print(f"!! {t}: seeds disagree on the training-set fingerprint: "
+                  + ", ".join(f"{v:.10f}" for v in sorted(prints)))
+            missing.append(t)
+        rows.append((t, len(fs), sorted(prints)[0], len(d["features"]),
+                     sorted(hypers)[0], d["best_iteration"], d["val_bss"]))
 
     print(f"{'tag':<12}{'seeds':>6}{'train-set fingerprint':>24}{'feat':>6}"
           f"{'best_it':>9}{'val_bss':>10}")
@@ -60,7 +69,12 @@ def main(tags):
         print("note: hyperparameters differ (a different loss_function is expected)")
         for t, _, _, _, hp, _, _ in rows:
             print(f"   {t:<12}{hp}")
-    return 2 if len(prs) > 1 else 0
+    if missing:
+        print(f"!! could not verify: {', '.join(missing)} -- do not treat this run "
+              f"as a lineage check")
+    # A requested tag that is absent is a failed check, not a pass. Returning 0
+    # here once let a comparison proceed against models that were never loaded.
+    return 2 if (len(prs) > 1 or missing) else 0
 
 
 if __name__ == "__main__":

@@ -1,0 +1,11 @@
+tag	status	date	reason
+MVB22_native	INVALIDATED_PENDING_RERUN	2026-08-13	val2022->test2023 run: 253,507 rows of 2024 were in the training pool (test_season flagged only season==S)
+CTR2_H22	INVALIDATED_PENDING_RERUN	2026-08-13	val2022->test2023 run: 253,507 rows of 2024 in training
+CTR3_H22	INVALIDATED_PENDING_RERUN	2026-08-13	val2022->test2023 run: 253,507 rows of 2024 in training
+PMTC22	INVALIDATED_PENDING_RERUN	2026-08-13	val2022->test2023 run: 253,507 rows of 2024 in training
+XCR0	INVALIDATED_PENDING_RERUN	2026-08-13	val2022->test2023 run: 253,507 rows of 2024 in training
+MVCELL22_s42	INVALIDATED_PENDING_RERUN	2026-08-13	val2022->test2023 run: 253,507 rows of 2024 in training
+PMTC21	INVALIDATED_PENDING_RERUN	2026-08-13	val2021->test2022 run: 499,032 rows of 2023-2024 in training
+MV21_base	INVALIDATED_PENDING_RERUN	2026-08-13	val2021->test2022 run: 499,032 rows of 2023-2024 in training
+XCR21	INVALIDATED_PENDING_RERUN	2026-08-13	val2021->test2022 run: 499,032 rows of 2023-2024 in training
+MV21_cell	INVALIDATED_PENDING_RERUN	2026-08-13	val2021->test2022 run: 499,032 rows of 2023-2024 in training

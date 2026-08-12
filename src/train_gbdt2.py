@@ -6,6 +6,7 @@
 
 import argparse
 import os
+import socket
 import sys
 import time
 
@@ -38,9 +39,20 @@ REDUNDANT = {"away_win_expectancy",        # home_win_expectancy와 r=1.000
              "run_top_before"}             # run_total_before와 r=0.804
 
 
-def bss(y, p):
+def raw_bss(y, p):
+    """Unclipped. Model selection and every sanity check must use this.
+
+    `bss()` applies the competition's max(0, .) so a collapsed run reports 0.0
+    instead of a negative number -- which is why the `test_bss < 0` guard below
+    had never once fired. Keep the clipped form for reporting the official
+    score only.
+    """
     r = y.mean()
-    return float(max(0.0, 100000 * (1 - ((p - y) ** 2).mean() / (r * (1 - r)))))
+    return float(100000 * (1 - ((p - y) ** 2).mean() / (r * (1 - r))))
+
+
+def bss(y, p):
+    return max(0.0, raw_bss(y, p))
 
 
 def load(tm_feats_path="", drop_f_pre=0, drop_unstable=False,
@@ -269,6 +281,33 @@ def _sample_weights(args, train, is_val, features):
     return w
 
 
+def _assert_partitions(train, args, is_val, is_fit):
+    """Hard-check the temporal contract before a single tree is grown.
+
+    An audit on 2026-08-13 found that `--test-season S` only flagged rows equal
+    to S, so seasons after S stayed in the training pool -- 253,507 rows of 2024
+    leaked into every val2022->test2023 run and 499,032 rows into val2021->2022.
+    Ten ledger runs and the transfer conclusions built on them were invalidated.
+    The contract is cheap to state and was never stated, so state it here rather
+    than trusting the caller to pass --max-train-season.
+    """
+    s = train["season"]
+    if args.test_season:
+        assert not (s > args.test_season).any(), (
+            f"seasons after test_season {args.test_season} are still present")
+        test_mask = train.get("_is_test", pd.Series(False, index=train.index))
+        assert (s[test_mask] == args.test_season).all(), "test rows are not exactly the test season"
+        assert not (is_val & test_mask).any(), "validation and test overlap"
+    # Table fitting (TE / priors / skill) must never see the validation season.
+    assert not (s[is_fit] == args.val_season).any(), "fit partition contains the validation season"
+    if args.test_season:
+        assert not (s[is_fit] == args.test_season).any(), "fit partition contains the test season"
+    print(f"  partitions ok | fit {int(is_fit.sum()):,} (<= "
+          f"{int(s[is_fit].max()) if is_fit.any() else '-'}) | "
+          f"val {int(is_val.sum()):,} @{args.val_season}"
+          + (f" | test @{args.test_season}" if args.test_season else ""))
+
+
 def run_cat(args, train, features, is_val):
     from catboost import CatBoostClassifier, CatBoostRegressor, Pool
     for c in CAT_COLS:
@@ -300,10 +339,13 @@ def run_cat(args, train, features, is_val):
     # 재현되지 않는다(최선의 합집합 84.1%). 라벨은 train 행끼리만 만든다.
     if args.failmode_cells:
         import failmode as fm
+        _fm_modes = tuple(m.strip() for m in args.fm_modes.split(",") if m.strip())
+        # Selection view: labels are recovered inside each partition and the rare
+        # taxonomy is frozen on the fit rows. Without fit_mask the last 310 fit
+        # rows take their label from the validation season's first pitch.
         code, names, succ = fm.build_cells(
-            train, modes=tuple(m.strip() for m in args.fm_modes.split(",")
-                               if m.strip()),
-            context=args.fm_context, min_share=args.fm_min_share)
+            train, modes=_fm_modes, context=args.fm_context,
+            min_share=args.fm_min_share, fit_mask=(~is_val).to_numpy())
         tr = Pool(train.loc[~is_val, features], code[~is_val],
                   cat_features=CAT_COLS, weight=w_tr)
         va = Pool(train.loc[is_val, features], code[is_val],
@@ -333,16 +375,24 @@ def run_cat(args, train, features, is_val):
             )
         if args.no_refit:
             return clf, np.clip(p, 0.0, 1.0), best_iter
-        full = Pool(train[features], code, cat_features=CAT_COLS,
+        # Deployment view: the whole frame is now the final-train partition, so
+        # labels and taxonomy are rebuilt over it and the *refit's own* success
+        # set is what ships. Sharing the selection-view mapping would attach a
+        # fit-frozen taxonomy to a model trained on more data.
+        rcode, rnames, rsucc = fm.build_cells(
+            train, modes=_fm_modes, verbose=False, context=args.fm_context,
+            min_share=args.fm_min_share)
+        full = Pool(train[features], rcode, cat_features=CAT_COLS,
                     weight=_refit_weights(args, train))
         final = CatBoostClassifier(
             iterations=max(int(best_iter * args.refit_mult), 1),
             learning_rate=args.lr, depth=args.depth, l2_leaf_reg=args.l2,
             border_count=args.border_count, task_type=args.device, devices="0",
-            loss_function="MultiClass", classes_count=len(names),
+            loss_function="MultiClass", classes_count=len(rnames),
             random_seed=args.seed, verbose=0)
         final.fit(full)
-        final._fm_success = sorted(succ)
+        final._fm_success = sorted(rsucc)
+        final._fm_names = rnames
         return final, np.clip(p, 0.0, 1.0), best_iter
 
     # E141b: **다중라벨** (MultiLogloss). 셀 다중분류가 심플렉스(합=1)라면
@@ -1028,6 +1078,17 @@ def main():
         # (이 피처들은 전부 시즌 expanding 이라 test 시즌 행의 변환값은
         #  자동으로 그 이전 시즌만 쓴다 = 추론과 같은 절차다)
         train["_is_test"] = (train["season"] == args.test_season)
+        # Seasons *after* test_season are neither _is_test nor is_val, so without
+        # this they fall straight into the training pool. Measured 2026-08-13:
+        # --test-season 2023 kept 253,507 rows of 2024, --test-season 2022 kept
+        # 499,032 rows of 2023-2024. That invalidated ten rolling runs. Do not
+        # leave this to a --max-train-season the caller may forget.
+        future = int((train["season"] > args.test_season).sum())
+        if future:
+            n0 = len(train)
+            train = train[train["season"] <= args.test_season].reset_index(drop=True)
+            print(f"test 시즌 {args.test_season} 이후 {future:,}행 제거: "
+                  f"{n0:,} -> {len(train):,}")
     if args.max_train_season:
         # 한 시즌 앞 예측 상황을 재현한다 (E96 편향 측정용).
         # val_season 이후 시즌을 통째로 제거해야 '미래를 보고 학습'하지 않는다.
@@ -1055,6 +1116,7 @@ def main():
     # 타깃을 쓰는 표 적합에서는 검증 시즌과 test 시즌을 **둘 다** 뺀다
     is_fit = ~is_val & ~train.get("_is_test",
                                   pd.Series(False, index=train.index))
+    _assert_partitions(train, args, is_val, is_fit)
     if args.dump_full_fit:
         if not args.dump_npz:
             raise ValueError("--dump-full-fit requires --dump-npz")
@@ -1435,14 +1497,15 @@ def main():
             else:
                 pt = np.clip(model.predict(Xt), 0, 1)
             yt = test_df[TARGET].to_numpy(np.float64)
-            test_bss = bss(yt, pt)
+            test_raw = raw_bss(yt, pt)
+            test_bss = max(0.0, test_raw)
             print(f"  → 미학습 {args.test_season} 시즌 BSS {test_bss:.2f} "
-                  f"(예측평균 {pt.mean():.4f} vs 실제 {yt.mean():.4f})")
+                  f"(raw {test_raw:.2f}, 예측평균 {pt.mean():.4f} vs 실제 {yt.mean():.4f})")
             # 산출물이 망가졌는지 **여기서** 잡는다. DV_cell 이 BSS -1367 / 편향
             # 0.37 로 나왔는데(다중분류 열을 잘못 집었다) 조용히 지나가서 그 위에
             # "다양성 경로 종료" 판정을 쌓았다.
-            if test_bss < 0 or abs(pt.mean() - yt.mean()) > 0.05:
-                print(f"  !!! 산출물 이상 — BSS {test_bss:.1f}, 편향 "
+            if test_raw < 0 or abs(pt.mean() - yt.mean()) > 0.05                     or not np.isfinite(pt).all():
+                print(f"  !!! 산출물 이상 — raw BSS {test_raw:.1f}, 편향 "
                       f"{pt.mean() - yt.mean():+.4f}. 예측 추출 경로를 의심할 것 "
                       f"(다중분류/다중라벨/범주 정렬). 이 수치로 판정하지 말 것.",
                       flush=True)
@@ -1451,6 +1514,10 @@ def main():
             _test_payload = {
                 "y": yt, "pred": pt,
                 "row_id": test_df["row_id"].to_numpy(),
+                "raw_bss": np.float64(test_raw),
+                "seed": np.int32(_sd), "host": socket.gethostname(),
+                "surface": f"val{args.val_season}->test{args.test_season}",
+                "argv": " ".join(sys.argv[1:]),
             }
             if args.dump_cell_proba and _cell_proba is not None:
                 _test_payload["cell_proba"] = _cell_proba.astype(np.float32)
@@ -1458,14 +1525,20 @@ def main():
             np.savez_compressed(f"./out/{args.model}_{args.tag}_test_preds.npz",
                                 **_test_payload)
 
+        # Validation OOF carries row_id too. Without it nothing downstream can
+        # re-attach a prediction to its row, and order assumptions break quietly.
         np.savez_compressed(f"./out/{args.model}_{args.tag}_val_preds.npz",
-                            y=y_va, pred=p)
+                            y=y_va, pred=p,
+                            row_id=train.loc[is_val, "row_id"].to_numpy(),
+                            raw_bss=np.float64(raw_bss(y_va, p)),
+                            seed=np.int32(_sd), host=socket.gethostname(),
+                            surface=f"val{args.val_season}",
+                            argv=" ".join(sys.argv[1:]))
         # ── 원장 자동 기록 ────────────────────────────────────────────────
         # 08-07 에 30개 실험을 돌리고 docs/EXPERIMENTS_LOG.md 를 하나도 안 갱신했다.
         # 그래서 E08 에서 -580 으로 끝난 season 제거를 "안 해본 축"이라 부르며
         # 다시 큐에 걸었다. 사람이 적는 단계를 없앤다 — tools/precheck.py 가 읽는다.
         try:
-            import socket
             with open("./LEDGER.tsv", "a", encoding="utf-8") as _lg:
                 _lg.write("\t".join([
                     time.strftime("%Y-%m-%d %H:%M"), socket.gethostname(),

@@ -91,7 +91,11 @@ def check(argv, label=""):
             bad = 2
 
     if os.path.exists(LEDGER):
-        sig = {k for k in pairs if k not in ("--tag", "--seed", "--seeds")}
+        # Compare (flag, value) pairs, not just flag names. Names alone called
+        # `--depth 8` and `--depth 9` an "exact duplicate", so the warning could
+        # not be used as a verdict.
+        skip = ("--tag", "--seed", "--seeds")
+        sig = {k: v for k, v in pairs.items() if k not in skip}
         hits = []
         with open(LEDGER, encoding="utf-8") as f:
             for line in f:
@@ -99,7 +103,7 @@ def check(argv, label=""):
                 if len(c) < 9:
                     continue
                 prev = flags_of(c[-1].split())
-                prevsig = {k for k in prev if k not in ("--tag", "--seed", "--seeds")}
+                prevsig = {k: v for k, v in prev.items() if k not in skip}
                 if prevsig == sig:
                     hits.append(c)
         if hits:

@@ -36,6 +36,10 @@ start)
         'tasklist /fi "imagename eq python.exe" /fo table | find /c "python.exe"' \
         2>/dev/null | tr -d '\r\n ')
   echo "  4070  ${b:-?} python process(es)  (a parent+child pair means one job)"
+  c=$(ssh -o ConnectTimeout=10 desktop-5070 \
+        'tasklist /fi "imagename eq python.exe" /fo table | find /c "python.exe"' \
+        2>/dev/null | tr -d '\r\n ')
+  echo "  5070  ${c:-?} python process(es)"
   ;;
 end)
   echo "=== $WHO session end ==="

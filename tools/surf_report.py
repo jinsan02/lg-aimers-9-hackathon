@@ -11,6 +11,8 @@ import sys
 
 import numpy as np
 
+from invalidated import guard as _guard_invalidated
+
 
 def machine_of(tag):
     """LEDGER 에서 그 태그를 만든 머신을 찾는다.
@@ -42,6 +44,7 @@ def load(tag):
 
 
 def main():
+    _guard_invalidated(sys.argv[1:])
     tags = sys.argv[1:]
     if len(tags) < 2:
         print(__doc__)

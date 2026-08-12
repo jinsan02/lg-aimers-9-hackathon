@@ -15,6 +15,8 @@ import sys
 
 import numpy as np
 
+from invalidated import guard as _guard_invalidated
+
 
 def load(tag):
     fs = sorted(glob.glob(f"./out/*{tag}_s*_test_preds.npz"))
@@ -26,6 +28,7 @@ def load(tag):
 
 
 def main():
+    _guard_invalidated(sys.argv[1:])
     tags = sys.argv[1:]
     if len(tags) < 2:
         print(__doc__)
