@@ -36,7 +36,8 @@ def _grid(g, keys, seasons):
     return g.reindex(idx, fill_value=0.0).sort_index()
 
 
-def build_te(df, keys, k=K_DEFAULT, half_life=0.0, prefix=None, strat=True):
+def build_te(df, keys, k=K_DEFAULT, half_life=0.0, prefix=None, strat=True,
+             fit_mask=None):
     """keys 조합에 대한 시즌 expanding 타깃 인코딩 표를 만든다.
 
     반환: (키..., season) -> [ratio, rate, n] 을 담은 DataFrame.
@@ -53,7 +54,12 @@ def build_te(df, keys, k=K_DEFAULT, half_life=0.0, prefix=None, strat=True):
     """
     seasons = sorted(df["season"].unique())
     horizon = seasons + [max(seasons) + 1]
-    prior = float(df[TARGET].mean())
+    # The cumulative count/sum body is season-expanding with shift(1), so no
+    # row sees its own season. This scalar was the exception: computed over the
+    # whole frame it carries the validation season's target mean into every
+    # shrunk rate. `fit_mask` restricts it to the stage's fit partition.
+    prior = float(df.loc[fit_mask, TARGET].mean() if fit_mask is not None
+                  else df[TARGET].mean())
 
     rest = [c for c in keys if c not in ("pitcher_id", "batter_id")]
     if strat and rest:

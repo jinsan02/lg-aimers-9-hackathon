@@ -146,7 +146,7 @@ def _future(df, axis=""):
     return pd.Series(fn, index=d.index), pd.Series(fr, index=d.index)
 
 
-def build(train, axis=""):
+def build(train, axis="", neutral_first=False):
     """시즌별 계수 묶음을 만든다. 시즌 S 계수는 **S 미만 시즌**으로만 적합.
 
     axis="count" (E117) 타깃 = 그 투수의 이 볼카운트에서의 남은 성공률.
@@ -164,7 +164,11 @@ def build(train, axis=""):
     for i, s in enumerate(seasons):
         b = _fit(df[df["season"] < s], med, axis=axis) if i > 0 else None
         if b is None:                      # 첫 시즌은 과거가 없다
-            b = _fit(df, med, axis=axis)
+            # Legacy: fall back to coefficients fit on the **whole** frame, so
+            # 2019 training rows receive a regression built from future-season
+            # targets. `neutral_first` says the honest thing instead -- there is
+            # no past, so the estimate is missing and CatBoost treats it as such.
+            b = "neutral" if neutral_first else _fit(df, med, axis=axis)
         coef[s] = b
     coef[max(seasons) + 1] = _fit(df, med, axis=axis)   # 2025 행용
     return {"coef": coef, "med": med, "last": max(seasons) + 1, "axis": axis}
@@ -182,6 +186,8 @@ def add(df, pack):
     out = np.full(len(df), np.nan)
     for s in np.unique(se):
         b = coef.get(int(s))
+        if isinstance(b, str):             # "neutral" -- no past season exists
+            continue                       # leave NaN; CatBoost reads it natively
         if b is None:                      # 학습에 없던 시즌 = 마지막 계수
             b = coef[pack["last"]]
         m = se == s

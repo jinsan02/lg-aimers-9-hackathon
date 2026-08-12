@@ -1010,6 +1010,15 @@ def main():
                     help="실력 추정기를 붙일 축을 쉼표로. 빈 항목='' = 투수 단위, "
                          "count = 투수x볼카운트(E117), hand = 투수x타자손(E123). "
                          "예: --skill-axes count,hand")
+    # --- P1 validation-contract fixes (B1-J surface). Off by default so B0-JL
+    # keeps its legacy-like behaviour and the two surfaces stay distinguishable.
+    ap.add_argument("--te-fit-prior", action="store_true",
+                    help="TE global shrink prior from the fit partition only")
+    ap.add_argument("--skill-neutral-first", action="store_true",
+                    help="first season gets a missing skill estimate instead of "
+                         "coefficients fit on the whole frame")
+    ap.add_argument("--p1", action="store_true",
+                    help="enable every P1 validation-contract fix at once")
     ap.add_argument("--feat-window", action="store_true",
                     help="E118: 중첩된 prev1/3/5 를 분리된 창(경기1 / 2~3 / 4~5)으로 "
                          "분해. 역산값이 100%% [0,1] 안에 들어와 분해가 정확하다")
@@ -1077,6 +1086,11 @@ def main():
     ap.add_argument("--no-refit", action="store_true",
                     help="검증만 하고 전체 재학습 생략 (실험용)")
     args = ap.parse_args()
+
+    if args.p1:
+        args.te_fit_prior = True
+        args.skill_neutral_first = True
+        print("P1: fit-only TE prior + neutral first-season skill")
 
     train, features, tm_table = load(args.tm_feats, args.drop_f_pre,
                                      args.drop_unstable, args.drop_redundant,

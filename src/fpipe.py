@@ -238,7 +238,9 @@ def fit(train, args, is_fit, tm_table=None, verbose=True):
             tables.append((keys, te_mod.build_te(
                 train, keys, k=_kmap.get(spec, _kdef),
                 half_life=args.te_halflife,
-                strat=_strat)))
+                strat=_strat,
+                fit_mask=(is_fit if getattr(args, "te_fit_prior", False)
+                          else None))))
         art["te"] = {"tables": tables, "dev": args.te_dev,
                      "cross": bool(args.feat_cross and args.feat_std)}
         train, cols = _apply_te(train, art["te"])
@@ -250,7 +252,10 @@ def fit(train, args, is_fit, tm_table=None, verbose=True):
     axes = skill_axes(args)
     if axes:
         import skill as sk_mod
-        art["skill_packs"] = [sk_mod.build(train, axis=a) for a in axes]
+        art["skill_packs"] = [
+            sk_mod.build(train, axis=a,
+                         neutral_first=getattr(args, "skill_neutral_first", False))
+            for a in axes]
         cols = []
         for pk in art["skill_packs"]:
             train, c = sk_mod.add(train, pk)
