@@ -293,6 +293,34 @@ def _sample_weights(args, train, is_val, features):
     return w
 
 
+def _guard_two_stage(args):
+    """Refuse a two-stage run whose frame is edited after `fpipe.fit`.
+
+    The deployment frame is rebuilt by calling `fpipe.fit` again on a pristine
+    copy, so it carries the fpipe columns and nothing else. Anything that
+    mutates the frame *after* that call -- PCA fitted on `~is_val`, the missing
+    experiment, a row filter, distillation targets, late column drops -- would
+    be present in the selection frame and absent from the deployment one, and
+    the refit would then be trained on a quietly different design matrix.
+    Fail loudly instead of producing a mixed frame.
+    """
+    blockers = [
+        ("--tm-context", args.tm_context),
+        ("--pca", args.pca), ("--pca-add", args.pca_add),
+        ("--missing-strategy", args.missing_strategy not in ("", "native")),
+        ("--row-filter", args.row_filter),
+        ("--soft-target", args.soft_target),
+        ("--drop-cols", getattr(args, "drop_cols", "")),
+        ("--feat-role", getattr(args, "feat_role", False)),
+    ]
+    hit = [n for n, v in blockers if v]
+    if hit:
+        raise SystemExit(
+            "--two-stage-artifact cannot be combined with "
+            f"{', '.join(hit)}: those edit the frame after fpipe.fit, so the "
+            "deployment frame would not match the selection frame.")
+
+
 def _assert_partitions(train, args, is_val, is_fit):
     """Hard-check the temporal contract before a single tree is grown.
 
@@ -320,10 +348,18 @@ def _assert_partitions(train, args, is_val, is_fit):
           + (f" | test @{args.test_season}" if args.test_season else ""))
 
 
-def run_cat(args, train, features, is_val):
+def run_cat(args, train, features, is_val, train_dep=None):
+    """`train` is the selection view. `train_dep`, when given, is the same rows
+    featurised by an artifact fitted on the whole final-train partition, and is
+    what the refit is trained on (audit contract 2)."""
     from catboost import CatBoostClassifier, CatBoostRegressor, Pool
     for c in CAT_COLS:
         train[c] = train[c].astype(str)
+    if train_dep is None:
+        train_dep = train
+    else:
+        for c in CAT_COLS:
+            train_dep[c] = train_dep[c].astype(str)
 
     w_tr = _sample_weights(args, train, is_val, features)
     y_tr = train.loc[~is_val, TARGET].astype(float)
@@ -392,10 +428,10 @@ def run_cat(args, train, features, is_val):
         # set is what ships. Sharing the selection-view mapping would attach a
         # fit-frozen taxonomy to a model trained on more data.
         rcode, rnames, rsucc = fm.build_cells(
-            train, modes=_fm_modes, verbose=False, context=args.fm_context,
+            train_dep, modes=_fm_modes, verbose=False, context=args.fm_context,
             min_share=args.fm_min_share)
-        full = Pool(train[features], rcode, cat_features=CAT_COLS,
-                    weight=_refit_weights(args, train))
+        full = Pool(train_dep[features], rcode, cat_features=CAT_COLS,
+                    weight=_refit_weights(args, train_dep))
         final = CatBoostClassifier(
             iterations=_refit_trees(best_iter, args.refit_mult),
             learning_rate=args.lr, depth=args.depth, l2_leaf_reg=args.l2,
@@ -581,11 +617,11 @@ def run_cat(args, train, features, is_val):
 
     # ★ 전체 데이터(2024 포함) 재학습 — 제출용. drift 데이터라 최신 시즌 포함이 필수
     #   (E18 교훈: 2023까지만 학습한 모델은 2025에서 2년 외삽이 되어 LB 폭락)
-    full = Pool(train[features],
+    full = Pool(train_dep[features],
                 train["_soft"] if "_soft" in train.columns else train[TARGET],
-                cat_features=CAT_COLS, weight=_refit_weights(args, train))
+                cat_features=CAT_COLS, weight=_refit_weights(args, train_dep))
     if args.baseline_col:
-        qf = np.clip(train[args.baseline_col].astype(float).fillna(0.5),
+        qf = np.clip(train_dep[args.baseline_col].astype(float).fillna(0.5),
                      1e-4, 1 - 1e-4)
         full.set_baseline(np.log(qf / (1 - qf)).to_numpy())
     # 재학습은 **검증 모델과 같은 설정**이어야 한다. 한쪽에만 규제를 걸면 best_iter 는
@@ -1017,8 +1053,15 @@ def main():
     ap.add_argument("--skill-neutral-first", action="store_true",
                     help="first season gets a missing skill estimate instead of "
                          "coefficients fit on the whole frame")
+    ap.add_argument("--two-stage-artifact", action="store_true",
+                    help="rebuild the fpipe artifact on the final-train "
+                         "partition for the refit instead of reusing the "
+                         "selection artifact (audit contract 1/2)")
     ap.add_argument("--p1", action="store_true",
-                    help="enable every P1 validation-contract fix at once")
+                    help="the audit's B1-J definition: all three P1 "
+                         "validation-contract fixes at once. Use the three "
+                         "flags individually to attribute an effect -- a "
+                         "bundled arm cannot say which fix moved the score")
     ap.add_argument("--feat-window", action="store_true",
                     help="E118: 중첩된 prev1/3/5 를 분리된 창(경기1 / 2~3 / 4~5)으로 "
                          "분해. 역산값이 100%% [0,1] 안에 들어와 분해가 정확하다")
@@ -1090,7 +1133,9 @@ def main():
     if args.p1:
         args.te_fit_prior = True
         args.skill_neutral_first = True
-        print("P1: fit-only TE prior + neutral first-season skill")
+        args.two_stage_artifact = True
+        print("P1 (audit B1-J): two-stage artifact + fit-only TE prior "
+              "+ neutral first-season skill")
 
     train, features, tm_table = load(args.tm_feats, args.drop_f_pre,
                                      args.drop_unstable, args.drop_redundant,
@@ -1154,7 +1199,34 @@ def main():
     # 피처 생성은 fpipe 가 전담한다 — 추론(script_blend_v6)이 쓰는
     # fpipe.transform 과 **같은 파일에 나란히** 있어서 순서가 어긋날 수 없다.
     ctx_tables = role_table = mgr_table = None
+    # Audit contract 1/2: the selection model's artifact may only see rows before
+    # validation, but the refit model's artifact is allowed the whole final-train
+    # partition. Sharing one `is_fit` artifact across both stages pinned the TE
+    # shrink prior at <= val_season-1 for the deployment model too, and because
+    # success rates fall every season (.5495 in 2019 -> .4861 in 2024) that stale
+    # prior cost -2.41 on unseen 2024 while gaining +3.56 on validation.
+    _raw_dep = train.copy() if args.two_stage_artifact else None
     train, new_cols, new_cats, art = fpipe.fit(train, args, is_fit, tm_table)
+    art_dep, train_dep = art, None
+    if args.two_stage_artifact:
+        _guard_two_stage(args)
+        dep_mask = ~_raw_dep.get("_is_test",
+                                 pd.Series(False, index=_raw_dep.index))
+        print(f"  2단계 artifact: 배포용 fit {int(dep_mask.sum()):,}행 "
+              f"(<= {int(_raw_dep.loc[dep_mask, 'season'].max())})")
+        train_dep, dep_cols, _, art_dep = fpipe.fit(
+            _raw_dep, args, dep_mask, tm_table, verbose=False)
+        del _raw_dep
+        # Row alignment is not assumed -- fpipe merges reset the index, and a
+        # silently reordered deployment frame would train the refit on shuffled
+        # labels while every score still looked plausible.
+        if not np.array_equal(train_dep["row_id"].to_numpy(),
+                              train["row_id"].to_numpy()):
+            raise RuntimeError("two-stage frames disagree on row order")
+        if set(dep_cols) != set(new_cols):
+            raise RuntimeError(
+                f"two-stage frames disagree on columns: "
+                f"{sorted(set(dep_cols) ^ set(new_cols))[:8]}")
     features = features + [c for c in new_cols if c not in features]
     CAT_COLS.extend([c for c in new_cats if c not in CAT_COLS])
     print(f"피처 총 {len(features)}개 (범주형 {len(CAT_COLS)})")
@@ -1426,7 +1498,14 @@ def main():
     if args.test_season:
         # 피처가 다 붙은 뒤에 분리한다 — 이제 test_df 도 같은 컬럼을 갖는다
         m = train["_is_test"].to_numpy()
-        test_df = train[m].reset_index(drop=True)
+        # Under two-stage, the unseen season is scored by the refit model, so its
+        # features must come from the deployment artifact -- the one that was
+        # allowed to see the validation season. Taking them from the selection
+        # frame would score a deployment model on selection-view inputs.
+        _src = train_dep if train_dep is not None else train
+        test_df = _src[m].reset_index(drop=True)
+        if train_dep is not None:
+            train_dep = train_dep[~m].reset_index(drop=True)
         train = train[~m].reset_index(drop=True)
         is_val = train["season"] == args.val_season
         print(f"test 시즌 {args.test_season} 분리: 학습·검증 {len(train):,}행 / "
@@ -1459,7 +1538,10 @@ def main():
         t0 = time.time()
         runner = {"cat": run_cat, "lgb": run_lgb, "rank": run_rank}.get(
             args.model, run_xgb)
-        model, p, best_iter = runner(args, train, features, is_val)
+        model, p, best_iter = (
+            runner(args, train, features, is_val, train_dep=train_dep)
+            if (train_dep is not None and args.model == "cat")
+            else runner(args, train, features, is_val))
         score = bss(y_va, p)
         print(f"[{args.model} {args.tag}] val{args.val_season} BSS {score:.2f} "
               f"| best_iter={best_iter} | {time.time() - t0:.0f}s", flush=True)
@@ -1577,9 +1659,13 @@ def main():
         except Exception as _e:                       # 기록 실패로 학습을 죽이지 않는다
             print(f"  (LEDGER 기록 실패: {_e})")
         # 피처 재현에 필요한 건 전부 art 안에 있다 (fpipe.transform 이 읽는다).
+        # Under two-stage this must be the *deployment* artifact: the shipped
+        # model was trained on features it produced, so inference has to rebuild
+        # them the same way. Storing the selection artifact would give the
+        # submission a shrink prior one season staler than its own training set.
         joblib.dump({"model": model, "features": features, "cat_cols": CAT_COLS,
                      "best_iteration": best_iter, "val_bss": score,
-                     "fpipe": art, "resid_col": args.resid_col,
+                     "fpipe": art_dep, "resid_col": args.resid_col,
                      "baseline_col": args.baseline_col,
                      "fm_success": getattr(model, "_fm_success", None),
                      "season_means": season_means},

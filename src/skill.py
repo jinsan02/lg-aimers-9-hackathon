@@ -132,10 +132,17 @@ def _future(df, axis=""):
     axis 가 비면 (투수, 시즌). 축이 있으면 그 축 컬럼이 키에 더해져
     '그 투수의 **이 상황에서의** 남은 성적'이 타깃이 된다.
     """
-    # row_id 는 load() 가 피처에서 빼면서 아예 안 읽어온다. 대신 **안정 정렬**로
-    # 그룹 내 원본 파일 순서(= 시간 순)를 그대로 유지한다.
+    # Order inside a group is time order, and "the rest of the season" is a
+    # cumulative sum, so a reordered frame silently changes every target. A
+    # stable sort only preserves whatever order the caller happened to pass;
+    # sorting on row_id makes the pitch order explicit and independent of it
+    # (audit 4.2: "명시적 row_id 정렬"). row_id is not a feature -- load() drops
+    # it from the model input -- so this costs nothing but determinism.
     keys = ["pitcher_id", "season"] + AXES.get(axis, {}).get("keys", [])
-    d = df.sort_values(keys, kind="stable")
+    if "row_id" in df.columns:
+        d = df.sort_values(keys + ["row_id"], kind="stable")
+    else:
+        d = df.sort_values(keys, kind="stable")
     g = d.groupby(keys, sort=False)
     tot = g[TARGET].transform("sum").to_numpy(np.float64)
     cnt = g[TARGET].transform("size").to_numpy(np.float64)
