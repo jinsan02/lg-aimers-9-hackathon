@@ -55,6 +55,18 @@ def bss(y, p):
     return max(0.0, raw_bss(y, p))
 
 
+def _refit_trees(best_iter, mult):
+    """Tree count for the refit.
+
+    `get_best_iteration()` is a 0-based index, so the selected model holds
+    best_iter + 1 trees -- CatBoost itself prints "Shrink model to first 144
+    iterations" when bestIteration is 143. Multiplying the raw index undercounts
+    by `mult` trees on every refit we have ever built. Corrected here; too small
+    to be worth its own arm, but no reason to keep it wrong.
+    """
+    return max(int((best_iter + 1) * mult), 1)
+
+
 def load(tm_feats_path="", drop_f_pre=0, drop_unstable=False,
          drop_redundant=False, keep_ids=False, league=""):
     test_cols = pd.read_csv(f"{DATA}/test.csv", encoding="utf-8-sig", nrows=0).columns
@@ -385,7 +397,7 @@ def run_cat(args, train, features, is_val):
         full = Pool(train[features], rcode, cat_features=CAT_COLS,
                     weight=_refit_weights(args, train))
         final = CatBoostClassifier(
-            iterations=max(int(best_iter * args.refit_mult), 1),
+            iterations=_refit_trees(best_iter, args.refit_mult),
             learning_rate=args.lr, depth=args.depth, l2_leaf_reg=args.l2,
             border_count=args.border_count, task_type=args.device, devices="0",
             loss_function="MultiClass", classes_count=len(rnames),
@@ -423,7 +435,7 @@ def run_cat(args, train, features, is_val):
             return clf, np.clip(p, 0.0, 1.0), best_iter
         full = Pool(train[features], Y, cat_features=CAT_COLS)
         final = CatBoostClassifier(
-            iterations=max(int(best_iter * args.refit_mult), 1),
+            iterations=_refit_trees(best_iter, args.refit_mult),
             learning_rate=args.lr, depth=args.depth, l2_leaf_reg=args.l2,
             border_count=args.border_count, task_type=args.device, devices="0",
             loss_function="MultiLogloss", random_seed=args.seed, verbose=0)
@@ -494,7 +506,7 @@ def run_cat(args, train, features, is_val):
         full = Pool(train[features], y_all, cat_features=CAT_COLS,
                     weight=_refit_weights(args, train))
         rfp = dict(
-            iterations=max(int(best_iter * args.refit_mult), 1),
+            iterations=_refit_trees(best_iter, args.refit_mult),
             learning_rate=args.lr,
             depth=args.depth, l2_leaf_reg=args.l2,
             border_count=args.border_count,
@@ -581,7 +593,7 @@ def run_cat(args, train, features, is_val):
     # ex(grow_policy / monotone / min_data_in_leaf)는 task_type 까지 바꿀 수 있으므로
     # 위 params 와 **똑같은 순서**로 적용한 뒤 CPU 면 devices 를 뺀다.
     fp = dict(
-        iterations=max(int(best_iter * args.refit_mult), 1),
+        iterations=_refit_trees(best_iter, args.refit_mult),
         learning_rate=args.lr, depth=args.depth,
         l2_leaf_reg=args.l2, border_count=args.border_count,
         bagging_temperature=args.bagging_temp,
@@ -685,7 +697,7 @@ def run_rank(args, train, features, is_val):
     full, _ = _rank_pool(train, features, np.ones(len(train), dtype=bool),
                          args.rank_group_size)
     final = CatBoostRanker(
-        iterations=max(int(best_iter * args.refit_mult), 1),
+        iterations=_refit_trees(best_iter, args.refit_mult),
         learning_rate=args.lr, depth=args.depth, l2_leaf_reg=args.l2,
         border_count=args.border_count, task_type=args.device, devices="0",
         loss_function="PairLogitPairwise", random_seed=args.seed, verbose=0,
@@ -731,7 +743,7 @@ def run_lgb(args, train, features, is_val):
         return m, p, best_iter
     ds_all = lgb.Dataset(X, train[TARGET], categorical_feature=CAT_COLS)
     final = lgb.train(params, ds_all,
-                      num_boost_round=max(int(best_iter * args.refit_mult), 1))
+                      num_boost_round=_refit_trees(best_iter, args.refit_mult))
     return final, p, best_iter
 
 
@@ -1426,6 +1438,7 @@ def main():
     seeds = ([int(x) for x in args.seeds.split(",") if x.strip()]
              if args.seeds else [args.seed])
     base_tag = args.tag
+    _lineage_seeds = {}
     for _si, _sd in enumerate(seeds):
         args.seed = _sd
         args.tag = base_tag if len(seeds) == 1 else f"{base_tag}_s{_sd}"
@@ -1558,6 +1571,27 @@ def main():
                      "season_means": season_means},
                     f"./model/{args.model}_{args.tag}.pkl", compress=3)
         print(f"saved: model/{args.model}_{args.tag}.pkl")
+        _lineage_seeds[str(_sd)] = {
+            "tag": args.tag,
+            "best_iteration": int(best_iter),
+            "refit_trees": (None if args.no_refit
+                            else _refit_trees(best_iter, args.refit_mult)),
+            "val_bss_official": round(score, 4),
+            "val_bss_raw": round(raw_bss(y_va, p), 4),
+            "val_pred_mean": round(float(np.mean(p)), 6),
+            "val_target_mean": round(float(np.mean(y_va)), 6),
+            "test_bss_raw": (round(locals().get("test_raw"), 4)
+                             if "test_raw" in locals() else None),
+        }
+
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
+        import lineage
+        lineage.write(base_tag, args, features, train, is_val, is_fit,
+                      _lineage_seeds,
+                      cell_names=locals().get("cell_names"))
+    except Exception as _e:            # provenance must never kill a finished run
+        print(f"  (lineage 기록 실패: {_e})")
 
 
 if __name__ == "__main__":
