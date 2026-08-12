@@ -161,3 +161,67 @@ three seeds. B1-J base sd is 2.10 across six.
   one machine, nothing more (audit 6.3). The 2022→2023 stress case is separate.
 - Not attribution. `--p1` bundles three fixes; the individual arms are what say
   which one moved the number.
+
+---
+
+# Attribution — the four single-change arms
+
+Each arm adds exactly one flag to the fixed B0-JL core, seeds 3, 4, 5, same
+host. Screening scale (audit 6.3): these terminate obviously-negative
+candidates and declare nothing.
+
+`.45/.55` core, against B0-JL:
+
+| arm | unseen 2024 | val 2023 |
+|---|---|---|
+| `--te-fit-prior` | −0.01 (SE 1.36, t −0.01) | +2.61 (t +1.15) |
+| `--skill-neutral-first` | **−5.59** (SE 0.96, **t −5.83**) | **+5.97** (t +6.04) |
+| `--two-stage-artifact` | +1.01 (SE 1.36, t +0.74) | +0.15 (t +0.96) |
+| `--anchor-last-pitch` | +1.80 (SE 1.16, t +1.56) | +0.58 (t +0.32) |
+| `--p1` (the first three together) | +1.12 (SE 0.68, t +1.65) | +4.16 (t +2.53) |
+
+## The three P1 fixes are strongly non-additive
+
+```
+sum of the three single arms   −4.59
+measured together (--p1)       +1.12      interaction +5.71
+```
+
+This kills the arithmetic I used before these arms existed. When only the two
+cheap fixes had run I attributed their −2.41 to the stale TE prior and the
+season drift behind it (.5495 in 2019 → .4861 in 2024). **The TE prior is not
+the cause: alone it is −0.01 on unseen 2024.** The drift numbers were right and
+the causal claim was wrong — it was reasoning from a plausible mechanism
+instead of from a measurement, and the measurement disagrees.
+
+What actually costs is `--skill-neutral-first`, and only in combination does it
+come back. Do not attribute any part of a bundled result by subtraction here.
+
+## Every contract fix hurts base and helps cell
+
+Unseen 2024, per family:
+
+| arm | base | cell |
+|---|---|---|
+| `--te-fit-prior` | −6.63 (t −2.34) | +5.02 (t +3.51) |
+| `--skill-neutral-first` | −16.34 (t −3.92) | +1.64 (t +1.32) |
+| `--two-stage-artifact` | −2.48 (t −1.16) | +3.58 (t +2.25) |
+| `--anchor-last-pitch` | +1.02 (t +0.50) | +2.83 (t +2.43) |
+
+The sign is the same in all four rows, and the `.45/.55` blend is cancelling
+most of it. `--skill-neutral-first` touches one thing -- the 2019 rows
+(211,627, 15.4% of the frame) lose their skill estimate to NaN -- and the
+binary family loses 16 points.
+
+That is worth a follow-up arm, not a revert. The audit's wording is "사전 고정
+neutral/결측"; NaN was my choice because CatBoost handles it natively. A base
+model reacting this hard suggests NaN is being learned as *a 2019 marker*
+rather than as absent information, which a fixed neutral value would not be.
+
+## Status
+
+- The three P1 fixes are a correctness contract, applied regardless of sign
+  (audit 1.5). These numbers are their cost, not a vote.
+- `--anchor-last-pitch` is a live candidate: +1.80 with a 95% upper bound of
+  +6.8, so rule 5 neither adopts nor rejects it at n=3. It goes to six seeds on
+  B1-J (`ANCH6`), which is the adoption surface -- these screens ran on B0-JL.
