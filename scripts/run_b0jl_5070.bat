@@ -1,6 +1,11 @@
 @echo off
 REM B0-JL -- judging, legacy-like. The new zero point for cheap screening.
 REM
+REM SUPERSEDED by run_judge_5070.bat, which is the same core parameterised by
+REM tag and extra flags (`run_judge_5070.bat B0JL "3,4,5"`). Kept because this
+REM exact file produced the declared baseline in docs/B0_BASELINE.md; use the
+REM parameterised runner for anything new.
+REM
 REM P0 is fixed here (future-season cutoff, split-safe cell labels); P1 is NOT
 REM (TE global prior and skill first-season fallback keep their legacy behaviour).
 REM So a B0 number is a paired delta inside one implementation, never "honest"
