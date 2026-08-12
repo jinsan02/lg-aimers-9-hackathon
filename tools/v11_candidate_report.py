@@ -60,7 +60,7 @@ def main():
     ap.add_argument("--alt", required=True)
     ap.add_argument("--cell", required=True)
     ap.add_argument("--season", type=int, default=2024)
-    ap.add_argument("--constants", default="out/matchup_constants_2024.npz")
+    ap.add_argument("--constants", default="model/matchup_constants_2024.npz")
     args = ap.parse_args()
     b, y, nb = load(args.base)
     a, ya, na = load(args.alt)

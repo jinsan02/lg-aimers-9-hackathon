@@ -14,7 +14,7 @@ import pandas as pd
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TEST = os.environ.get("V12_TEST_CSV", os.path.join(ROOT, "data", "test.csv"))
 OLD = os.environ.get("V12_OLD_CONSTANTS",
-                     os.path.join(ROOT, "out", "matchup_constants_2024.npz"))
+                     os.path.join(ROOT, "model", "matchup_constants_2024.npz"))
 NEW = os.environ.get("V12_NEW_CONSTANTS",
                      os.path.join(ROOT, "out", "final_constants_2024.npz"))
 

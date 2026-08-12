@@ -56,7 +56,7 @@ def corrections(d):
     mid = np.full(len(d), NAN_OFFSET)
     ok = np.isfinite(x)
     mid[ok] = OFFSETS[np.searchsorted(THRESHOLDS, x[ok], side="right")]
-    z = np.load(os.path.join(OUT, "matchup_constants_2024.npz"))
+    z = np.load(os.path.join(ROOT, "model", "matchup_constants_2024.npz"))
     tab = {(int(p), int(b)): float(v) for p, b, v in
            zip(z["pb0_pitcher"], z["pb0_batter"], z["pb0_offset"])}
     pb = np.fromiter((tab.get((int(p), int(b)), 0.0) for p, b in
