@@ -96,3 +96,68 @@ refuse the valid baseline. It cannot contaminate anything on its own — it has 
   skill fallback both change the artifact, and B1-J exists to measure that
   change against this line rather than against a moving target.
 - Three seeds is a screen, not an adoption bar. Finalists need six.
+
+---
+
+# B1-J — the adoption surface
+
+Same host, same core, seeds 3, 4, 5, 6, 8, 13, with `--p1` (all three P1
+validation-contract fixes). This is the audit's B1-J: the surface a finalist is
+adopted on. B0-JL above stays what it is, a three-seed screen.
+
+## Score
+
+| arm | mean (6 seeds) | sd | ensembled |
+|---|---:|---:|---:|
+| `B1J6_base` | 866.23 | 2.10 | 874.00 |
+| `B1J6_cell` | 886.52 | 2.82 | 889.78 |
+| `.45/.55` core | 892.31 | — | **894.93** |
+
+Validation 2023 ensembled: base 602.54, cell 601.45, core 616.80.
+
+## Paired against B0-JL (common seeds 3, 4, 5)
+
+| arm | unseen 2024 | val 2023 |
+|---|---|---|
+| base | −0.65 (SE 3.09, t −0.21) | +7.74 (SE 3.71, t +2.09) |
+| cell | +2.45 (SE 1.28, t +1.92) | +0.81 (SE 1.30, t +0.62) |
+| **core** | **+1.12** (SE 0.68, t +1.65) | **+4.16** (SE 1.64, t +2.53) |
+
+The point of this table is not the size. It is the sign.
+
+A half-applied P1 -- the two cheap fixes with the artifact still shared between
+stages -- measured **−2.41 (t −2.51) on unseen 2024 while gaining +3.56 on
+validation**. Two surfaces disagreeing at t > 2.4 in opposite directions is not
+seed noise; it was the stale deployment prior. Completing contract 1/2 removed
+the conflict: both surfaces are now positive. Nothing about the two cheap fixes
+changed, and the selection-stage score is untouched by construction (seed 3
+base val was 588.68 before and after).
+
+Neither surface reaches the +3 adoption bar, and it does not matter here. P1 is
+a correctness contract applied regardless of score direction (audit 1.5), not a
+candidate. What this measures is the cost of the contract, and the cost is not
+negative.
+
+## Provenance
+
+```
+feature fingerprint  ac03d14a49872b1e   (121 features, both arms -- same as B0)
+rows   selection fit 870,752 (<= 2022) | deployment fit 1,116,277 (<= 2023)
+       val 245,525 | unseen 2024 253,507
+refit trees   base   901 - 1312
+              cell   4428 - 4500   (still pinned at the 3000-iteration cap)
+host                 DESKTOP-053T952
+source               a913cec (stamped via .deployed_commit)
+```
+
+`collapse check: ok`. Prediction means sit +0.0017 to +0.0029 from the truth on
+both arms -- tighter than B0, where base ran to +0.0029 with sd 6.57 across
+three seeds. B1-J base sd is 2.10 across six.
+
+## What this is not
+
+- Not a submission shape. Still `--drop-f-pre 2022`.
+- Not a temporal generalisation claim. Same-seed t is stochastic stability on
+  one machine, nothing more (audit 6.3). The 2022→2023 stress case is separate.
+- Not attribution. `--p1` bundles three fixes; the individual arms are what say
+  which one moved the number.
