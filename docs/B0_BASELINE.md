@@ -225,3 +225,63 @@ rather than as absent information, which a fixed neutral value would not be.
 - `--anchor-last-pitch` is a live candidate: +1.80 with a 95% upper bound of
   +6.8, so rule 5 neither adopts nor rejects it at n=3. It goes to six seeds on
   B1-J (`ANCH6`), which is the adoption surface -- these screens ran on B0-JL.
+
+---
+
+# B1-S — submission shape, and the champion's stale artifact
+
+`--val-season 2024`, no `--drop-f-pre`, no test season, `--p1`, seeds 3, 4, 5,
+6, 8, 13. The only surface whose training set matches the shipped champion, so
+the only place "did the rebuild beat v11" is a real question.
+
+## Score (val 2024, 253,507 rows, target .486105)
+
+| arm | raw | centered | pred mean |
+|---|---:|---:|---:|
+| base | 920.41 | 940.24 | .4931 |
+| cell | 916.42 | 949.42 | .4952 |
+| `.45/.55` core | **929.49** | **956.15** | .4943 |
+
+Per seed — base 909.00 / 910.62 / 917.53 / 912.06 / 916.17 / 916.57,
+cell 920.04 / 910.23 / 908.92 / 911.27 / 917.05 / 919.28. Cell pins at the cap
+again (best_iter 2985–2999).
+
+No post-processing is applied. SLOPE, SHIFT, recent-middle and PB are all still
+legacy constants fitted on legacy OOF, and audit 6.4 forbids refitting them
+until the structure is settled. So this number is not comparable to LB.
+
+## The champion's deployment artifact is one season stale
+
+`member_fingerprint.py` reports B1-S at `0.5352282203`. The shipped champion is
+`0.5401750413`. Both are `fpipe['priors']['asof_pitcher_success_rate']`, and
+both were checked against the data:
+
+```
+mean asof_pitcher_success_rate, whole train.csv
+  all rows (<= 2024)   0.5352282203   <- B1-S
+  <= 2023              0.5401750413   <- shipped champion
+```
+
+Exact, to ten places. **The champion's inference-time features were built from
+seasons up to 2023 while its trees were refit on data through 2024.** Its
+`is_fit` excluded the validation season, and that one artifact then served the
+final refit too — precisely the mismatch audit contract 2 names. Under
+`--two-stage-artifact` the deployment artifact is rebuilt on the final-train
+partition, so the fingerprint moves to the whole frame and now matches the rows
+the model was actually fit on.
+
+This is a difference to expect and verify, not an error to chase. The
+fingerprint check exists because a mismatch once cost 52 points (`VB_base`);
+here the mismatch is the fix landing.
+
+## Champion val numbers are not a fair comparison
+
+The champion's recorded `cat_v14f` val BSS on the same six seeds averages
+921.67 against our base's 913.66. That gap is not evidence the rebuild is
+worse. The champion's validation model drew its TE prior and its skill
+coefficients from a frame that included the 2024 targets it was being scored
+on; ours does not. A leak-free validation score is expected to be lower than a
+leaky one on the same rows.
+
+The comparison that would settle it is LB, and that needs post-processing
+constants refitted on this OOF — the next step, in the order audit 6.4 sets.
