@@ -24,7 +24,9 @@ C=$(git rev-parse HEAD)
 ssh "$H" "if not exist $R\\src mkdir $R\\src & if not exist $R\\tools mkdir $R\\tools & if not exist $R\\out mkdir $R\\out"
 scp -q src/*.py   "$H:$R/src/"
 scp -q tools/*.py "$H:$R/tools/"
-ssh "$H" "echo $C> $R\\.deployed_commit"
+# cmd redirection needs a backslash path; $R is the scp (forward-slash) form.
+W="${R//\//\\}"
+ssh "$H" "cmd /c echo $C> $W\\.deployed_commit"
 
 echo "deployed ${C:0:8} to $H"
-ssh "$H" "type $R\\.deployed_commit"
+ssh "$H" "cmd /c type $W\\.deployed_commit" 2>/dev/null
