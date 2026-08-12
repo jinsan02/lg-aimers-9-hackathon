@@ -1,145 +1,156 @@
-# 닫힌 질문 — 다시 하지 말 것
+# Closed questions — do not run these again
 
-> `tools/precheck.py` 가 이 파일을 읽는다. 실험 전 반드시 통과시킬 것.
-> 형식: `FLAG <플래그조각> | <판정> | <수치> | <근거>`
-> 판정은 `BANNED`(재실행 금지) / `CLOSED`(닫힘, 새 근거 있을 때만) 둘 중 하나.
+> `tools/precheck.py` parses this file. Every experiment must pass it first.
+> Format: `FLAG <flag fragment> | <verdict> | <number> | <mechanism>`
+> Verdict is `BANNED` (never re-run) or `CLOSED` (settled; reopen only on new evidence).
 
-## 왜 이 파일이 생겼나
+## Why this file exists
 
-2026-08-07 하루에 **약 30개 실험을 돌리고 docs/EXPERIMENTS_LOG.md 에 하나도 안 적었다.**
-그 결과 `season` 제거를 "한 번도 안 해본 축"이라고 두 번 말하고 실제로 큐에 걸었다.
-E08 에서 **−580점**으로 이미 끝난 질문이었다. 기록이 멈추면 대화 기억으로 일하게
-되고, 대화는 압축된다. 그래서 기록을 **자동화**하고(LEDGER.tsv) 조회를
-**강제**한다(precheck).
+On 2026-08-07 we ran **about 30 experiments and recorded none of them** in
+`docs/EXPERIMENTS_LOG.md`. As a result we called the `season` drop an "untried axis"
+twice and actually queued it — a question E08 had already closed at **−580**.
+When recording stops you start working from conversation memory, and conversation
+gets compacted. So recording is now **automatic** (`LEDGER.tsv`) and lookup is
+**mandatory** (precheck).
 
 ---
 
-## BANNED — 기전까지 밝혀진 것. 표면이 바뀌어도 안 뒤집힌다
+## BANNED — mechanism understood. Changing the surface does not overturn these
 
-FLAG --drop-cols season | BANNED | E08 −580 | season 은 드리프트 캘리브레이터다. 시즌당 −0.012 씩 떨어지는 수준을 이 피처가 잡는다. 빼면 6년 평균(0.524)을 예측하는데 2025 는 ~0.48 이라 편향 0.04 짜리 재앙이 된다.
-FLAG --drop-cols season,season_progress | BANNED | E08 −580 | 위와 동일.
-FLAG last-season-weight | BANNED | LB −41.5 | 최신시즌 가중(W). 로컬은 좋아지는데 LB 오프셋이 +133 → +99 로 무너진다. F리그 유사물이 부호를 반대로 예측했다.
-FLAG test-row-derived | BANNED | 실격 사유 | test.csv 내부 다른 행을 쓰는 피처·사후보정 전부. 실패모드 라벨 복원(failmode.py)을 test 에 쓰면 2025 타깃이 96.79% 복원된다 — train 전용.
-FLAG lb-probing | BANNED | 규칙·심사 | LB 점수를 보고 상수를 되맞추는 것. Public=Private 이라 정답 세트 직접 적합이고, Phase 2 코드 심사에서 근거 없는 상수로 남는다.
+FLAG --drop-cols season | BANNED | E08 −580 | `season` is the drift calibrator. It captures the −0.012/season decline in level. Drop it and the model predicts the 6-year mean (0.524) while 2025 is ~0.48 — a 0.04 bias catastrophe.
+FLAG --drop-cols season,season_progress | BANNED | E08 −580 | Same as above.
+FLAG last-season-weight | BANNED | LB −41.5 | Recency weighting (W). Local improves but the LB offset collapses from +133 to +99. The F-league analogue predicted the sign backwards.
+FLAG test-row-derived | BANNED | disqualifying | Any feature or post-hoc correction that reads other rows of `test.csv`. Applying failure-mode label recovery (`failmode.py`) to test recovers 96.79% of the 2025 targets — that file is train-only.
+FLAG lb-probing | BANNED | rules / code review | Tuning a constant against LB feedback. Public = Private, so it is direct fitting to the answer key, and Phase 2 code review sees an unjustified constant.
+FLAG cross-machine-compare | BANNED | A100 +15.05 vs 4070 +4.27 | **Build the comparison arm on the same machine.** std-k 40 with identical config and identical 6 seeds diverged by 11 points across the two machines. We did not notice baseline RN1.5 was a 4070 artefact, compared it to an A100 result, produced "adopt, t=11.88", and nearly submitted it. More seeds cannot fix this — machine effect is not seed noise. `tools/surf_report.py` cross-checks hostnames in LEDGER and invalidates mixed comparisons.
+FLAG member-training-set-parity | BANNED | v16 −6.15 / v17 −53.6 / 08-08 VB_base 52 pts | Choosing blend weights among **members trained on different data**. A `--drop-f-pre 2022` copied from a judging command into a submission-member rebuild produced a model 52 points weaker that we mistook for a v14f reproduction. It is invisible by eye. **Run `python tools/member_fingerprint.py <tags>` to compare the `fpipe['priors']` fingerprint in the pkl** (exit code 2 on mismatch). Submission members v14f and ZD5 do **not** use `--drop-f-pre 2022` (fingerprint 0.5401750413).
+FLAG drop-f-pre-omitted | BANNED | val2023 surface: best_iter 12–21, BSS 124–232 | **The judging surface (`--val-season 2023`) cannot run without `--drop-f-pre 2022`.** Feeding old-regime F (success rate 0.71) into training makes the new-regime 2023 validation loss bottom out at iteration 15 and worsen from there (measured on AB2_base: best_iter 12–21, test BSS 124–232 vs AB_base 868–881). The **submission surface (`--val-season 2024`) does not use the flag** — v14f and ZD5 do not. The two surfaces demand different flags, so **never copy a command between surfaces.** We got this wrong three times (v16, v17, 08-08 VB_base).
+FLAG --drop-unstable | BANNED | E47 −262 plus IndexError | Not only a performance loss: removing the columns `season_std` requires also breaks the code path.
+FLAG --rank-group-size 64 | BANNED | 4070 CUDA OOM / A100 segfault | PairLogitPairwise expands all pairs inside a group. The 4070 needed 2748 MB more with 2317 MB free (explicit OOM); the A100 crashed natively after a long run. Only group ≤ 16 is allowed.
+FLAG --model rank full-refit | BANNED | group16 native crash on both machines | The no-refit 50-iteration smoke test passes, but discarding the validation ranker to build the full ranker crashes natively on both the 4070 and the A100. Do not re-run before implementing a two-stage refit in separate processes.
+FLAG F-2023-ABS-first-year-analogue | BANNED | official history + reverse .0497→.2988 | KBO has run Futures-league ABS since 2020. The F 2022→2023 jump (.7087→.4729 success, 6× reverse) is a data/target regime break, not a first ABS year. Do not use it as an analogue for R 2024→2025 year-1→year-2.
+FLAG matchup_constants_2024-on-2024-validation | BANNED | leaked BSS 1402 | `matchup_constants_2024.npz` was fit on 2024 labels/OOF residuals for the 2025 submission. Re-applying it to historical 2024 validation rows is direct target leakage. Historical validation constants must be refit on the preceding source season and frozen onto the target.
 
-## CLOSED — 측정으로 닫힘. 새 근거(표면·구조 변화) 있을 때만 재개
+---
 
-FLAG strong-champion-residual-learner | CLOSED | SR1 best_iter=0; 고정 2% source 2023 −0.038, strong 2024 −0.014 | K0의 honest residual을 raw 공식 피처로 다시 학습해도 시즌을 넘는 잔차 구조가 없다. 얕고 강하게 수축한 CatBoostRegressor조차 첫 트리에서 멈췄으며 R 전·후반이 모두 비양수다.
-FLAG base-cell-disagreement-routing | CLOSED | MDU1 signed-q8 25% source −2.349 / strong target −2.106; abs-q8 source −0.303 / strong R −1.747 | base와 cell의 예측 차이는 불확실성처럼 보이지만 residual 방향·크기 매핑이 다음 시즌으로 이전되지 않는다. q-bin·부호×크기·확률구간 조합을 더 고르는 것은 source 선택편의다.
-FLAG within-base-seed-variance | CLOSED | EV1 q8 25% −0.966; shrink 25% 전체 +1.369, early +4.255 / late −2.401 | 동일 base 계열 공통 4시드의 행별 표준편차 분포는 2023→24에 안정적이지만, residual 방향은 후반기에 반전한다. 앙상블 분산은 epistemic uncertainty의 크기 진단일 뿐 제출 가능한 보정 방향이 아니다.
-FLAG --bootstrap-type Bernoulli | CLOSED | BTP1 standalone −13.63/−14.19; core base 10% 교체 −0.159/−0.107 | 기본 Bayesian bootstrap을 0.8 Bernoulli 행 샘플링으로 바꾸면 R에서 과소성능하고, F 다양성(+2.19 at 10%)도 전체 core에 남지 않는다. 동일 source/target에서 모든 교체비율이 음수라 다른 subsample 연속탐색은 하지 않는다.
-FLAG --model lgb | CLOSED | 미학습표면 margin −7.1 | 자기검증(−9.8)과 미학습(−7.1) 양쪽에서 음수. D 가 9.8 → 59.9 로 **더 나빠졌다** — 표면 효과가 이쪽엔 없다.
-FLAG --feat-frac | CLOSED | 미학습표면 이득 +0.60 | 부분공간 0.7. margin +8.8 로 양수지만 무시할 크기.
-FLAG gpboost | CLOSED | 랜덤효과 분산 ~0 | 우리 피처(asof·TE·skill)를 다 넣으면 투수 랜덤효과 분산이 0.0042 로 죽는다. 피처 42개를 빼고 랜덤효과로 대체하면 −265.
-FLAG --tm-feats | CLOSED | 홀드아웃 6시드 −6.04, t=−2.14 | trackman 투수×시즌 요약 13개. 링키지는 좋다(행 커버 99.6%, ratio>0.9 가 70.8%) — 정보 자체가 안 먹힌다.
-FLAG optuna | CLOSED | 홀드아웃 6시드 −7.44, t=−2.65 | 공동 하이퍼 탐색. 2시드(SE 3.2)로 40 trial 중 최고를 고르면 선택 편의가 이득보다 크다.
-FLAG segment-drift | CLOSED | 이전 −3.76 ~ +0.96 | 세그먼트별 드리프트 보정. 자기적합은 +11.45 인데 시즌을 못 넘는다. 매핑 성공률 100% 확인함(audit_seg).
-FLAG --label-smooth | CLOSED | E118 계열 | 라벨 평활. 손실·링크를 같이 바꿔 가설이 섞인다.
-FLAG --resid-col | CLOSED | −17.8 | 2단 잔차. 타깃·손실·링크 6가지를 한 번에 건드렸다. baseline-col 이 같은 가설의 단독 검정본이고 그것도 중립.
+## CLOSED — settled by measurement. Reopen only on new evidence (surface or structure change)
 
-## 조건부 — 표면을 바꾸면 뒤집힌 전례가 있다
+### Model family and hyperparameters
 
-FLAG --failmode-cells | OPEN | 자기검증 D +2.8 → 미학습 D **−18.0** | 셀 다중분류. **자기검증 표면에서 과소평가되고 있었다.** base 보다 강한 모델이고 미학습 표면 최적 w 0.70 (이득 +22.26). 셀 기하 변형(d4/d6/16셀/다중라벨)은 전부 틀린 표면에서 기각됐으므로 재검정 대상.
+FLAG --model lgb | CLOSED | unseen-surface margin −7.1 | Negative on both self-validated (−9.8) and unseen (−7.1). D worsened from 9.8 to 59.9 — the surface effect does not apply here.
+FLAG optuna | CLOSED | holdout 6 seeds −7.44, t=−2.65 | Joint hyperparameter search. Picking the best of 40 trials with 2 seeds (SE 3.2) costs more in selection bias than it gains.
+FLAG gpboost | CLOSED | random-effect variance ~0 | With all our features (asof, TE, skill) present, pitcher random-effect variance collapses to 0.0042. Removing 42 features and substituting random effects gives −265.
+FLAG --depth 9 | CLOSED | −3.38, t=−1.68 (4070) | depth 8 is optimal; both 7 (SC_d7) and 9 are negative.
+FLAG --lr 0.02 | CLOSED | −10.66, t=−2.68 (4070) | Keep lr 0.01. Raising it clearly hurts.
+FLAG --refit-mult 2.0 | CLOSED | 4070 6 seeds +0.73, t=+0.43 | Self-validated 12 seeds showed +2.44 (t=1.91), but on the **unseen surface** (RS1.5 vs RS2.0, seeds 31–36) it vanishes to +0.73. Training time is 1.33×.
+FLAG --loss RMSE | CLOSED | E55 weight 0 / E93 +2.44, t=.80 | Direct Brier optimisation was already measured; no gain relative to uncertainty.
+FLAG --eval-metric BrierScore | CLOSED | best_iter 826, identical; unseen −0.03 | Training on Logloss but early-stopping on the competition MSE selects the same iteration count. Metric mismatch is not a remaining Brier lever.
+FLAG --boosting-type Ordered | CLOSED | A100 −38.08 / 4070 −10.73 | Changing the boosting scheme itself (Plain→Ordered), separate from ordered target statistics. Both surfaces fall well below their same-machine single-seed baselines, so multi-seed is not worth it.
+FLAG --random-strength 0 | CLOSED | val −7.79, unseen 2024 −15.78 | Removing only the split-score randomness from the current 121-feature MVA_native hurts both surfaces. Even at this data size the randomness is necessary regularisation. Do not sweep intermediate values.
+FLAG --bootstrap-type Bernoulli | CLOSED | BTP1 standalone −13.63/−14.19; 10% core replacement −0.159/−0.107 | Replacing the default Bayesian bootstrap with 0.8 Bernoulli row sampling underperforms on R, and the F diversity (+2.19 at 10%) does not survive into the full core. Every replacement ratio is negative on the same source/target, so no further subsample search.
+FLAG failmode-cell-iters-5000 | CLOSED | val +1.63, unseen cell −8.67, core replace −2.688 | Raising the depth5 cell model past its 3000 cap moved best_iter to 3928 but the next season got worse. 10/25/50/100% substitution of old/new cells is negative on test throughout. The 3000 cap acts as transfer regularisation.
+FLAG xgb-current-121-blend | CLOSED | weak K0 +2.640/+20.294/+3.749; strong v11 analogue 2% −0.053 | XGB on the current 121 features fills gaps in a weak single-seed Cat core, but on the strong 4070 VB2×8+ZD5×6 analogue 2/5/10% give −0.053/−0.369/−1.526. Even after refit×1.5 lifted standalone 816.32→828.82, the best 2% is +0.094 with R/late negative.
 
-## 측정 원칙 (어기면 하루를 날린다)
+### Feature axes
 
-1. **판정 표면**: `--val-season S-1 --test-season S` (배치 구조). 자기검증 2024 는 참고용.
-2. **후처리 상수**는 그 값을 잰 실행의 **학습 데이터·플래그가 제출과 완전히 같을 때만** 쓴다. (v16 −6.15 — 편향은 `--drop-f-pre 2022` 로 재고 제출엔 안 썼다)
-3. **구조가 다른 실험의 결론을 옮기지 말 것.** (v17 −53.6 — FL 실험은 학습에 신체제 F 가 0시즌, 제출은 2시즌)
-4. **제출 하나에 변경 하나.** (v16 은 SHIFT+SLOPE 동시 변경 → 역산 필요)
-5. 채택 t ≥ 2.4 / 기각 95% 상한 < +3, 홀드아웃 시드 n ≥ 6, 페어 비교.
-6. **시드를 늘려 SE 를 줄이는 것으로는 보류 축이 채택으로 안 넘어온다.** 6→12→18
-   로 가도 결론이 안 바뀌었다. 머신 효과(11점)가 시드 잡음보다 크므로 시드 확장은
-   그 편의를 못 줄인다 — n≥6 만 채우고 다음 축으로 갈 것.
+FLAG --feat-frac | CLOSED | unseen-surface gain +0.60 | Subspace 0.7. margin +8.8 is positive but negligible.
+FLAG --tm-feats | CLOSED | holdout 6 seeds −6.04, t=−2.14 | 13 Trackman pitcher×season summaries. The linkage is good (99.6% row coverage, 70.8% at ratio>0.9) — the information itself does not help.
+FLAG --feat-prof | CLOSED | E100 family −7.6 | Season-lag profile signal duplicates the existing expanding/asof features.
+FLAG --feat-form | CLOSED | E108 −5.4 | Short-term form variation does not generalise.
+FLAG --feat-cross | CLOSED | lever H −1.7 | Extra cross terms duplicate the existing TE/skill features.
+FLAG --feat-count | CLOSED | E113 −1.07 | Count expansion does not improve the existing count/TE signal.
+FLAG --feat-count-cat | CLOSED | FCC1 867.33, −9.57 vs baseline | Adding the exact 12 ball-strike states as a low-cardinality category. The two raw numeric columns plus pitcher×count TE/skill already absorb the information.
+FLAG --feat-v5 | CLOSED | −26 | The extended feature bundle does not generalise.
+FLAG --fill-prev | CLOSED | −3.51 | Filling missing previous-value features does not help.
+FLAG --keep-ids | CLOSED | E88 −105 | Raw IDs overfit.
+FLAG --monotone | CLOSED | E65 −28 | Monotone constraints block interactions the model needs.
+FLAG --std-excess | CLOSED | E104 −24.7 | The excess-count transform destroys information.
+FLAG --std-ratio | CLOSED | E110 −38.5 | The ratio transform is unstable.
+FLAG --std-multi-k | CLOSED | paired ≈ 0 | Adding several shrinkage scales together yields no extra signal.
+FLAG --std-k-mix | CLOSED | E112 family | Mixed shrinkage does not improve on the current k80.
+FLAG --std-k-bat | CLOSED | E112 family | A batter-only shrinkage change does not help.
+FLAG --std-k 120 | CLOSED | −4.61, t=−1.40 / k200 −19.98 | Raising the season-standardisation k is closed. Only the downward direction was ever open.
+FLAG --std-k 40 | CLOSED | submission surface −1.954, SE 2.377, t=−.822 | The judging surface showed 4070 +4.27 (t=1.30) and A100 +10.31 (t=3.55), but on the actual submission training set (val2024, no drop, 4070 8 seeds, fingerprint 0.5401750413) `SK2_k40−VB2_base` is negative. Full base replacement −0.564, half replacement +0.194, and even the half split fails to transfer (first half +0.417 / second half −0.305). **A small k's gain on the old surface does not reproduce in the submission structure.**
+FLAG --te-k b:500 | CLOSED | TK_b500 +0.58 (t=0.19) / TK_rel +2.26 (t=0.80) | Per-axis reliability shrinkage. E161's method of moments said the batter axis was 6–11× under-shrunk, but there is no effect. **The optimal independent estimator and the optimal feature are different things** — the tree also sees the raw asof, so matching the shrinkage buys nothing.
+FLAG --te-halflife 2 | CLOSED | submission surface +0.164, SE 1.760, t=.093 | +6.03 (t=3.32) on the A100 drop-f-pre judging surface, gone on the 4070 val2024 8-seed run that matches the real submission training set. Blend-replacement gain is +0.610, and the first-half selection gives −1.573 in the second half (and −1.112 reversed). The fingerprint matched at 0.5401750413, so this is not an invalid run — it is **surface transfer failure**.
+FLAG --te pb | CLOSED | PBTE1 −17.56 | Feeding an exact pitcher×batter success-rate TE into the model overfits. PB's real +1.7 survives only as a small, heavily shrunk post-hoc residual, never as a core feature.
+FLAG --feat-id-cohort | CLOSED | transfers −3.18/+13.93/+8.13, 4070 −2.42; pitcher +1.33/−0.22, batter −0.10/−0.71 | The first three digits of the anonymised player ID really do encode registration cohorts (242/243 = 2022, 244 = 2023, 245 = 2024), but the numeric prefix with the ID suffix discarded leaves no stable increment over the current asof_n/roster signals. The A100 seed3 +8.13 with both axes together is self-selection on tree-path/early-stop variation — each axis alone is 0 and it reverses on other transfers and machines.
+FLAG --feat-recent-pair-bin | CLOSED | raw q8 −35.63, season-expanding TE −7.84 | The reverse × prev3-success relationship looked stable across three transfers, so we encoded it as a fit-only frozen 2D q-bin category and as a past-seasons-only k500 TE. Both fall below the 876.90 baseline — the existing continuous axes already absorb it.
+FLAG local-targeted-pruning | CLOSED | pitchmix delta −4.99, outcome delta −16.22, low-importance indicators −11.88, batter_team_id −45.21 | Actual retraining of four semantically-scoped deletions on the same local seed42 2023→2024 surface. A negative fixed-model `LossFunctionChange` is not a causal removal effect, and even low-gain columns support other split paths. Beyond the broad E47, these four small deletions are also closed.
+FLAG frozen-career-middle-q8-k200 | CLOSED | LB 1101.802→1083.531, −18.271 | v12: replacing v11's recent-5-game middle q8/k500 wholesale with career-cumulative middle q8/k200 and refitting PB. The 2023→2024 relative gain of +3.174 was lopsided (first half −0.292, second half +7.704), and on 2022→2023 the career path itself is −31.003 — we mistook "less bad than the other path" (+23.657) for stability. The frozen 2024 bucket values are also non-monotone (+.00646, −.00365, −.00333, +.00456, +.00394, +.00062, +.00312, −.01169; missing −.01453) and k=200 barely shrinks buckets holding tens of thousands of rows. The PB tables share 26,355 groups with v11 at correlation .999176 and RMS difference .000130, so the failure is the career-middle residual lookup breaking across seasons, not PB. No resubmission, no partial weighting, no LB-based coefficient refitting.
+FLAG --feat-quality-min | CLOSED | residual lookup +9.75/+11.84 → actual retrain −10.95 | The bottleneck minimum of std pitcher success rate and std batter-allowed rate was positive on two transfers in the source residual map, but as a CatBoost input it drops to 865.95. Post-hoc residual resolution does not transfer into a deterministic feature increment.
+FLAG --feat-window + --failmode-cells | CLOSED | A100 +0.51 / 4070 −5.85 | Recent 1/3/5-game dispersion was weakly positive on the binary base, but adding it to the depth5 failure-mode cells worsens the submission surface. Centred RMS vs ZD5 is only .0025 — no new failure-mode diversity.
 
-## 비교 규칙 (2026-08-08 추가, 실측 근거 있음)
+### Segment routing, calibration, weighting
 
-FLAG cross-machine-compare | BANNED | A100 +15.05 vs 4070 +4.27 | **비교군은 같은 머신에서 만들 것.** std-k 40 을 같은 설정·같은 6시드로 두 머신에서 돌렸더니 11점이 벌어졌다. 기준선 RN1.5 가 4070 산인 줄 모르고 A100 결과와 비교해 "채택 t=11.88" 을 만들었고, 하마터면 그 설정으로 제출할 뻔했다. 시드를 늘려도 못 막는다 — 머신 효과는 시드 잡음이 아니다. `tools/surf_report.py` 가 LEDGER 의 hostname 을 대조해 자동으로 '무효' 처리한다.
+FLAG segment-drift | CLOSED | transfer −3.76 to +0.96 | Per-segment drift correction. Self-fit is +11.45 but it does not cross a season. Mapping success verified at 100% (`audit_seg`).
+FLAG isotonic | CLOSED | E30 −21 | Probability calibration in general. Backtesting 2019–22 fit → 2023 calibration → 2024 test made **every** variant worse (global δ −21, isotonic −21, monthly −52). And the unseen-2024 reliability decomposition leaves a total fixable term of **+13.1**, of which SLOPE already took +3. There is effectively no post-processing headroom left.
+FLAG logit-blend | CLOSED | centred +0.021 | VB2_base 8 seeds and ZD5 6 seeds at w=.55: probability mean 961.628 vs logit mean 961.649. The prediction range is too narrow for the operator choice to matter.
+FLAG --row-filter strikes | CLOSED | FX_str −2.76, t=−1.51 (A100 6 seeds) | Two-strike routing with a dedicated model. The loss map put 0-2/1-2 counts at 16% of loss, but detaching the segment costs what it would have learned from the rest.
+FLAG --fm-context | CLOSED | FX_cnt −71.8 (A100 6 seeds) | Cell × ball-count context. Splitting cells by count shrinks the per-cell sample and the multiclass collapses. 801.2 vs AB_base 873.0.
+FLAG --league F | CLOSED | crash at 55,696 training rows | An F-only model. `--league F --drop-f-pre 2022` leaves only two new-regime F seasons — 55,696 rows, 71.5% TE missing, and no season for the skill estimator to fit, giving a matmul error. **There is not enough data.** Also, F only *looks* worse by BSS; its **MSE is lower than R** (.24690 vs .24770), an artefact of a base rate far from 0.5.
+FLAG --label-smooth | CLOSED | E118 family | Label smoothing. Changes loss and link together, confounding the hypothesis.
+FLAG --resid-col | CLOSED | −17.8 | Two-stage residual. Touches target, loss, and link — six things at once. `baseline-col` is the isolated test of the same hypothesis and is also neutral.
+FLAG --baseline-col skill_pc_hat | CLOSED | BC1_offset 899.31 vs VB2_base_s42 911.22 | Re-measured on the same 4070 seed42 after fixing all three missing paths (refit model marker, test-season Pool, fpipe submission baseline): still −11.91. Forcing the skill estimate as a logit starting point duplicates the level effect CatBoost has already learned. (The earlier "neutral" verdict was invalid — it had no LEDGER row and those three paths meant target and submission predictions were computed without the offset.)
+FLAG batter-experience-offset | CLOSED | 2023→2024 −47.618 | Freezing the 2023 per-experience-bucket bias and applying it to 2024 gives R −51.097, F +3.416. High correlation without magnitude transfer is a net loss.
+FLAG pitcher-batter-hand-residual | CLOSED | BI2023→BI2024 k100 −191.952 | Pitcher × batter-hand common-group correlation is +.0108 with 75.6% row coverage in 2024. The same-season cross-fit +31 is not a year-transfer signal.
+FLAG extreme-subgroup-correction | CLOSED | extremes vanish in 2024 | Candidates with historical success rates around .679 revert to .416–.441 in 2024. There is no fixable high-confidence subgroup.
+FLAG base-cell-disagreement-routing | CLOSED | MDU1 signed-q8 25% source −2.349 / strong target −2.106; abs-q8 source −0.303 / strong R −1.747 | The base-cell prediction gap looks like uncertainty, but the residual direction/magnitude mapping does not carry to the next season. Choosing further among q-bin, sign×magnitude, and probability-band combinations is source selection bias.
+FLAG within-base-seed-variance | CLOSED | EV1 q8 25% −0.966; shrink 25% total +1.369, early +4.255 / late −2.401 | The per-row standard deviation across four common seeds of the same base family is stable from 2023→24, but the residual direction reverses in the second half. Ensemble variance diagnoses the *size* of epistemic uncertainty; it is not a shippable correction direction.
+FLAG strong-champion-residual-learner | CLOSED | SR1 best_iter=0; fixed 2% source 2023 −0.038, strong 2024 −0.014 | Relearning K0's honest residual from raw official features finds no residual structure that crosses a season. Even a shallow, heavily shrunk CatBoostRegressor stopped at the first tree, and both halves of R are non-positive.
+FLAG posterior-uncertainty-residual-head | CLOSED | full −8.037/−123.482/−76.637; fixed 5% +1.462/−3.060/−0.083 | Current-season pitcher success/middle counts were rebuilt as k80 binomial posterior mean/sd/precision, and an intercept-free heavily-shrunk Ridge residual head was fit on the source season over the current K0 OOF. Source gains were large (+66 to +128) but the sign does not repeat next season; the latest transfer is early +0.969 / late −1.458. Even testing uncertainty-conditional *resolution* rather than plain calibration, it memorised season residuals.
+FLAG weak-signal-salvage-on-K0 | CLOSED | cell routing target best +0.133; pitch combo +1.526 | Freezing only the source-2023-positive segments still failed to transfer the 5000-cell, and the +2~3 from pitch probabilities on the raw core is mostly absorbed once recent-middle+PB are in. No further weak-signal combination or segment selection.
 
-## 2026-08-08 추가
+### Cells, distillation, and other output geometries
 
-FLAG --failmode-cells-second | CLOSED | 두 번째 셀 멤버 +0.34 | **셀 축 소진.** base+d5 가 +19.22 인데 d6 를 더해도 +19.56 이다. 셀끼리 rms 0.0032 (base 와는 0.0107) — 같은 라벨·피처·알고리즘이라 서로 닮았다. d4·c16 은 NNLS 가중 0.00. 셀 최적 가중은 0.55~0.65 이고 그 구간이 평평하다.
-FLAG --league F | CLOSED | 학습 55,696행에서 크래시 | F 전용 모델. `--league F --drop-f-pre 2022` 면 신체제 F 가 2시즌뿐이라 55,696행만 남고 TE 결측 71.5%, skill 추정기가 적합할 시즌이 없어 matmul 오류. **데이터가 없어서 못 한다.** 그리고 F 는 BSS 가 낮아 보일 뿐 **MSE 는 R 보다 낮다**(.24690 vs .24770) — 기저율이 0.5 에서 멀어 생긴 착시다.
-FLAG --std-k 40 | CLOSED | 제출 표면 -1.954, SE 2.377, t=-.822 | 판정 표면에서는 4070 +4.27(t=1.30) / A100 +10.31(t=3.55)이었지만, 실제 제출 학습집합(val2024, drop 없음, 4070 8시드, 지문 0.5401750413)에서는 `SK2_k40−VB2_base`가 음수였다. 현행 base+cell의 base 완전교체 -0.564, 절반교체 +0.194이고 절반교체도 전반기 +0.417/후반기 -0.305로 전이되지 않는다. **작은 k의 과거 표면 이득은 제출 구조에서 재현되지 않는다.**
-FLAG isotonic | CLOSED | E30 −21 | 확률 보정 전반. 2019~22 학습 → 2023 보정 → 2024 테스트 백테스트에서 **모든 보정이 악화**했다(전역δ −21, isotonic −21, 월별 −52). 그리고 미학습 2024 신뢰도 분해상 **고칠 수 있는 항이 총 +13.1** 뿐이고 SLOPE 가 이미 +3 을 먹었다. 후처리 여지는 사실상 없다.
-FLAG --refit-mult 2.0 | CLOSED | 4070 6시드 +0.73, t=+0.43 | 재학습 배수 1.5→2.0. 자기검증 12시드에서 +2.44(t=1.91) 로 보류였는데 **미학습 표면(RS1.5 vs RS2.0, 시드 31~36)에서 +0.73, t=0.43** 으로 사라진다. 95% 상한 +4.1 < 기각선 밖이 아니라 애매하지만 학습시간이 1.33배다.
-FLAG --te-k b:500 | CLOSED | TK_b500 +0.58(t=0.19) / TK_rel +2.26(t=0.80) | 축별 신뢰도 수축. E161 적률법은 타자 축이 6~11배 덜 수축돼 있다고 했지만 효과 없음. **최적 독립 추정량과 최적 피처는 다르다** — 트리가 원본 asof 를 같이 보고 있어 수축을 맞춰도 얻을 게 없다.
-FLAG --fm-context | CLOSED | FX_cnt −71.8 (A100 6시드) | 셀 × 볼카운트 맥락. 셀을 카운트별로 쪼개면 셀당 표본이 줄어 다중분류가 무너진다. 801.2 vs AB_base 873.0.
-FLAG --row-filter strikes | CLOSED | FX_str −2.76, t=−1.51 (A100 6시드) | 2스트라이크 라우팅(전용 모델). 손실 지도상 0-2/1-2 카운트가 손실의 16% 라 노려봤는데, 세그먼트를 떼면 나머지에서 배울 걸 못 배운다.
-FLAG --depth 9 | CLOSED | −3.38, t=−1.68 (4070) | depth 8 이 최적. depth 7(SC_d7)·9 양쪽 음수.
-FLAG --lr 0.02 | CLOSED | −10.66, t=−2.68 (4070) | lr 0.01 유지. 올리면 확실히 나빠진다.
-FLAG --std-k 120 | CLOSED | −4.61, t=−1.40 / k200 −19.98 | 시즌표준화 k 를 올리는 방향은 닫혔다. 내리는 방향(k40)만 OPEN.
-FLAG drop-f-pre-생략 | BANNED | val2023 표면에서 best_iter 12~21, BSS 124~232 | **판정 표면(`--val-season 2023`)은 `--drop-f-pre 2022` 없이 돌릴 수 없다.** 구체제 F(성공률 0.71) 를 학습에 넣으면 신체제 2023 검증 손실이 15 iter 에서 최저를 찍고 계속 나빠진다(AB2_base 실측: best_iter 12~21, test BSS 124~232 vs AB_base 868~881). 반면 **제출 표면(`--val-season 2024`)은 이 플래그를 쓰지 않는다** — 제출 멤버 v14f·ZD5 가 그렇다. 두 표면이 서로 다른 플래그를 요구하므로 **명령을 표면 간에 복사하지 말 것.** 이걸 세 번 틀렸다(v16·v17·08-08 VB_base).
-FLAG teacher-fpipe-order | CLOSED | T3 vs T2 −1.64, SE 0.86, t=−1.91 | 교사 `fpipe.fit` 이 2019~2024 를 보는 문제. 순서를 `load → season 필터 → fpipe.fit` 로 고쳐 재측정하니 이득이 +39.85 → +38.43 로 **1.6 만 줄었다**(사전 조건 |Δ|<2×SE 충족). `target_enc.build_te` 가 시즌 expanding + shift(1) 이라 행 단위로는 안 새고, 전역 prior 스칼라 하나만 흘렀다. **교사는 이제 필터-먼저 순서를 쓴다.**
-FLAG 멤버-학습집합-대조 | BANNED | v16 −6.15 / v17 −53.6 / 08-08 VB_base 52점 | 블렌드 가중을 **학습 데이터가 다른 멤버들** 사이에서 고르는 것. 판정용 명령의 `--drop-f-pre 2022` 를 제출 멤버 재현에 복사해 52점 약한 모델을 v14f 재현본으로 착각했다. 눈으로는 구분 안 된다. **`python tools/member_fingerprint.py <태그들>` 로 pkl 의 `fpipe['priors']` 지문을 대조할 것** (다르면 종료코드 2). 제출 멤버 v14f·ZD5 는 `--drop-f-pre 2022` 를 **쓰지 않는다**(지문 0.5401750413).
-FLAG --soft-target | CLOSED | 제출 표면 −10.19, 블렌드 가중 0.00 | **증류 종료.** 판정 표면의 `+38.43` 은 대부분 **교사만 본 F 2022 이전 행**이었다 — 교사에게도 `--drop-f-pre 2022` 를 걸면(`DT5_seq`) `+4.6~7.0` 으로 무너진다(85% 소실). 제출 표면(양쪽 다 drop 없음, val2024 8시드, 지문 일치)에서는 학생이 base 보다 **−10.19**(편향제거) 고, 3멤버 격자에서 최적 dist 가중이 **0.00** 이다. 다양성도 없다 — base 와 rms 0.0067 로 셋 중 가장 닮았다(base-cell 0.0110). 부드러운 타깃은 base 의 매끄러운 복사본이지 새 기하가 아니다.
-FLAG prev-pitch-teacher | CLOSED | 위 `--soft-target` 에 흡수 | 직전 투구 결과는 평가 시점에 못 쓰므로 증류 교사로만 쓸 수 있었는데, 증류 자체가 닫혔다. 조건부 기여 +39.1 은 교사 안에서만 존재한다.
-FLAG prev-pitch-teacher-old | CLOSED | 교사 A/B +39.1 | 직전 투구 결과의 **조건부** 기여. 단변량으로는 +127 로 보이지만 121개 피처를 다 넣으면 +39 다(T_self 2076.0 → T_seq 2115.1, 같은 랜덤 4-fold). 평가 시점엔 못 쓰므로 증류 교사로만 쓴다.
+FLAG --failmode-cells | ADOPTED | self-validated D +2.8 → unseen D **−18.0** | Cell multiclass. **It was being underrated on the self-validated surface.** Stronger than base; optimal w 0.70 on the unseen surface (gain +22.26). It is in the current submission at w 0.55.
+FLAG --failmode-cells-second | CLOSED | second cell member +0.34 | **Cell axis exhausted.** base+d5 is +19.22 and adding d6 gives +19.56. Cells resemble each other (rms 0.0032 between cells vs 0.0107 to base) because they share labels, features, and algorithm. d4 and c16 get NNLS weight 0.00. The optimal cell weight is 0.55–0.65 and that region is flat.
+FLAG --soft-target | CLOSED | submission surface −10.19, blend weight 0.00 | **Distillation is closed.** The `+38.43` on the judging surface was mostly **F rows before 2022 that only the teacher saw** — give the teacher `--drop-f-pre 2022` too (`DT5_seq`) and it collapses to `+4.6~7.0`, an 85% loss. On the submission surface (neither side dropping, val2024, 8 seeds, fingerprint matched) the student is **−10.19** below base (bias-removed) and the optimal distillation weight in the three-member grid is **0.00**. There is no diversity either — rms 0.0067 to base, the closest pair of the three (base-cell is 0.0110). A soft target is a smoothed copy of base, not a new geometry.
+FLAG prev-pitch-teacher | CLOSED | absorbed into `--soft-target` above | The previous pitch's outcome is unavailable at inference, so it could only serve as a distillation teacher — and distillation itself is closed. Its conditional contribution of +39.1 exists only inside the teacher. (Univariate it looks like +127; with all 121 features it is +39: T_self 2076.0 → T_seq 2115.1 on the same random 4-fold.)
+FLAG teacher-fpipe-order | CLOSED | T3 vs T2 −1.64, SE 0.86, t=−1.91 | The teacher's `fpipe.fit` was seeing 2019–2024. Reordering to `load → season filter → fpipe.fit` and re-measuring reduced the gain only from +39.85 to +38.43 (within the pre-registered |Δ| < 2×SE). `target_enc.build_te` is season-expanding with `shift(1)`, so nothing leaks per row — only a single global prior scalar did. **The teacher now uses filter-first order.**
+FLAG cell-posterior-stack | CLOSED | 2023R source min +101.32 → 2024R route −52.38 | Feeding all 14 cell probabilities into a ridge stack instead of the summed success scalar. Enormous within-season gains across halves, but routing the source-only arm/alpha to the unseen next season reverses it (−169.80 applied league-wide). **Per-class calibration of failure-mode posteriors, and their relationship to the success residual, do not cross a season.**
+FLAG hierarchical-failure-chain | CLOSED | chain−flat −0.149→−71.655, fixed-w25 +15.135→−2.519 | Decomposing the flat 14-cell joint into four conditional binary CatBoosts and marginalising eight latent failure modes per row. RMS .0143 diversity was large, but the 2023 self-validated blend gain reverses on unseen 2024. Failure-mode conditional calibration is non-transferring; no multi-seed, output-order, or weight variants.
+FLAG tabm-current-121 | CLOSED | standalone 821.81, margin vs AB −2.5 | The old-feature TabM rebuilt on the current 121/std features with the correct val2023→test2024 refit structure. rms to AB is only .0121 and the 61.6 performance gap exceeds the 59.1 diversity ceiling, so optimal weight is 0. **Fed the same strong TE, an NN reconstructs the CatBoost geometry.**
+FLAG tabm-cell-consistent | CLOSED | 6 seeds standalone 839.34, blend weight 0.00 | TabM 32-head with a 14-failure-cell softmax plus a success-marginal BCE. The single-seed pilot looked like +16.58 over AB; the 6-seed mean is +1.48 and joint NNLS with `AB+DW_cell` gives weight 0. First-half→second-half is also 0, only the reverse direction gives .122 — selection bias.
+FLAG mtnn-cell-consistent | CLOSED | increment over current blend +1.36 | A plain MLP with the same 14-cell softmax + marginal BCE. Standalone 701.99 with rms .0256 — diverse, but the gap is too large. The self-fit increment over `AB+DW_cell` is +1.36 and the second-half→first-half weight is 0, which does not justify the submission cost or transfer risk.
+FLAG mlp-plr | CLOSED | unseen best 641.29 / sigma1 517.60 / sigma10 426.58 | Periodic-linear-ReLU embeddings over 92 numeric + 9 categorical features (TE and skill excluded). Raising the frequency scale 0.1→1→10 monotonically worsened it, and the gap to CatBoost's 868.83 leaves no blend room.
+FLAG ft-transformer-current-121 | CLOSED | val 499.903 / unseen 712.940; K0 2% +0.098 | dim32 2-layer field-token attention is diverse (rms .0224 to K0) but source blend is −8.566 and the target goes negative from 5% on. On this data attention's performance gap exceeds its diversity ceiling.
+FLAG content-two-tower | CLOSED | unseen 675.32 / submission surface 699.67 | Pitcher and batter asof-content towers with low-rank product/distance interactions, no raw IDs. It solves cold start but sits 190+ points below CatBoost on both surfaces. The existing asof/TE trees are far stronger than the relational structure.
+FLAG dynamic-hier-offset | CLOSED | 2022→2023R +8.03 → 2024 −19.09 | Pitcher and batter states built from the previous season's CatBoost OOF residuals, with shrinkage and coefficients frozen on the source. Year-over-year correlation is +.115 for pitcher state and −.089 for batter — not a latent effect that persists — and the source gain reverses.
 
-## 2026-08-08 Codex 단독 검문 추가
+### Human-baseball hypotheses (three-transition gate, 2026-08-09)
 
-FLAG logit-blend | CLOSED | centered +0.021 | VB2_base 8시드와 ZD5 6시드, w=.55에서 probability 평균 961.628 vs logit 평균 961.649. 예측 범위가 좁아 실질 차이가 없다.
-FLAG batter-experience-offset | CLOSED | 2023→2024 -47.618 | 2023 경험구간 편향을 고정해 2024에 적용하면 R -51.097, F +3.416. 상관이 높아도 크기가 전이되지 않아 전체 손실이다.
-FLAG pitcher-batter-hand-residual | CLOSED | BI2023→BI2024 k100 -191.952 | 투수×타자손 공통그룹 상관 +.0108, 2024 행 커버 75.6%. 동일시즌 교차적합 +31은 연도 전이 신호가 아니다.
-FLAG extreme-subgroup-correction | CLOSED | 2024 극단성 소실 | 과거 성공률 .679 수준의 후보도 2024 실제 .416~.441로 되돌아왔다. 고정 가능한 고신뢰 하위집단 없음.
-FLAG --loss RMSE | CLOSED | E55 weight 0 / E93 +2.44, t=.80 | Brier 직접 최적화 안건은 이미 측정됐고 불확실성 대비 이득이 없다.
-FLAG --feat-prof | CLOSED | E100 계열 -7.6 | 시즌 lag 프로필 신호가 현재 expanding/asof 피처에 중복된다.
-FLAG --feat-form | CLOSED | E108 -5.4 | 단기 폼 변동이 일반화되지 않는다.
-FLAG --feat-cross | CLOSED | lever H -1.7 | 추가 교차항이 기존 TE/skill과 중복된다.
-FLAG --feat-count | CLOSED | E113 -1.07 | count 확장이 기존 count/TE 신호를 개선하지 못한다.
-FLAG --std-excess | CLOSED | E104 -24.7 | 표준화 초과량 변환이 정보를 훼손한다.
-FLAG --std-ratio | CLOSED | E110 -38.5 | 비율 변환이 불안정하다.
-FLAG --std-multi-k | CLOSED | paired 약 0 | 복수 shrinkage 스케일을 함께 넣어도 추가 신호가 없다.
-FLAG --std-k-mix | CLOSED | E112 계열 | 혼합 shrinkage가 현재 k80을 개선하지 못한다.
-FLAG --std-k-bat | CLOSED | E112 계열 | 타자 전용 shrinkage 변경이 개선되지 않는다.
-FLAG --monotone | CLOSED | E65 -28 | 단조 제약이 필요한 상호작용을 막는다.
-FLAG --keep-ids | CLOSED | E88 -105 | 원시 ID가 과적합을 유발한다.
-FLAG --drop-unstable | BANNED | E47 -262 및 IndexError | 성능 손실뿐 아니라 season_std 요구 열 제거로 코드 경로도 깨진다.
-FLAG --fill-prev | CLOSED | -3.51 | 이전값 결측 대체가 개선되지 않는다.
-FLAG --feat-v5 | CLOSED | -26 | 확장 피처 묶음이 일반화되지 않는다.
-FLAG --te-halflife 2 | CLOSED | 제출 표면 +0.164, SE 1.760, t=.093 | A100의 drop-f-pre 판정 표면에서는 +6.03(t=3.32)이었으나 실제 제출 학습집합과 같은 4070 val2024 8시드에서는 사라졌다. 현행 base+cell 블렌드 대체 이득도 +0.610이고, 전반기 선택 가중은 후반기 -1.573 / 반대는 -1.112로 불안정하다. 학습집합 지문은 0.5401750413으로 일치했으므로 무효 실행이 아니라 **표면 전이 실패**다.
-FLAG tabm-current-121 | CLOSED | 단독 821.81, AB 대비 margin −2.5 | 구 피처 TabM을 현재 121/std 피처와 올바른 val2023→test2024 refit 구조로 다시 만들었다. AB와 rms가 .0121뿐이고 성능 격차 61.6이 다양성 상한 59.1보다 커 최적 가중 0. **강한 TE를 같이 먹이면 NN도 Cat 기하를 재구성한다.**
-FLAG tabm-cell-consistent | CLOSED | 6시드 단독 839.34, 현행 블렌드 가중 0.00 | TabM 32-head에 14 실패셀 softmax와 성공 marginal BCE를 공동 적용했다. 파일럿 1시드는 AB 대비 +16.58로 보였지만 6시드 평균은 +1.48, `AB+DW_cell` 동시 NNLS에서 가중 0. 전반→후반도 0, 반대 방향만 .122라 선택 편의였다.
-FLAG mtnn-cell-consistent | CLOSED | 현행 블렌드 증분 +1.36 | 일반 MLP의 14셀 softmax+marginal BCE. 단독 701.99, rms .0256으로 다양하지만 격차가 너무 크다. `AB+DW_cell` 위 자기적합 증분 +1.36이고 후반→전반 가중 0이라 제출 비용·전이 위험을 못 넘는다.
-FLAG cell-posterior-stack | CLOSED | 2023R source 최소 +101.32 → 2024R route −52.38 | 14셀 전체 확률을 성공합 스칼라 대신 ridge stack에 넣었다. 같은 시즌 전·후반에서는 거대한 이득처럼 보였지만 source-only arm/alpha를 미학습 다음 시즌에 적용하면 반전했다(전체 적용 −169.80). **실패형태 posterior의 클래스별 calibration과 성공 잔차 관계가 시즌을 넘지 않는다.**
-FLAG mlp-plr | CLOSED | 미학습 최고 641.29 / sigma1 517.60 / sigma10 426.58 | TE·skill을 제외한 92개 수치+9개 범주 피처에 periodic-linear-ReLU 임베딩을 적용했다. 주파수 스케일을 0.1→1→10으로 올릴수록 악화했고 CatBoost 868.83과 격차가 너무 커 블렌드 여지가 없다.
-FLAG content-two-tower | CLOSED | 미학습 675.32 / 제출 표면 699.67 | raw ID 없이 투수·타자 asof 콘텐츠 tower와 저랭크 곱/거리 상호작용을 학습해 콜드스타트는 해결했지만 두 표면 모두 CatBoost와 190점 이상 차이다. 관계 구조보다 기존 asof·TE 트리가 훨씬 강하다.
-FLAG dynamic-hier-offset | CLOSED | 2022→2023R +8.03 → 2024 -19.09 | 이전 시즌 CatBoost OOF 잔차로 투수·타자 상태를 만들고 source에서 수축·계수를 고정했다. 투수 상태 연도 상관 +.115, 타자 -.089라 다음 시즌에 유지되는 잠재효과가 아니며 source 선택 이득이 반전했다.
-FLAG --rank-group-size 64 | BANNED | 4070 CUDA OOM / A100 segmentation fault | PairLogitPairwise는 그룹 안 쌍을 전개한다. 4070은 추가 2748MB 요구 시 2317MB만 남아 명시적 OOM, A100도 장시간 뒤 native crash. group16 이하만 허용한다.
-FLAG --baseline-col skill_pc_hat | REOPENED | 기존 중립 판정 무효 | 기존 CLOSED에는 LEDGER 실행 행이 없고 refit 모델 marker·test-season Pool·fpipe 제출 baseline이 누락돼 target/제출 예측이 오프셋 없이 계산됐다. 세 경로 수정 뒤 BC1으로 다시 측정한다.
-FLAG --baseline-col skill_pc_hat | CLOSED | BC1_offset 899.31 vs VB2_base_s42 911.22 | 누락됐던 refit/test/fpipe baseline 경로를 모두 고친 같은 4070·seed42 재검정에서도 −11.91. skill 추정치를 로짓 출발점으로 강제하면 CatBoost가 이미 학습한 수준 효과와 중복된다.
-FLAG F-2023-ABS-first-year-analogue | BANNED | 공식 연혁 + reverse .0497→.2988 | KBO는 퓨처스리그 ABS를 2020년부터 운영했다. F 2022→2023 성공률 .7087→.4729와 reverse 6배 급증은 ABS 최초 도입이 아니라 데이터/타깃 체제 단절이다. 이를 R 2024→2025의 1년차→2년차 아날로그로 쓰지 않는다.
-FLAG --model rank full-refit | BANNED | group16 양 머신 native crash | no-refit 50iter smoke는 되지만 validation ranker를 폐기하고 full ranker를 만드는 단계에서 4070과 A100 모두 native crash했다. 별도 프로세스 2단 refit을 구현하기 전에는 재실행하지 않는다.
-FLAG --boosting-type Ordered | CLOSED | A100 −38.08 / 4070 −10.73 | ordered target statistics와 별개로 boosting scheme 자체를 Plain→Ordered로 바꿨다. A100 미학습 2024와 4070 제출 표면이 모두 같은 머신 단일시드 기준선보다 크게 낮아 다중시드 가치가 없다.
-FLAG --feat-window + --failmode-cells | CLOSED | A100 +0.51 / 4070 −5.85 | binary base에서 약한 양수였던 최근 1/3/5경기 산포를 depth5 실패모드 셀에 넣었으나 제출 표면에서 악화했다. ZD5와 centered RMS도 .0025라 새로운 실패형태 다양성이 없다.
-FLAG frozen-career-middle-q8-k200 | CLOSED | LB 1101.802→1083.531, −18.271 | v11의 recent-5-game middle q8/k500을 career cumulative middle q8/k200으로 전량 교체하고 PB를 재적합한 v12. 2023→2024 상대 이득 +3.174는 전반 −0.292/후반 +7.704로 한쪽에 몰렸고, 2022→2023에서는 career 경로 자체가 −31.003인데 기존 경로보다 덜 나쁘다는 상대값 +23.657을 안정성으로 오판했다. 2024 고정 구간값도 비단조(+.00646, −.00365, −.00333, +.00456, +.00394, +.00062, +.00312, −.01169; 결측 −.01453)이며 k=200은 분위별 수만 행에 사실상 수축이 아니다. PB 테이블은 v11과 공통 26,355그룹·상관 .999176·차이 RMS .000130이므로 실패 원인은 PB가 아니라 career-middle 잔차 lookup의 시즌 전이 붕괴다. 재제출·부분가중·LB 기반 계수 재적합 금지.
-FLAG --feat-id-cohort | CLOSED | 둘 다 전이 −3.18/+13.93/+8.13, 4070 −2.42; 투수 +1.33/−0.22, 타자 −0.10/−0.71 | 익명 선수 ID 앞 3자리는 실제 등록 코호트 구조(242/243=2022, 244=2023, 245=2024 등)를 담지만, full ID suffix를 버린 수치 prefix는 현행 asof_n·roster 신호 위에 안정적인 증분을 남기지 못했다. 둘을 함께 넣은 A100 seed3 +8.13은 단독 두 축이 모두 0이고 다른 전이·머신에서 반전하므로 트리 경로/early-stop 변동을 고른 자기선택이다.
-FLAG historical-lineup-role | CLOSED | target 최고 +0.444, early +8.911 / late −10.591 | Trackman 과거 타순 lookup coverage 90%지만 role×same-hand조차 전·후반 부호가 반전했다. slot, role, count, league, 안정성·entropy 등 다른 arm은 전체 음수. 실제 2025 타순도 없으므로 확장하지 않는다.
-FLAG historical-mechanics-change | CLOSED | target 최고 −0.245, early +18.801 / late −25.268 | 전년도 릴리스 위치·산포·구속·무브먼트와 변화량을 recent-middle과 함께 정직한 2023→2024 전이로 감사했다. 최고 rel-side 변화도 전체 음수이고 반분 부호가 크게 갈렸다. 과거 기계적 프로필은 현재 제구 상태로 안정 전이되지 않는다.
-FLAG pb-residual-matrix-factorization | CLOSED | K4−K0 −2.639 / +0.350 / +0.551 | exact-PB residual matrix를 rank 4로 분해해 known player/new pair까지 확장했다. 2021→22는 전체 음수, 뒤 두 전이는 크기가 +1 미만이고 후반기 음수. known-new-pair도 +1.256→−0.730으로 반전해 상성을 이웃 pair로 전파할 근거가 없다.
-FLAG recent-state-empirical-bayes | CLOSED | middle −3.288/+3.017/−1.247, success −2.694/+8.318/−5.633 | prev1/3/5를 1경기·2~3·4~5 블록으로 분해하고 강한 Ridge 수축으로 K0 잔차를 보정했다. middle/success 모두 세 rolling 전이에서 부호가 반복 반전했다. LB에서 성공한 고정 prev5-middle을 유지하되 복잡한 상태 확장은 하지 않는다.
-FLAG workload-pace | CLOSED | +6.332 / +1.262 / −2.167 | 당해 시즌 투구수÷월 진행도, 전년도 workload, 전년도 역할×현재 이닝을 사용했다. 최신 2023→24 전체·전후반이 음수이고 F는 −25.587. 월 기반 사용강도는 역할 변화·복귀를 안정적으로 분리하지 못한다.
-FLAG team-call-style | CLOSED | 연도 combined corr 중앙값 +.227 < gate .25 | 수비팀×count family×주자×타자손의 middle/ball/reverse 구성비를 k300 Dirichlet 수축했다. 최근 2023→24는 +.398이나 앞선 네 전이 중 세 개가 .205~.227이고 middle은 −.419도 있어 코칭/포수 사인 성향의 지속성이 부족하다.
-FLAG intent-execution-bilinear | CLOSED | +0.390 / +3.502 / −2.919 | count-family×runner×same-hand 의도와 투수 recent/career 실패상태를 rank-4 bilinear residual로 부분공유했다. 가운데 전이만 +3을 넘고 최신 2023→24는 R −3.439, 전반 −3.144, 후반 −2.626. hard routing 반복 없이도 의도×실행 상호작용이 현행 모델에 증분을 주지 못했다.
-FLAG pb-familiarity-adaptive-k | CLOSED | −4.466 / −2.123 / −0.107 | source 시즌 이전에도 만난 familiar pair만 exact-PB 수축을 k500→k250으로 완화했다. familiar 그룹은 각 source의 9,417/9,691/11,412개였으나 세 전이 모두 악화했다. 반복 대결도 PB 표본 잡음을 덜 수축할 근거가 아니며 현 k500을 유지한다.
-FLAG posterior-uncertainty-residual-head | CLOSED | full −8.037/−123.482/−76.637; fixed 5% +1.462/−3.060/−0.083 | 현재시즌 pitcher success/middle 누적을 k80 binomial posterior mean·sd·precision으로 복원하고, 현행 K0 OOF 위에 intercept 없는 강수축 Ridge 잔차 head를 source 시즌에서만 학습했다. source 이득은 +66~128로 컸지만 다음 시즌 부호가 반복되지 않았고 최신 전이도 early +0.969 / late −1.458이었다. 단순 calibration이 아니라 uncertainty-조건부 resolution을 직접 검정했어도 시즌 잔차를 외웠으므로 GPU·제출 확장 금지.
-FLAG trackman-link-batter-hand | INFRA PASS | 730→755명, train 행 커버 99.6376%→99.7925%, 기존 공통 730명 일치 100% | 기존 “86%”는 미매칭률이 아니라 옛 매핑 정확도 추정이었다. 실제 고신뢰 map2는 이미 99.64% 행을 덮었다. 유일하게 빠진 공통 행 단독 키 batter_hand를 추가해 저표본 25명(2,285행)을 복구했지만 전체 추가 커버는 0.1549%뿐이다. Trackman 피처 자체는 이미 CLOSED이므로 점수 레버가 아니라 향후 재현용 링키지 개선이다.
-FLAG local-targeted-pruning | CLOSED | pitchmix delta -4.99, outcome delta -16.22, low-importance indicators -11.88, batter_team_id -45.21 | 같은 로컬·seed42·2023→2024 표면에서 의미 단위 삭제를 실제 재학습했다. 고정 모델 LossFunctionChange 공통 음수도 제거 인과효과가 아니었고, 낮은 gain importance 열도 다른 분할 경로를 지탱했다. 광범위 E47뿐 아니라 이 네 소규모 삭제도 반복하지 않는다.
-FLAG --feat-recent-pair-bin | CLOSED | raw q8 -35.63, season-expanding TE -7.84 | 세 전이에서 안정적으로 보였던 reverse×prev3-success 관계를 fit-only 동결 2D q-bin 범주와 과거시즌 전용 k500 TE로 각각 표현했다. 둘 다 기준 876.90보다 악화해 기존 연속축이 이미 관계를 흡수한다.
-FLAG --te pb | CLOSED | PBTE1 -17.56 | exact pitcher×batter의 성공률 TE를 모델 입력으로 넣으면 과적합한다. PB의 실전 +1.7은 코어 피처가 아니라 강수축한 작은 사후 residual일 때만 유지된다.
-FLAG prior-pa-depth-proxy | CLOSED | 최선 +0.089/+0.565 | 완료된 과거 시즌의 투수·타자 2스트라이크/깊은 카운트/풀카운트 비율을 k500 수축해 현재 count에서 gate했다. 두 rolling 전이 최소 이득이 +1 미만이라 실제 투구번호·PA ID 없는 데이터에서는 유효한 타석 피로 proxy가 되지 못한다.
-FLAG --feat-count-cat | CLOSED | FCC1 867.33, 기준 대비 -9.57 | 볼-스트라이크 정확한 12상태를 저카디널리티 범주로 추가했다. 원본 두 수치열과 pitcher×count TE/skill이 이미 같은 정보를 흡수한다.
-FLAG --feat-quality-min | CLOSED | 잔차 lookup +9.75/+11.84 → 실제 재학습 -10.95 | std 투수 성공률과 std 타자 상대 성공률의 bottleneck 최소값은 source residual map에서는 두 전이 양수였지만 CatBoost 입력에 넣으면 865.95로 악화했다. 사후 잔차 해상도를 결정론적 피처 증분으로 옮길 수 없다.
-FLAG joint-current-pitch-linkage | INFRA PASS | 전체 1:1 75.1668%, 2023/2024 77.1225%/76.5947% | 기존 상황키만의 8.9%와 달리 검증된 투수·타자 map2까지 포함하면 main 1행:Trackman 1행의 현재 구종 3분류 라벨을 약 75% 복원한다. 실제 구종은 연구용 보조라벨일 뿐 추론 피처로 쓰지 않으며, 복수행 그룹은 공통 game/pitch ID가 없어 억지 정렬하지 않는다.
-FLAG predicted-pitch-type-marginalization | CLOSED | row-local −13.043/−25.091, main 47열 head −14.843/−28.871 | 실제 구종 oracle은 +120.693/+141.909로 강하지만, 2023 기준선 잔차의 구종·구종×count 보정을 합법적 P(type|현재행)로 주변화하면 2024에서 크게 악화했다. 가장 강한 구종 head도 정확도 53.606%, 기대보정-실제잔차 상관 .0017 이하라 예측 가능한 구종 성분은 현행 x가 이미 흡수한다. SBS식 직전구종 sequence는 test 행독립상 금지한다. 단, 직접 주변화가 아닌 masked auxiliary representation은 아래 별도 축으로 재개했다.
-FLAG masked-pitch-auxiliary-full-fit | CLOSED | LB 1101.802→1099.465; proper parity −198.662(t=−3.758)/−123.688(t=−6.348) | 처음 양수였던 rolling은 fpipe/vocab/QT를 모델 refit보다 한 시즌 더 과거에 동결했는데 v13은 전처리까지 2024 full-fit했다. 제출형 full-fit을 과거에 재현하자 두 전이 6시드가 유의하게 반전했고, 단순 행단독 서브그룹 중 두 전이 동시 양수도 0개였다. 후처리 old/new 상관은 .9989/.9998이라 원인은 NN 전처리 refit이다. v13 full-fit 반복 금지.
-FLAG masked-pitch-auxiliary-lagged-artifact | CLOSED | v14 LB 1101.802→1099.299 (−2.503), v13→v14 −0.166 | 원래 rolling의 artifact/vocab/QT≤S−2 구조를 2025로 정확히 평행 이동했지만 full-fit v13과 거의 같은 LB 하락을 냈다. 가중치·후처리는 불변이고 ZIP/smoke/행독립도 정상이므로 cutoff가 아니라 보조 표현의 2024→25 일반화 실패다. 추가 weight/gate/refit 변형 및 LB 맞춤 금지.
-FLAG hierarchical-failure-chain | CLOSED | chain−flat −0.149→−71.655, fixed-w25 +15.135→−2.519 | flat 14-cell joint를 네 조건부 이진 CatBoost로 분해하고 8개 잠재 실패모드를 행별 주변화했다. RMS .0143 다양성은 컸지만 2023 자기검증의 블렌드 이득이 미학습 2024에서 반전했다. 실패모드 조건부 calibration이 시즌 비전이므로 다중시드·출력 순서·가중치 변형 금지.
-FLAG --random-strength 0 | CLOSED | val −7.79, unseen 2024 −15.78 | 현행 121피처 MVA_native에서 split-score 무작위성만 제거했더니 양 표면 모두 악화했다. 큰 데이터에서도 이 무작위성은 필요한 정규화다. 중간값 연속 탐색 금지.
-FLAG predicted-pitch-probability-features | CLOSED | best fastball×breaking +2.797/+2.602; offspeed +1.376/+3.212 | Trackman rolling pitch head의 행단독 entropy/max/margin·3확률·q4 2D 조합을 현행 local base+cell 잔차 위에서 2023 반분과 2024에 전이했다. 불확실성은 실패했고 구종확률 조합은 약한 동부호지만 양 표면 +3을 동시에 못 넘었다. q/k/scale 추가 탐색과 CatBoost 재학습 금지.
-FLAG failmode-cell-iters-5000 | CLOSED | val +1.63, unseen cell −8.67, core replace −2.688 | 3000 상한에 걸리던 depth5 cell을 5000까지 허용하자 best_iter 3928로 이동했지만 다음 시즌은 악화했다. old/new cell 10/25/50/100% 치환도 test가 모두 음수. 3000 상한이 전이 정규화 역할을 하므로 추가 iteration 탐색 금지.
-FLAG weak-signal-salvage-on-K0 | CLOSED | cell routing target 최고 +0.133; pitch combo +1.526 | source-2023 양수 세그먼트만 동결 적용해도 5000-cell은 전이되지 않았고, raw core에서 보이던 구종확률 +2~3도 recent-middle+PB 뒤 대부분 흡수됐다. 약신호 결합·세그먼트 선택을 더 탐색하지 않는다.
-FLAG ft-transformer-current-121 | CLOSED | val 499.903 / unseen 712.940; K0 2% +0.098 | dim32·2-layer field-token attention은 K0와 RMS .0224로 다양하지만 source blend −8.566이고 5%부터 target도 음수. 현재 데이터에서 attention의 성능 격차가 다양성 상한보다 크다.
-FLAG --eval-metric BrierScore | CLOSED | best_iter 826 동일; unseen −0.03 | Logloss 학습을 유지하고 대회 MSE로 early stop해도 기준과 같은 반복수를 골랐다. 조기종료 지표 불일치는 남은 Brier 개선축이 아니다.
-FLAG xgb-current-121-blend | CLOSED | weak K0 +2.640/+20.294/+3.749; strong v11 analogue 2% −0.053 | 현재 121피처 XGB는 약한 single-seed Cat core의 부족분은 보완했지만 4070 VB2×8+ZD5×6 강한 아날로그 위 2/5/10%가 −0.053/−0.369/−1.526. refit×1.5로 단독 816.32→828.82를 올려도 최선 2% +0.094, R/late 음수라 제출 증분이 아니다.
-FLAG matchup_constants_2024-on-2024-validation | BANNED | 누수 BSS 1402 | `matchup_constants_2024.npz`는 2025 제출용으로 2024 라벨/OOF 잔차에 적합됐다. 이를 역사 2024 검증행에 되붙이면 직접 타깃 누수다. 역사 검증 상수는 반드시 직전 source 시즌에서 새로 fit해 target에 동결한다.
+FLAG historical-lineup-role | CLOSED | target best +0.444, early +8.911 / late −10.591 | Trackman historical batting-order lookup covers 90%, but even role×same-hand flips sign between halves. Every other arm (slot, role, count, league, stability, entropy) is negative overall. The real 2025 lineup is unavailable anyway.
+FLAG historical-mechanics-change | CLOSED | target best −0.245, early +18.801 / late −25.268 | Previous-season release position, dispersion, velocity, movement, and their deltas, audited on an honest 2023→2024 transfer alongside recent-middle. Even the best rel-side change is negative overall with wildly split halves. Historical mechanical profiles do not transfer to current command.
+FLAG pb-residual-matrix-factorization | CLOSED | K4−K0 −2.639 / +0.350 / +0.551 | Rank-4 factorisation of the exact-PB residual matrix, extended to known players and new pairs. 2021→22 is negative overall and the other two transfers are under +1 with negative second halves. Known-new-pair reverses +1.256→−0.730 — no basis for propagating matchup effects to neighbouring pairs.
+FLAG recent-state-empirical-bayes | CLOSED | middle −3.288/+3.017/−1.247, success −2.694/+8.318/−5.633 | Decomposing prev1/3/5 into game-1 / 2–3 / 4–5 blocks and correcting the K0 residual with strong Ridge shrinkage. Both middle and success flip sign repeatedly across the three rolling transfers. Keep the fixed prev5-middle that worked on LB; do not extend to complex state.
+FLAG workload-pace | CLOSED | +6.332 / +1.262 / −2.167 | Current-season pitch count ÷ month progress, previous-season workload, and previous-season role × current inning. The latest 2023→24 transfer is negative overall and in both halves, with F at −25.587. Month-based intensity cannot cleanly separate role changes and returns from injury.
+FLAG team-call-style | CLOSED | year-over-year combined corr median +.227 < gate .25 | Defensive team × count family × runners × batter hand, with middle/ball/reverse composition shrunk by k300 Dirichlet. The most recent 2023→24 is +.398, but three of the four earlier transfers sit at .205–.227 and middle reaches −.419. Coaching/catcher call tendency is not persistent enough.
+FLAG intent-execution-bilinear | CLOSED | +0.390 / +3.502 / −2.919 | Count-family × runner × same-hand intent partially shared with pitcher recent/career failure state through a rank-4 bilinear residual. Only the middle transfer exceeds +3; the latest 2023→24 is R −3.439, first half −3.144, second half −2.626. Even without repeating hard routing, intent × execution gives no increment over the current model.
+FLAG pb-familiarity-adaptive-k | CLOSED | −4.466 / −2.123 / −0.107 | Relaxing exact-PB shrinkage from k500 to k250 only for pairs that had already met before the source season. The familiar group held 9,417 / 9,691 / 11,412 pairs per source, and all three transfers got worse. Repeat matchups are not a reason to shrink PB sample noise less; keep k500.
+FLAG prior-pa-depth-proxy | CLOSED | best +0.089/+0.565 | Pitcher and batter two-strike / deep-count / full-count rates from completed past seasons, k500-shrunk and gated on the current count. Both rolling transfers give under +1 — without real pitch numbers or PA IDs there is no valid plate-appearance-fatigue proxy.
+
+### Pitch type (Trackman-derived auxiliaries)
+
+FLAG predicted-pitch-type-marginalization | CLOSED | row-local −13.043/−25.091, main 47-col head −14.843/−28.871 | The true-pitch-type oracle is strong (+120.693/+141.909), but marginalising the 2023 baseline's residual correction over a legal `P(type | current row)` badly worsens 2024. The strongest type head reaches 53.606% accuracy with expected-correction/actual-residual correlation ≤ .0017 — the predictable part of pitch type is already absorbed by the current features. SBS-style previous-pitch sequences are forbidden by test row independence.
+FLAG predicted-pitch-probability-features | CLOSED | best fastball×breaking +2.797/+2.602; offspeed +1.376/+3.212 | Row-local entropy/max/margin, the three probabilities, and q4 2D combinations from the Trackman rolling pitch head, transferred over the current local base+cell residual on 2023 halves and 2024. Uncertainty failed; the probability combinations are weakly same-signed but never clear +3 on both surfaces at once. No further q/k/scale search and no CatBoost retrain.
+FLAG masked-pitch-auxiliary-full-fit | CLOSED | LB 1101.802→1099.465; proper parity −198.662 (t=−3.758) / −123.688 (t=−6.348) | The originally-positive rolling result froze fpipe/vocab/QT one season further back than the model refit, whereas v13 full-fit the preprocessing on 2024 as well. Reproducing the submission-shaped full fit historically reversed both transfers significantly at 6 seeds, and zero simple row-local subgroups were positive on both. Old/new post-processing correlation is .9989/.9998, so the cause is the NN preprocessing refit.
+FLAG masked-pitch-auxiliary-lagged-artifact | CLOSED | v14 LB 1101.802→1099.299 (−2.503), v13→v14 −0.166 | Translating the original rolling artifact/vocab/QT ≤ S−2 structure exactly onto 2025 produced almost the same LB drop as full-fit v13. Weights, post-processing, zip, smoke, and row independence were all unchanged, so the cause is not the cutoff — the auxiliary representation simply fails to generalise 2024→25. No further weight/gate/refit variants and no LB fitting.
+
+---
+
+## Infrastructure results (not score levers)
+
+FLAG trackman-link-batter-hand | INFRA PASS | 730→755 players, train row coverage 99.6376%→99.7925%, 100% agreement on the existing 730 | The old "86%" figure was an accuracy estimate for a previous mapping, not a miss rate. The high-confidence map2 already covered 99.64% of rows. Adding the one missing row-local common key, `batter_hand`, recovered 25 low-sample players (2,285 rows) for just +0.1549% coverage. Trackman features themselves are already CLOSED, so this is reproducibility work, not a lever.
+FLAG joint-current-pitch-linkage | INFRA PASS | overall 1:1 75.1668%, 2023/2024 77.1225%/76.5947% | Including the validated pitcher and batter map2 (rather than situation keys alone, which gave 8.9%) recovers a 1-main-row : 1-Trackman-row current-pitch 3-class label for about 75% of rows. The actual pitch type is a research-only auxiliary label, never an inference feature, and multi-row groups are not force-aligned because there is no shared game/pitch ID.
+
+---
+
+## Measurement principles (breaking one costs a day)
+
+1. **Judging surface**: `--val-season S-1 --test-season S` (deployment shape). The self-validated 2024 holdout is reference only.
+2. **A post-hoc constant is valid only if the run that measured it used exactly the submission's training data and flags.** (v16, −6.15 — the bias was measured with `--drop-f-pre 2022`, which the submission does not use.)
+3. **Never transplant a conclusion across structures.** (v17, −53.6 — the FL experiment had zero new-regime F seasons in training; the submission has two.)
+4. **One change per submission.** (v16 moved SHIFT and SLOPE together and needed back-solving.)
+5. **Adopt at t ≥ 2.4; reject when the 95% upper bound < +3.** n ≥ 6 holdout seeds, paired.
+6. **Adding seeds to shrink SE will not promote a borderline axis.** 6 → 12 → 18 never changed a conclusion. The machine effect (11 points) is larger than seed noise, so more seeds cannot reduce that bias — meet n ≥ 6 and move on.

@@ -1,68 +1,69 @@
 #!/bin/bash
-# Claude <-> Codex 교대 — 시작할 때와 끝낼 때 한 번씩 부른다.
+# Claude <-> Codex handoff. Call once when you start and once when you finish.
 #
-# 두 에이전트가 같은 작업 트리를 만진다. 조용한 덮어쓰기를 막는 유일한 방법은
-# **넘기기 전에 커밋하고, 시작할 때 당겨오는 것**이다. 08-08 에 파일이 세션 중
-# 외부에서 바뀐 걸 나중에야 알아챈 적이 여러 번 있다.
+# Two agents share this working tree. The only way to stop silent overwrites is to
+# **commit before handing over and pull when starting**. On 08-08 files changed
+# under us mid-session several times and we only noticed afterwards.
 #
 #   bash tools/agent_sync.sh start <claude|codex>
-#   bash tools/agent_sync.sh end   <claude|codex> "무엇을 했는가"
+#   bash tools/agent_sync.sh end   <claude|codex> "what you did"
 set -u
 cd "$(dirname "$0")/.." || exit 1
 MODE="${1:-}"; WHO="${2:-}"; MSG="${3:-}"
 
 case "$MODE" in
 start)
-  echo "=== $WHO 작업 시작 ==="
+  echo "=== $WHO session start ==="
   git fetch -q origin 2>/dev/null || true
-  # 남이 올린 게 있으면 먼저 받는다. 로컬 변경이 있으면 멈춘다 — 자동 병합 금지.
+  # Pull whatever the other agent pushed. Halt on local changes -- never auto-merge.
   if [ -n "$(git status --porcelain)" ]; then
-    echo "!! 커밋 안 된 변경이 있다. 이전 세션이 end 를 안 불렀다:"
+    echo "!! Uncommitted changes. The previous session never called end:"
     git status --short | head -20
-    echo "   확인하고 커밋하거나 되돌린 뒤 다시 시작할 것."
+    echo "   Inspect, then commit or revert, then start again."
     exit 2
   fi
-  git pull -q --ff-only origin main 2>/dev/null || echo "  (원격 없음/충돌 — 수동 확인)"
+  git pull -q --ff-only origin main 2>/dev/null || echo "  (no remote / conflict -- check manually)"
   echo "HEAD $(git log --oneline -1)"
   bash tools/ledger_sync.sh
   echo
-  echo "읽을 것: AGENTS.md -> EXPERIMENT.md -> HANDOFF.md"
-  echo "현재 Status: $(grep -A3 '^## Status' HANDOFF.md | grep -v '^##' | grep -v '^$' | head -1)"
-  echo "실행 중인 원격 작업:"
+  echo "Read: AGENTS.md -> EXPERIMENT.md -> HANDOFF.md"
+  echo "Status: $(grep -A3 '^## Status' HANDOFF.md | grep -v '^##' | grep -v '^$' | head -1)"
+  echo "Remote jobs running:"
   a=$(ssh -o ConnectTimeout=10 hsu-server \
         "pgrep -af train_gbdt2 | grep -oE 'tag [A-Za-z0-9_.]+'" 2>/dev/null)
-  echo "  A100  ${a:-(없음)}"
+  echo "  A100  ${a:-(none)}"
   b=$(ssh -o ConnectTimeout=10 desktop-4070 \
         'tasklist /fi "imagename eq python.exe" /fo table | find /c "python.exe"' \
         2>/dev/null | tr -d '\r\n ')
-  echo "  4070  python 프로세스 ${b:-?}개  (부모+자식 쌍이면 작업 1개)"
+  echo "  4070  ${b:-?} python process(es)  (a parent+child pair means one job)"
   ;;
 end)
-  echo "=== $WHO 작업 종료 ==="
-  # 루트 러너 금지. scripts/README.md 에 규칙을 적어뒀는데 08-08 에 30개,
-  # 08-12 에 51개가 다시 쌓였다. 규칙만으로는 안 지켜져서 여기서 막는다.
+  echo "=== $WHO session end ==="
+  # No runners in the project root. scripts/README.md said so and it still
+  # collected 30 files on 08-08 and 51 on 08-12. Rules alone did not hold, so
+  # this is the enforcement point.
   stray=$(ls *.sh *.bat 2>/dev/null)
   if [ -n "$stray" ]; then
-    echo "!! 프로젝트 루트에 러너가 있다. scripts/ 로 옮기고 다시 부를 것:"
+    echo "!! Runners in the project root. Move them to scripts/ and call again:"
     echo "$stray" | sed 's/^/   /'
     exit 2
   fi
   bash tools/ledger_sync.sh
   git add -A
   if [ -z "$(git diff --cached --name-only)" ]; then
-    echo "변경 없음 — 커밋 생략"
+    echo "No changes -- skipping commit"
   else
     git diff --cached --stat | tail -12
-    git commit -q -m "[$WHO] ${MSG:-작업}" || exit 1
-    git push -q origin main 2>/dev/null && echo "push 완료" \
-      || echo "!! push 실패 — 수동 확인"
+    git commit -q -m "[$WHO] ${MSG:-work}" || exit 1
+    git push -q origin main 2>/dev/null && echo "push complete" \
+      || echo "!! push failed -- check manually"
   fi
   echo
-  echo "HANDOFF.md 의 Status / Next Agent 를 갱신했는지 확인할 것:"
+  echo "Confirm you updated Status / Next Agent in HANDOFF.md:"
   grep -E '^(## Current Agent|## Next Agent|## Status)' -A1 HANDOFF.md | head -9
   ;;
 *)
-  echo "사용법: bash tools/agent_sync.sh {start|end} <claude|codex> [메시지]"
+  echo "usage: bash tools/agent_sync.sh {start|end} <claude|codex> [message]"
   exit 1
   ;;
 esac

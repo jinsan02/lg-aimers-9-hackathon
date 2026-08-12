@@ -1,136 +1,230 @@
-# AGENTS.md — Claude / Codex 공용 진입점
+# AGENTS.md — single entry point for every agent
 
-> **어느 에이전트든 작업 전에 이 파일부터 읽는다.**
-> Codex 는 `AGENTS.md`, Claude 는 `CLAUDE.md` 를 관례적으로 먼저 읽으므로,
-> 공용 규칙은 전부 여기에 두고 `CLAUDE.md` 는 대회 스펙만 담는다.
-
-## 1. Project
-
-LG Aimers 9기 — KBO 투구 **제구 성공 확률** 예측 (Dacon 236743). 마감 2026-09-01.
-투구가 이루어지기 **전까지 확인 가능한 정보만으로** 0~1 확률을 낸다.
-
-### Goal
-
-- 지표: **Brier Skill Score** `max(0, 1e5 × (1 − brier / r(1−r)))` — 높을수록 좋음
-- Public = Private = 전체 테스트 100%. **hidden split 이 없다** → 과적합보다 순수 일반화
-- 현재 자체 최고 **LB 1,101.8020672065 (v11 recent-middle+PB)**.
-  사용자 제공 리더보드에서 확인한 최고점은 1,288.180881이며 정확한 현재 순위는 별도 확인 전이다.
-
-전체 대회 스펙·데이터 명세·제출 zip 구조·평가 서버 사양은 **[CLAUDE.md](CLAUDE.md)** 에 있다.
-Codex 도 첫 작업 전에 CLAUDE.md 를 한 번 읽을 것.
+> **Read this file before doing anything.** Claude and Codex share this working tree.
+> `CLAUDE.md` is the same document (see the last section for why it is a stub).
+>
+> Current state → [EXPERIMENT.md](EXPERIMENT.md) · Baton → [HANDOFF.md](HANDOFF.md)
+> Closed questions → [docs/SETTLED.md](docs/SETTLED.md) · Run log → `LEDGER.tsv`
+> Long-form history → [docs/EXPERIMENTS_LOG.md](docs/EXPERIMENTS_LOG.md)
 
 ---
 
-## 2. Tech Stack
+# 1. Competition
 
-Python 3.11 · CatBoost(GPU) · pandas 2.0.3 · numpy 1.26.4 · scikit-learn 1.8.0 · joblib 1.5.3
+**LG Aimers 9th — KBO pitch control-success probability** (Dacon 236743).
+Predict a 0–1 probability per pitch **using only information available before the
+pitch is thrown**.
 
-**평가 서버 버전에 고정돼 있다.** 로컬에서 임의로 올리지 말 것 — pkl 호환성이 깨진다.
+- Page: https://dacon.io/competitions/official/236743
+- Deadline **2026-09-01** (Phase 2 submissions) → 09-07 code/PPT → 09-14 finalists
+- Target: `control_success` (1 = success, 0 = failure)
+- Failure is defined as ① middle of the strike zone ② outside the zone
+  ③ opposite side from the catcher's call
 
----
+## Metric — Brier Skill Score
 
-## 3. Project Structure
-
-```text
-CLAUDE.md              대회 스펙 (규칙·데이터·서버·제출)
-AGENTS.md              이 파일 — 공용 운영 규칙
-EXPERIMENT.md          현재 상태판 (지금 뭘 하고 있나)
-HANDOFF.md             에이전트 간 인수인계
-LEDGER.tsv             ★ 자동 기록. 시드마다 1행 (머신·태그·시드·BSS·명령 전문)
-                         원격 머신에 쌓이므로 `bash tools/ledger_sync.sh` 로 합친다
-docs/SETTLED.md        ★ 닫힌 질문 — 다시 하지 말 것 (precheck 이 읽음)
-docs/EXPERIMENTS_LOG.md  장문 실험 로그 (역사)
-docs/experiment_guide.md 머신별 실행 방법
-LEVERS.md              레버 백로그
-
-src/
-├── train_gbdt2.py     학습 본체 (CatBoost/LGB/XGB, 모든 플래그)
-├── fpipe.py           ★ 피처 파이프라인 — fit/transform 이 같은 파일에 있다
-├── failmode.py        실패모드 라벨 복원 (⚠ train 전용, 제출 zip 미포함)
-├── teacher.py         증류 교사
-├── script_blend_v*.py 제출용 추론 스크립트
-tools/                 분석·검증 도구 (precheck / surf_report / audit_*)
-model/  out/  submissions/
+```
+brier          = mean((pred - y)^2)
+baseline_brier = r * (1 - r)          # r = true success rate (hidden constant)
+score          = max(0, 100000 * (1 - brier / baseline_brier))     # higher is better
 ```
 
+- Calibration drives the score. **Never round to 0/1.**
+- **Each evaluation row must be predicted independently.** No post-processing that
+  uses the test distribution.
+- **Public = Private = 100% of the test set.** There is no hidden split, so plain
+  generalisation matters more than public-LB overfitting.
+- Certification threshold: Public ≥ 549.51 (organiser's baseline run).
+
+## Standing
+
+| | |
+|---|---|
+| Current LB | **1,101.802** — `submissions/v11_pb_posix_0809.zip` |
+| Rank-1 | 1,198.02 |
+| Goal | reach the 1,120s by legal means |
+
+## Data
+
+| File | Shape | Notes |
+|---|---|---|
+| `data/train.csv` | 1,475,092 × 49 | 2019–2024, includes target |
+| `data/test.csv` | 5 × 48 | **sample only.** The server injects the real 245,789 rows (2025) |
+| `data/trackman_history.csv` | 1,793,078 × 30 | 2019–2024 pitch log. Cannot be joined 1:1 |
+| `data/sample_submission.csv` | | row_id order/columns the submission must match |
+
+**`test.csv` columns are the contract**: 47 features besides `row_id`. Using a
+train-only column as a feature breaks inference. Full spec:
+[data/data_description.md](data/data_description.md).
+
+Column groups: game context (`season`, `game_month`, `game_dayofweek`, `inning`,
+`top_bottom`, `game_type`) · count/score (`balls_before`, `strikes_before`,
+`outs_before`, `run_*`, `score_diff_*`) · runners/leverage (`runner_on_*`,
+`num_runners_on`, `base_state`, `*_win_expectancy`, `li`) · players
+(`pitcher_id`, `batter_id`, `*_hand`, `*_team_id`) · **19 `asof_*` history
+features** (cumulative rates up to the pitch — officially provided, legal to use;
+zero-sample rows are missing → cold start).
+
+## Disqualifying information
+
+- Anything determined after the current pitch (actual location, call, pitch type,
+  Trackman measurements)
+- 2025 Trackman data
+- **Any feature built from other rows of `test.csv`** — cumulative, frequency,
+  distribution, rolling, target encoding, post-hoc rescaling
+
+## Rules
+
+| Item | Limit |
+|---|---|
+| Language | Python only |
+| External data | **Forbidden** |
+| Pretrained weights | Public weights, MIT/Apache-2.0-class licence, bundled in the zip |
+| Remote APIs | Forbidden |
+| Submissions | 5 per day |
+| Reproducibility | Must reproduce locally; `random_state` fixed |
+
 ---
 
-## 3-1. 원격 머신 — ssh 로 붙는다 (2026-08-08 실측)
+# 2. Evaluation server
 
-학습은 전부 원격에서 돈다. 노트북은 **분석·판정·제출 패키징 전용**이다(발열).
+| Item | Spec |
+|---|---|
+| OS | Ubuntu 22.04.5 LTS |
+| GPU | NVIDIA L4 (22.4 GiB), CUDA 12.8 |
+| CPU / RAM | 6 vCPU / 28 GB |
+| Python | **3.11.15** |
+| Internet | **Blocked** — no runtime downloads |
+| Inference budget | ≤ 10 min for 245,789 rows |
+| Install budget | ≤ 10 min |
+| Zip size | ≤ 10 GB (≤ 32 GB unpacked) |
 
-| 별칭 | 하드웨어 | 접속 | 프로젝트 | 파이썬 |
+Preinstalled and **version-pinned**:
+
+```
+torch==2.7.1+cu128  pandas==2.0.3  numpy==1.26.4  scipy==1.15.3
+scikit-learn==1.8.0  joblib==1.5.3  threadpoolctl==3.6.0  narwhals==2.21.2
+transformers==4.46.3  accelerate==1.9.0  sentencepiece  regex  tqdm  loguru  pyyaml  rich
+```
+
+**Strategy: use only preinstalled packages and keep `requirements.txt` empty** —
+zero install time, zero install risk. Never re-declare a preinstalled version in
+`requirements.txt`; that is how version conflicts happen. sklearn version parity
+matters most, because the model pkl files must load.
+
+## Submission zip
+
+```
+submit.zip
+├── model/            trained artefacts
+├── script.py         inference entry point — the server runs this
+└── requirements.txt  (kept empty)
+```
+
+- `script.py` must sit at the **zip root**; a wrapper folder is an install error.
+- The server unpacks, runs `script.py`, and grades `./output/submission.csv`.
+  `data/` is read-only and holds the real evaluation rows.
+- **Error classes**: install errors (bad zip layout, failed install) do *not* consume
+  a submission. Runtime errors in `script.py` **do**. Always smoke-test locally.
+- Any feature built outside the pipeline must be reproduced inside `script.py`.
+
+## Model feasibility (measured, `src/bench_inference.py`)
+
+Inference is **not** the bottleneck: RF(100 trees) predicts 245,789 rows in 0.4 s on
+6 cores — 0.1% of budget. The real constraints are install time, no internet, and
+package-version conflicts.
+
+| Family | Verdict |
+|---|---|
+| sklearn (RF, HistGB) | ✅ preinstalled |
+| LightGBM / XGBoost / CatBoost | ✅ needs a `requirements.txt` line (1–2 min wheel) |
+| Torch NN (MLP, TabM, FT-Transformer) | ✅ torch preinstalled; bundle weights in the zip |
+| Large seed × fold ensembles | ✅ budget is ample; watch the 10 GB zip limit |
+| AutoGluon | ⚠️ dependency storm → version conflict / install timeout |
+| TabPFN | ⚠️ 1.47M rows exceeds context; subsample ensembles only |
+| Remote APIs | ❌ forbidden |
+
+---
+
+# 3. Machines
+
+Training runs on remote boxes. **The laptop is for analysis, judgement, and
+submission packaging only** (thermals).
+
+| Alias | Hardware | Access | Project | Python |
 |---|---|---|---|---|
-| `hsu-server` | **A100 40GB** · 80 vCPU · RAM 503GB | `ssh hsu-server` (desktop-4070 경유 ProxyJump, 포트 8822) | `~/aimers` | `~/venv451/bin/python` (3.10.12) |
-| `desktop-5070` | **RTX 5070 Ti 16GB** (Blackwell) | `ssh desktop-5070` (Tailscale 100.121.174.83, 계정 `jinsan`) | `C:\aimers` | `C:\aimers\.conda\python.exe` (3.11.15) |
-| `desktop-4070` | **RTX 4070 Ti SUPER 16GB** | `ssh desktop-4070` | `C:\aimers` | `.venv\Scripts\python.exe` (3.11.15) |
-| 노트북 (여기) | RTX 5060 8GB | — | `C:\aimers` | `uv run python` (3.11.15) |
+| `desktop-5070` | **RTX 5070 Ti 16 GB** (Blackwell) | `ssh desktop-5070` (Tailscale 100.121.174.83, user `jinsan`) | `C:\aimers` | `C:\aimers\.conda\python.exe` (3.11.15) |
+| `hsu-server` | **A100 40 GB** · 80 vCPU · 503 GB RAM | `ssh hsu-server` (ProxyJump via `desktop-4070`, port 8822) | `~/aimers` | `~/venv451/bin/python` (3.10.12) |
+| `desktop-4070` | RTX 4070 Ti SUPER 16 GB | `ssh desktop-4070` | `C:\aimers` | `.venv\Scripts\python.exe` (3.11.15) |
+| laptop (here) | RTX 5060 8 GB | — | `C:\aimers` | `uv run python` (3.11.15) |
 
-### `desktop-5070` — 2026-08-12 합류. **환경이 평가 서버와 정확히 일치한다**
+Aliases already live in `~/.ssh/config`. Tailscale must be up.
+**`hsu-server` hops through `desktop-4070`** — if the 4070 is off, the A100 is
+unreachable too.
 
-```text
+## `desktop-5070` — joined 2026-08-12. Its environment matches the eval server exactly
+
+```
 python 3.11.15 · torch 2.7.1+cu128 (CUDA OK) · catboost 1.2.10
-pandas 2.0.3 · numpy 1.26.4 · sklearn 1.8.0     ← 평가 서버 고정 버전과 완전 일치
+pandas 2.0.3 · numpy 1.26.4 · sklearn 1.8.0     ← identical to the eval server
 ```
 
-A100 은 pandas 2.3.3 / numpy 2.2.6 / sklearn 1.7.2 라 어긋난다. **제출 pkl 을 굽는
-머신으로는 5070 이 가장 안전하다.** 파이썬이 PATH 에 없으니 절대경로로 부를 것:
-`C:\aimers\.conda\python.exe`. 셸은 4070 과 같은 **cmd.exe** 다(§ 위 셸 주의).
+The A100 runs pandas 2.3.3 / numpy 2.2.6 / sklearn 1.7.2, which does **not** match.
+**Bake submission pkl files on the 5070.** Python is not on PATH there — call the
+absolute path. Shell is `cmd.exe`.
 
-`ssh` 별칭은 노트북 `~/.ssh/config` 에 있다. Tailscale 이 켜져 있어야 붙는다.
+## Shells differ per machine (this has cost us repeatedly)
 
-ssh 별칭은 `~/.ssh/config` 에 이미 있다. **`hsu-server` 는 `desktop-4070` 을 거쳐 간다** —
-4070 이 꺼져 있으면 A100 에도 못 붙는다.
+- `hsu-server` → **bash**. Normal.
+- `desktop-4070`, `desktop-5070` → **`cmd.exe`**, not PowerShell and not bash.
+  `;` is not a separator; use `&` instead of `&&`. No `head`/`tail`/`grep`
+  (use `findstr`). Korean output is CP949 and will mojibake when read as UTF-8 —
+  **judge from `.npz` artefacts, never from console text.**
+- laptop → Git Bash (POSIX), plus PowerShell.
 
-### 셸이 머신마다 다르다 (여기서 여러 번 헛발질했다)
-
-- `hsu-server` → **bash**. 평범하게 쓰면 된다.
-- `desktop-4070` → **cmd.exe** 다. PowerShell 도 bash 도 아니다.
-  `;` 는 명령 구분자가 아니고, `&&` 대신 `&` 를 쓴다. `head`/`tail`/`grep` 이 없다
-  (`findstr`). 한글 출력은 CP949 라 로컬에서 UTF-8 로 읽으면 깨진다 —
-  **로그는 `.npz` 산출물로 판정하고 콘솔 텍스트에 의존하지 말 것.**
-- 노트북 → Git Bash (POSIX). PowerShell 도 따로 있다.
-
-### 코드 동기화
+## Code sync
 
 ```bash
 scp src/*.py   hsu-server:~/aimers/src/
-scp src/*.py   desktop-4070:C:/aimers/src/     # 슬래시 방향 주의
+scp src/*.py   desktop-4070:C:/aimers/src/      # note the slash direction
+scp src/*.py   desktop-5070:C:/aimers/src/
 scp tools/*.py hsu-server:~/aimers/tools/
 ```
 
-원본은 항상 노트북. 원격에서 편집하지 않는다.
+The laptop is always the source of truth. Never edit on a remote.
 
-### 장기 실행 (ssh 끊겨도 살아남게)
+## Long-running jobs (must survive ssh disconnect)
 
 ```bash
-# A100 — PPID 1 로 떨어진다
+# A100 — reparents to PID 1
 ssh hsu-server "cd ~/aimers && setsid nohup bash X.sh > out/X.log 2>&1 < /dev/null & disown"
 
-# 4070 — 이 런처로만. 이유는 §4-15
-bash tools/run4070.sh <이름> 'C:\aimers\X.bat' 'C:\aimers\out\X.log'
+# 4070 — this launcher only. See rule 15.
+bash tools/run4070.sh <name> 'C:\aimers\X.bat' 'C:\aimers\out\X.log'
 ```
 
-4070 에서 `setsid nohup` · `start /b` · `Start-Process` 는 전부 ssh 종료와 함께 죽는다.
-WSL `tmux` 안에서는 Windows exe interop 이 깨진다(`UtilAcceptVsock accept4 failed 110`).
-**남은 방법이 `schtasks` 뿐이고, 그건 `tools/run4070.sh` 가 안전하게 감싼다.**
+On the Windows boxes `setsid nohup`, `start /b`, and `Start-Process` all die with
+the ssh session. WSL `tmux` breaks Windows exe interop
+(`UtilAcceptVsock accept4 failed 110`). `schtasks` is the only survivor, and
+`tools/run4070.sh` wraps it safely.
 
-### 환경 차이 — 알고 있을 것
+## Environment drift
 
 | | pandas | numpy | sklearn |
 |---|---|---|---|
-| 평가 서버 · 노트북 · 4070 | 2.0.3 | 1.26.4 | 1.8.0 |
+| eval server · laptop · 4070 · 5070 | 2.0.3 | 1.26.4 | 1.8.0 |
 | **A100** | **2.3.3** | **2.2.6** | **1.7.2** |
 
-**세 머신의 예측이 소수점 12자리까지 같다는 걸 실측했다**(`tools/env_check.py`).
-파이프라인이 버전에 노출되는 연산을 안 쓴다. 그래도 새 라이브러리를 쓰면 다시 확인할 것.
+Predictions were verified **identical to 12 decimals** across machines
+(`tools/env_check.py`) — the pipeline avoids version-sensitive ops. Re-verify if a
+new library enters.
 
-**그리고 A100 결과와 4070 결과를 직접 비교하지 말 것** — 같은 설정·같은 시드가
-11점 갈린다(§4-5). 머신마다 자기 기준선을 따로 만든다.
+**But never compare an A100 result to a 4070 result** — the same config and the
+same seeds diverged by 11 points (rule 5).
 
-### 원장 합치기
+## Merging the ledger
 
-`LEDGER.tsv` 는 학습이 돈 머신에 쌓인다. 판정 전에 모은다:
+`LEDGER.tsv` accumulates on whichever machine trained. Collect before judging:
 
 ```bash
 bash tools/ledger_sync.sh
@@ -138,170 +232,244 @@ bash tools/ledger_sync.sh
 
 ---
 
-## 4. 반드시 지킬 것 — 어긴 대가가 기록돼 있다
+# 4. Non-negotiables — each one has a price tag we already paid
 
-### 실행 전
+## Before running
 
-1. **`python tools/precheck.py <플래그 전부>` 를 통과시킨다.** 종료코드 2 면 금지.
-   스크립트째로도 된다: `--file some.sh`
-   → 08-07 에 이미 −580 으로 끝난 `season` 제거를 "안 해본 축"이라며 다시 큐에 걸었다.
-2. **`docs/SETTLED.md` 를 읽는다.** 닫힌 질문에 수치와 **기전**이 같이 적혀 있다.
-3. GPU 점유를 확인한다. 한 머신에 한 작업.
+1. **Pass `python tools/precheck.py <all flags>`.** Exit code 2 means forbidden.
+   Whole scripts work too: `--file some.sh`.
+   → On 08-07 we re-queued the `season` drop that E08 had already closed at −580.
+2. **Read `docs/SETTLED.md`.** Closed questions carry the number *and the mechanism*.
+3. Check GPU occupancy. **One job per machine.**
 
-### 측정
+## Measurement
 
-4. **판정 표면은 `--val-season S-1 --test-season S`** (배치 구조 = ≤S-1 재학습 → 미학습 S).
-   자기검증 홀드아웃은 참고용 — 셀 멤버 D 가 두 표면에서 +2.8 vs −18.0 으로 갈렸다.
-5. **비교군은 같은 머신에서 만든다.** 같은 설정·같은 6시드가 A100/4070 에서 **11점** 갈렸다.
-   시드를 늘려도 못 막는다. `tools/surf_report.py` 가 LEDGER 의 hostname 으로 자동 무효 처리.
-6. **채택 t ≥ 2.4 / 기각 95% 상한 < +3.** 홀드아웃 시드 n ≥ 6, 페어 비교.
-   → refit 배수 2.0 이 6시드에서 +2.44(t=1.91) 였는데 18시드로 늘리니 +0.60(기각).
-7. **세그먼트 BSS 를 손실로 읽지 말 것.** 기저율이 0.5 에서 멀면 BSS 가 낮아 보인다.
-   F리그가 BSS 로는 −301 인데 **MSE 로는 오히려 낮았다**(.24690 vs .24770).
+4. **The judging surface is `--val-season S-1 --test-season S`** (deployment shape:
+   refit on ≤S-1, evaluate untouched S). Self-validated holdout is reference only —
+   the cell member's contribution flipped +2.8 vs −18.0 between the two surfaces.
+5. **Build the comparison arm on the same machine.** Identical config and identical
+   6 seeds diverged **11 points** between A100 and 4070. More seeds cannot suppress
+   it. `tools/surf_report.py` cross-checks hostnames in `LEDGER.tsv` and invalidates
+   mixed comparisons automatically.
+6. **Adopt at t ≥ 2.4; reject when the 95% upper bound < +3.** n ≥ 6 seeds, paired.
+   → refit-multiplier 2.0 looked like +2.44 (t=1.91) at 6 seeds; at 18 it was +0.60.
+7. **Never read a segment's BSS as loss.** A base rate far from 0.5 depresses BSS.
+   The F league looked like −301 by BSS but its **MSE was lower** than R
+   (.24690 vs .24770).
+8. **Verify the training set, not just the flags.** Run
+   `python tools/member_fingerprint.py <tags>` — `fpipe['priors']` is computed from
+   the training rows, so it fingerprints the data. Exit code 2 means the members
+   were trained on different data and their blend weight is meaningless.
+   → 08-12: a `--drop-f-pre 2022` copied between surfaces produced a "v14f
+   reproduction" that was 52 points weaker.
 
-### 후처리·제출
+## Post-processing and submission
 
-8. **후처리 상수는 그 값을 잰 실행의 학습 데이터·플래그가 제출과 완전히 같을 때만 쓴다.**
-   → v16 −6.15 (편향은 `--drop-f-pre 2022` 로 재고 제출엔 안 썼다)
-9. **구조가 다른 실험의 결론을 옮기지 말 것.** → v17 −53.6
-10. **제출 하나에 변경 하나.** → v16 은 SHIFT+SLOPE 동시 변경으로 역산이 필요했다
-11. **제출 전 `python tools/audit_rowindep.py <script>` 통과 필수.**
-    배치 구성을 바꿔도 예측이 비트 단위로 같아야 한다. 데이콘이 행 독립을 명시 요구한다.
-12. **LB 를 보고 상수를 되맞추지 않는다.** Public=Private 이라 정답 세트 직접 적합이다.
+9. **A post-hoc constant is valid only if the run that measured it used exactly the
+   submission's training data and flags.** → v16, −6.15.
+10. **Never transplant a conclusion across structures.** → v17, −53.6.
+11. **One change per submission.** → v16 moved SHIFT and SLOPE together and needed
+    back-solving.
+12. **`python tools/audit_rowindep.py <script>` must pass before submitting.**
+    Predictions must be bit-identical under any batching. Dacon requires row
+    independence explicitly.
+13. **Never tune a constant against LB feedback.** Public = Private, so that is
+    fitting the answer key, and Phase 2 code review will see an unjustified constant.
 
-### 코드
+## Code
 
-13. **로그를 grep 으로 거르지 말 것.** `2>&1 | grep -E "^\[cat|..."` 가 트레이스백을
-    통째로 삼켜서, 죽은 실행이 "완료"로 보였다(증류 1차). 전문을 파일에 남긴다.
-14. 기존 구조·스타일을 유지한다. 한 실험에서 여러 요소를 동시에 바꾸지 않는다.
-15. 4070 장기 실행은 **`bash tools/run4070.sh`** 로만. `schtasks` 에 가까운 시각을
-    더미로 쓰면 그 시각에 전부 자동 재발화한다(9개가 동시에 떠서 GPU 를 9등분했다).
+14. **Never filter a log through grep.** `2>&1 | grep -E "^\[cat|..."` swallowed a
+    traceback whole and a dead run read as "complete" (first distillation attempt).
+    Write the full log to a file and check `Error|Traceback` yourself.
+15. Keep the existing structure and style. Never change several things at once.
+16. **Long 4070 jobs go through `bash tools/run4070.sh` only.** Using a nearby dummy
+    time in `schtasks` makes every task re-fire at that time — nine fired at once and
+    split the GPU nine ways.
+17. **`src/failmode.py` is train-only.** The same algebra on test rows recovers 2025
+    targets (verified 96.79%). It produces supervision labels, never features;
+    `fpipe.transform` does not import it; it is **never** in the submission zip.
+18. **No runners in the project root.** They go in `scripts/`. The rule existed and
+    was broken twice (30 files on 08-08, 51 on 08-12), so
+    `tools/agent_sync.sh end` now exits 2 when it finds one.
 
 ---
 
-## 5. Experiment Record
+# 5. Experiment record
 
-**사람이 적는 단계는 없앴다.** `train_gbdt2.py` 가 시드마다 `LEDGER.tsv` 에 자동 기록한다:
+**No manual step.** `train_gbdt2.py` and `train_tabdecoder.py` append one row per
+seed to `LEDGER.tsv`:
 
-```text
-날짜 · 머신 · 태그 · 모델 · val시즌 · test시즌 · 시드 · best_iter · val BSS · test BSS · 명령 전문
+```
+date · host · tag · model · val season · test season · seed · best_iter · val BSS · test BSS · full command
 ```
 
-에이전트가 추가로 남길 것:
+What an agent still writes by hand:
 
-- 축이 **닫히면** `docs/SETTLED.md` 에 한 줄 (판정 · 수치 · **기전**)
-- 제출하면 `docs/EXPERIMENTS_LOG.md` 에 LB 점수와 예측 대비 오차
-- 작업이 끝나면 `HANDOFF.md` 갱신
-
----
-
-## 6. Agent Roles
-
-### Temporary operating override — 2026-08-08
-
-Claude 토큰 제약이 해소될 때까지 **Codex 단독 운영**으로 전환한다. 이 기간에는 Codex가
-가설 검문, 실험 우선순위, 구현, 실행, 수치 해석과 다음 작업 결정까지 맡는다. 기존의
-동일 머신·동일 표면·채택 기준과 금지 규칙은 그대로 적용하며, 결론은 반드시 근거 수치와
-함께 문서화한다. `Claude 검토 대기`는 진행 조건이 아니고, 사용자가 복귀를 지시할 때만
-아래의 평상시 역할 분리로 돌아간다.
-
-### Claude — 무엇을 측정할지 정한다
-
-- 손실 분해·잔차 분석·가설 수립, 실험 우선순위
-- Codex 의 1차 분석을 **독립 검토**하고 최종 판정 (t 값, 표면, 머신 일치 확인)
-- 채택·기각 뒤의 다음 실험 계획과 전체 방향 수립
-- 제출 여부 결정, 후처리 상수 도출
-- 규칙 위반 위험 심사 (행 독립·외부 데이터·LB 프로빙)
-
-### Codex — 정해진 실험을 정확히 구현한다
-
-- 실험 스크립트/배치 작성, 플래그 배선, 에러 수정
-- 도구(`tools/*.py`) 구현, 리팩터링, 테스트
-- 머신별 실행·모니터링·산출물 회수
-- 제출 zip 패키징과 스모크
-- 결과 무결성 확인 후 **1차 분석·의견** 작성
-  (페어 통계, 비교 표면·머신·학습집합 일치, 기전 해석, 리스크, 후속 후보)
-
-**경계**: Codex 의 분석은 `Codex 1차 분석 (잠정)`으로 명시한다. 수치와 추론을 분리하고
-권고안을 내되, 이 단계만으로 `docs/SETTLED.md` 판정을 추가하거나 제출을 결정하지 않는다.
-Claude 는 이를 그대로 추인하지 않고 코드·LEDGER·규칙을 독립 검토한 뒤 **최종 판정과
-다음 계획**을 확정한다. Claude 는 구현 세부를 직접 고치기보다 무엇을·왜·어떤 기준으로
-측정할지를 적어 Codex 에 넘긴다.
+- When an axis **closes** → one line in `docs/SETTLED.md` (verdict · number ·
+  **mechanism**)
+- After a submission → LB score and prediction error in `docs/EXPERIMENTS_LOG.md`
+- When work ends → `HANDOFF.md`
 
 ---
 
-## 7. Source of Truth
+# 6. Agent roles
 
-1. 실제 코드
-2. `LEDGER.tsv` (실행된 명령 전문 — 기억보다 이걸 믿는다)
+## Claude — decides what gets measured
+
+- Loss decomposition, residual analysis, hypotheses, experiment priority
+- **Independently reviews** Codex's first-pass analysis and issues the verdict
+  (t value, surface, machine parity, training-set parity)
+- Plans the next experiment after an adopt/reject
+- Decides whether to submit; derives post-processing constants
+- Screens for rule violations (row independence, external data, LB probing)
+
+## Codex — implements the specified experiment exactly
+
+- Experiment scripts, flag wiring, error fixes
+- Tooling (`tools/*.py`), refactors, tests
+- Per-machine execution, monitoring, artefact recovery
+- Submission packaging and smoke tests
+- **First-pass analysis** after verifying integrity (paired statistics, surface /
+  machine / training-set parity, mechanism, risks, follow-up candidates)
+
+**Boundary**: Codex labels its analysis `Codex first pass (provisional)`, separates
+numbers from inference, and recommends — but does not add a `docs/SETTLED.md`
+verdict or decide a submission on that basis alone. Claude reviews the code, the
+ledger, and the rules before finalising **the verdict and the next plan**, and
+writes *what to measure and why* rather than editing implementation details.
+
+---
+
+# 7. Source of truth
+
+1. The actual code
+2. `LEDGER.tsv` — the commands that really ran. Trust it over memory.
 3. `docs/SETTLED.md`
 4. `docs/EXPERIMENTS_LOG.md`
 5. `EXPERIMENT.md` / `HANDOFF.md`
 
-문서와 코드가 다르면 **코드를 확인하고 문서를 고친다.**
+When a document disagrees with the code, **check the code and fix the document.**
 
 ---
 
-## 8. 교대 절차 — 두 에이전트가 같은 트리를 만진다
+# 8. Handoff — two agents, one working tree
 
-저장소: `github.com/jinsan02/lg-aimers-9-hackathon` (**private**)
-데이터는 안 올라간다(`data/` 무시). 재배포 금지 자료다.
+Repository: `github.com/jinsan02/lg-aimers-9-hackathon` (**private**).
+`data/` is git-ignored; redistribution is forbidden.
 
-### 시작할 때 — 반드시 먼저
+## Starting
 
 ```bash
-bash tools/agent_sync.sh start codex     # 또는 claude
+bash tools/agent_sync.sh start codex     # or claude
 ```
 
-> ⚠️ **Windows 앱(Codex 데스크톱 등)에서는 위 `bash` 를 쓰지 말고 래퍼를 쓸 것:**
+> ⚠️ **In Windows apps (Codex desktop and friends) use the wrapper, not bare `bash`:**
 >
 > ```cmd
 > tools\agent_sync.cmd start codex
-> tools\agent_sync.cmd end   codex "작업 요약"
+> tools\agent_sync.cmd end   codex "what I did"
 > ```
 >
-> 2026-08-08 에 두 번 물렸다. ① 맨 `bash` 가 WSL 로 잡혀 `E_ACCESSDENIED`.
-> ② Git Bash 를 직접 불러도 비로그인 모드면 Windows PATH 를 물려받아
-> `dirname`·`grep`·`head`·`tr` 을 못 찾는다. 래퍼가 `bash.exe --login` 으로
-> 열어 둘 다 막는다(Codex 수정).
+> Bitten twice on 08-08: ① bare `bash` resolved to WSL and died with
+> `E_ACCESSDENIED`; ② even calling Git Bash directly, a non-login shell inherits the
+> Windows PATH and loses `dirname`, `grep`, `head`, `tr`. The wrapper opens
+> `bash.exe --login` and blocks both.
 >
-> **실패한 걸 무시하고 진행하면** fetch 도 원장 병합도 안 된 상태로 남의 커밋
-> 위를 덮어쓴다. 래퍼가 실패하면 멈추고 원인부터 볼 것.
+> **Ignoring a failure here** leaves you with no fetch and no ledger merge, and you
+> will overwrite someone else's commits. If the wrapper fails, stop and diagnose.
 
-이게 하는 일: 원격 pull(fast-forward만) · **커밋 안 된 변경이 있으면 멈춤** ·
-`LEDGER.tsv` 두 머신에서 합치기 · HANDOFF Status 출력 · 원격 GPU 작업 표시.
+It does: fast-forward-only pull · **halt if anything is uncommitted** · merge
+`LEDGER.tsv` across machines · print the HANDOFF status · list remote GPU jobs.
 
-멈추면 그건 **이전 세션이 `end` 를 안 부른 것**이다. 덮어쓰지 말고 확인부터.
+A halt means **the previous session never called `end`.** Investigate; do not
+overwrite.
 
-이어서:
-1. `AGENTS.md` → `EXPERIMENT.md` → `HANDOFF.md`
-2. `docs/SETTLED.md` 에서 하려는 축이 닫혀 있는지
-3. `tools/precheck.py` 통과
+Then read: `AGENTS.md` → `EXPERIMENT.md` → `HANDOFF.md` → check `docs/SETTLED.md`
+for your axis → pass `tools/precheck.py`.
 
-### 끝낼 때 — 넘기기 전에 반드시
+## Finishing
 
 ```bash
-bash tools/agent_sync.sh end codex "DT_self/DT_seq 재검정 결과"
+bash tools/agent_sync.sh end codex "DT_self/DT_seq re-validation results"
 ```
 
-이게 하는 일: 원장 합치기 · `git add -A` · 커밋 · push · HANDOFF 상태 확인 출력.
+It does: **reject root-level runners (exit 2)** · merge the ledger · `git add -A` ·
+commit · push · print the handoff status.
 
-그리고 손으로:
-1. **`HANDOFF.md` 의 `Current Agent` / `Next Agent` / `Status` 갱신** — 이게 배턴이다
-2. Codex 가 넘길 때 `Codex 1차 분석 (잠정)`과 `Claude 검토 요청`을 채운다
-   (사실/수치 · 해석/기전 · 리스크 · 권고 · Claude 가 결정할 질문을 분리)
-3. Claude 가 검토해 축을 닫으면 `docs/SETTLED.md` 에 한 줄 (판정·수치·**기전**)
-4. 제출했으면 `docs/EXPERIMENTS_LOG.md` 에 LB 와 예측 대비 오차
+By hand:
 
-### 충돌이 났을 때
+1. **Update `Current Agent` / `Next Agent` / `Status` in `HANDOFF.md`** — that is the baton
+2. Codex fills in `Codex first pass (provisional)` and `Review requested from Claude`
+   (facts/numbers · interpretation/mechanism · risks · recommendation · the questions
+   Claude must decide)
+3. When Claude closes an axis → one line in `docs/SETTLED.md` (verdict · number · mechanism)
+4. After a submission → LB and prediction error in `docs/EXPERIMENTS_LOG.md`
 
-`git pull --ff-only` 가 실패하면 **자동 병합하지 말 것.** 두 에이전트가 같은 파일을
-다르게 고친 것이므로 사람이 볼 문제다. `git log --oneline origin/main..HEAD` 와
-`git diff origin/main` 을 찍어 HANDOFF 에 남기고 멈춘다.
+## On conflict
 
-### 서로의 영역
+If `git pull --ff-only` fails, **do not auto-merge.** Two agents edited the same file
+differently and a human should look. Dump `git log --oneline origin/main..HEAD` and
+`git diff origin/main` into HANDOFF and stop.
 
-- 커밋 메시지 앞에 `[claude]` / `[codex]` 를 붙인다 (`agent_sync.sh` 가 자동)
-- 상대가 쓴 코드를 **판단 없이 리팩터링하지 않는다.** 고칠 이유가 있으면
-  HANDOFF 에 근거를 적고 넘긴다
-- `docs/SETTLED.md` 는 **추가만** 한다. 기존 줄을 지우려면 그걸 뒤집는 실측이 있어야 한다
+## Territory
+
+- Prefix commits with `[claude]` / `[codex]` (`agent_sync.sh` does it)
+- **Never refactor the other agent's code without a reason recorded in HANDOFF**
+- `docs/SETTLED.md` is **append-only.** Removing a line requires a measurement that
+  overturns it
+
+---
+
+# 9. Repository layout
+
+```text
+AGENTS.md                this file — the single entry point
+CLAUDE.md                stub pointing here (see below)
+EXPERIMENT.md            current state board
+HANDOFF.md               agent-to-agent baton
+LEDGER.tsv               ★ automatic. one row per seed
+LEVERS.md, LEVERS_NEXT.md   lever backlog
+
+docs/SETTLED.md          ★ closed questions — precheck.py reads this
+docs/EXPERIMENTS_LOG.md  long-form history
+docs/experiment_guide.md per-machine how-to
+
+src/
+├── train_gbdt2.py       main trainer (CatBoost/LGB/XGB, every flag)
+├── train_tabdecoder.py  column-token causal decoder
+├── fpipe.py             ★ feature pipeline — fit and transform live in one file
+├── failmode.py          failure-mode label recovery (⚠ train-only, never shipped)
+├── teacher.py           distillation teacher (axis closed)
+└── script_blend_v*.py   submission inference
+tools/                   analysis and verification (precheck / surf_report / audit_*)
+scripts/                 live runners only; finished ones in scripts/archive/
+data/  model/  out/  submissions/     (all git-ignored)
+```
+
+## Running things
+
+```bash
+uv sync
+```
+
+```bash
+uv run python src/train_gbdt2.py --model cat --tag x --l2 3 --feat-v2
+```
+
+Native venv is `C:\aimers\.venv` (uv-managed). Set `$env:PYTHONPATH="src"` first for
+scripts that need it. Local pins match the eval server exactly.
+
+## Why `CLAUDE.md` is a stub, not a symlink
+
+Claude Code auto-loads `CLAUDE.md`, and the intent is for it to *be* this file.
+A real symlink needs `core.symlinks=true` plus Windows Developer Mode; on this
+laptop `mklink` is denied and git checks a symlink out as a plain text file
+containing the target path — which would silently feed Claude the string
+`AGENTS.md` instead of these rules.
+
+Once Developer Mode is on (Settings → Privacy & security → For developers), convert
+it with:
+
+```bash
+git config core.symlinks true && rm CLAUDE.md && ln -s AGENTS.md CLAUDE.md && git add -A CLAUDE.md
+```
