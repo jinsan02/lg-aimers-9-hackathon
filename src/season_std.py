@@ -42,7 +42,7 @@ ID_OF = {"pitcher": "pitcher_id", "batter": "batter_id",
          "pitchmix": "pitcher_id"}
 
 
-def build_anchors(df):
+def build_anchors(df, last_pitch=False, fit_mask=None):
     """각 (엔티티, 시즌)에 대해 **그 시즌 시작 시점**의 통산 상태를 만든다.
 
     반환: {접두어: DataFrame(id, season, n0, <비율별 S0>)}
@@ -58,16 +58,47 @@ def build_anchors(df):
         if ncol not in df.columns:
             continue
         cols = [idc, "season", ncol] + [c for c in rcols if c in df.columns]
+        if last_pitch and TARGET in df.columns:
+            cols = cols + [TARGET]
+        if last_pitch and fit_mask is not None:
+            df = df.assign(_anchor_ok=np.asarray(fit_mask, bool))
+            cols = cols + ["_anchor_ok"]
         # 각 (선수,시즌)의 **누적 투구수가 최대인 행** = 그 시즌 종료 시점 상태.
         # asof_n 자체가 단조 증가하므로 row_id 없이도 정렬 기준이 된다.
         last = df[cols].sort_values(ncol).groupby([idc, "season"],
                                                   sort=False).tail(1)
+        n_last = last[ncol].to_numpy(np.float64)
         rec = {idc: last[idc].to_numpy(), "season": last["season"].to_numpy(),
-               "n0": last[ncol].to_numpy(np.float64)}
+               "n0": n_last}
         for c in rcols:
             if c in last.columns:
-                rec[f"S0_{c}"] = (last[ncol].to_numpy(np.float64)
-                                  * last[c].fillna(0).to_numpy(np.float64))
+                rec[f"S0_{c}"] = n_last * last[c].fillna(0).to_numpy(np.float64)
+        # The stored asof_* on a row are **pre-pitch**, so the season's last row
+        # describes the state before its own final pitch: the anchor is one pitch
+        # short. Verified on the official train (2026-08-13): next_first_n ==
+        # previous_last_asof_n + 1 for 1,468/1,468 pitcher and 1,563/1,563 batter
+        # transitions, no exceptions.
+        #
+        # Only the success rate can be closed exactly -- the last pitch's outcome
+        # is the target itself. middle/ball/reverse/strike/pitchmix would need
+        # failmode differencing, which recovers 99.85% and is train-only, so they
+        # keep the short anchor and get their **own** denominator. Sharing one n0
+        # would put a corrected count under an uncorrected numerator, which is a
+        # worse error than the off-by-one it fixes.
+        if last_pitch and TARGET in last.columns:
+            ok = (last["_anchor_ok"].to_numpy(bool)
+                  if "_anchor_ok" in last.columns
+                  else np.ones(len(last), bool))
+            y = last[TARGET].fillna(0).to_numpy(np.float64)
+            for c in rcols:
+                key = f"S0_{c}"
+                if key not in rec:
+                    continue
+                if c.endswith("_success_rate"):
+                    rec[f"n0_{c}"] = np.where(ok, n_last + 1.0, n_last)
+                    rec[key] = np.where(ok, rec[key] + y, rec[key])
+                else:
+                    rec[f"n0_{c}"] = n_last
         tab = pd.DataFrame(rec)
         # (선수 x 전체 시즌) 격자로 펼쳐 앞으로 채운다 -> 시즌 건너뛴 경우 대응
         ids = tab[idc].unique()
@@ -206,6 +237,12 @@ def add_std(df, anchors, k=30.0, priors=None, to_career=True, multi_k=(),
             s0col = f"S0_{c}"
             if c not in df.columns or s0col not in df.columns:
                 continue
+            # Per-rate denominator. Only rates whose last-pitch outcome can be
+            # recovered exactly carry a corrected n0; the rest keep the shared
+            # one, so a corrected count never lands under an uncorrected sum.
+            n0c = (df[f"n0_{c}"].fillna(0).to_numpy(np.float64)
+                   if f"n0_{c}" in df.columns else n0)
+            snc = np.maximum(n - n0c, 0.0)
             S = n * df[c].fillna(0).to_numpy(np.float64)
             ss = np.maximum(S - df[s0col].fillna(0).to_numpy(np.float64), 0.0)
             pr = 0.5 if priors is None else float(priors.get(c, 0.5))
@@ -219,7 +256,7 @@ def add_std(df, anchors, k=30.0, priors=None, to_career=True, multi_k=(),
                 # S0/n0 자체는 저표본에서 매우 시끄럽다. std와 같은 k 및 시즌
                 # 사전확률로 수축하되, 당해 시즌 행은 한 건도 섞지 않는다.
                 s0 = df[s0col].fillna(0).to_numpy(np.float64)
-                df[f"anchor_{c}"] = (s0 + kg * sp) / (n0 + kg)
+                df[f"anchor_{c}"] = (s0 + kg * sp) / (n0c + kg)
                 new.append(f"anchor_{c}")
             if to_career:
                 car = np.nan_to_num(df[c].to_numpy(np.float64), nan=pr)
@@ -230,7 +267,7 @@ def add_std(df, anchors, k=30.0, priors=None, to_career=True, multi_k=(),
                 tgt = sp
             for kk in (kg,) + tuple(multi_k):
                 nm = f"std_{c}" if kk == kg else f"std_{c}_k{int(kk)}"
-                df[nm] = (ss + kk * tgt) / (sn + kk)
+                df[nm] = (ss + kk * tgt) / (snc + kk)
                 new.append(nm)
             # 통산 대비 이번 시즌 편차 = 체제 변화/폼 변화 성분
             df[f"std_{c}_delta"] = df[f"std_{c}"] - df[c]

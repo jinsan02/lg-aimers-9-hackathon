@@ -1053,6 +1053,10 @@ def main():
     ap.add_argument("--skill-neutral-first", action="store_true",
                     help="first season gets a missing skill estimate instead of "
                          "coefficients fit on the whole frame")
+    ap.add_argument("--anchor-last-pitch", action="store_true",
+                    help="season anchors count the season's final pitch "
+                         "(audit 4.1). Independent arm -- the direction is "
+                         "unmeasured, so it is not part of --p1")
     ap.add_argument("--two-stage-artifact", action="store_true",
                     help="rebuild the fpipe artifact on the final-train "
                          "partition for the refit instead of reusing the "

@@ -160,7 +160,10 @@ def fit(train, args, is_fit, tm_table=None, verbose=True):
         k_by = {k: v for k, v in (("pitchmix", args.std_k_mix),
                                   ("batter", args.std_k_bat)) if v > 0} or None
         std = {
-            "anchors": ss.build_anchors(train),
+            "anchors": ss.build_anchors(
+                train,
+                last_pitch=getattr(args, "anchor_last_pitch", False),
+                fit_mask=is_fit),
             "priors": pri,
             "k": args.std_k,
             "to_career": not args.std_to_prior,
