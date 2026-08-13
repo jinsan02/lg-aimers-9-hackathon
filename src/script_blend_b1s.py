@@ -1,7 +1,7 @@
 """B1-S submission: the post-audit rebuild, with v11's post-processing kept.
 
 Members are the `B1S` family — `--p1` (two-stage artifact, fit-only TE prior,
-neutral first-season skill), 6 base + 6 cell seeds, trained on the submission
+neutral first-season skill), 8 base + 6 cell seeds, trained on the submission
 surface (val2024, no `--drop-f-pre`).
 
 Post-processing is v11's, unchanged, and that is a measured decision rather than
@@ -36,7 +36,10 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 SHIFT, SLOPE = 0.0052, 1.0416
 _W_CELL = 0.55
-_BASE_SEEDS = [3, 4, 5, 6, 8, 13]
+# 8 base / 6 cell. Adding 42 and 7 to the base family is worth +0.89 on the
+# debiased local score at the stage the +139.03 LB offset was measured; the
+# same two seeds on the cell family are worth -0.13, so the cell stays at 6.
+_BASE_SEEDS = [3, 4, 5, 6, 8, 13, 42, 7]
 _CELL_SEEDS = [3, 4, 5, 6, 8, 13]
 WEIGHTS = ([(os.path.join(SCRIPT_DIR, "model", f"cat_B1S_base_s{s}.pkl"),
              (1 - _W_CELL) / len(_BASE_SEEDS)) for s in _BASE_SEEDS]
