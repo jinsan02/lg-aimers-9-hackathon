@@ -840,6 +840,12 @@ def main():
     ap.add_argument("--max-ctr-complexity", type=int, default=0,
                     help="CatBoost 범주형 조합 차수. 0은 라이브러리 기본값")
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--extra-feats", default="",
+                    help="row_id-keyed CSV whose remaining columns are merged in "
+                         "as extra features. Research path only -- the columns "
+                         "are keyed on train row_id, so a model trained with "
+                         "this cannot be packaged for inference until the "
+                         "generator is moved into fpipe as an artifact.")
     ap.add_argument("--tm-feats", default="",
                     help="data/processed/tm_pitcher_feats.csv 경로")
     ap.add_argument("--tm-context", default="",
@@ -1233,6 +1239,23 @@ def main():
                 f"{sorted(set(dep_cols) ^ set(new_cols))[:8]}")
     features = features + [c for c in new_cols if c not in features]
     CAT_COLS.extend([c for c in new_cats if c not in CAT_COLS])
+    if args.extra_feats:
+        ex = pd.read_csv(args.extra_feats)
+        if "row_id" not in ex.columns:
+            raise SystemExit("--extra-feats needs a row_id column")
+        cols = [c for c in ex.columns if c != "row_id"]
+        ex = ex.drop_duplicates("row_id").set_index("row_id")
+        for frame in (train, train_dep) if train_dep is not None else (train,):
+            hit = ex.reindex(frame["row_id"].to_numpy())
+            for c in cols:
+                frame[c] = hit[c].to_numpy()
+        miss = float(train[cols[0]].isna().mean())
+        # A silent miss here is the whole experiment: the column arrives all-NaN
+        # and CatBoost quietly ignores it while the run still reports a score.
+        if miss > 0.05:
+            raise SystemExit(f"--extra-feats: {miss * 100:.2f}% of rows unmatched")
+        features = features + [c for c in cols if c not in features]
+        print(f"extra feats {args.extra_feats}: +{len(cols)}개 | 결측 {miss * 100:.2f}%")
     print(f"피처 총 {len(features)}개 (범주형 {len(CAT_COLS)})")
     if args.tm_context:
         ctx = pd.read_csv(args.tm_context)
