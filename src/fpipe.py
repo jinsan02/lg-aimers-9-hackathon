@@ -251,6 +251,14 @@ def fit(train, args, is_fit, tm_table=None, verbose=True):
         say(f"TE({args.te}) k={args.te_k} hl={args.te_halflife}: +{len(cols)}개 "
             f"| 결측률 {train[cols[0]].isna().mean() * 100:.1f}%")
 
+    # 3.5 H1 — pitcher x batter-hand hierarchical prior adjustment.
+    # Needs the TE dev ratio and std_pitcher_n, so it sits after both.
+    art["h1"] = bool(getattr(args, "feat_h1", False))
+    if art["h1"]:
+        train, cols, dropped = _apply_h1(train, art.get("std", {}).get("season_prior"))
+        new_cols = [c for c in new_cols if c not in dropped] + cols
+        say(f"H1 hand-matchup prior: +{len(cols)} / -{len(dropped)}")
+
     # 4. 실력 추정 — TE 뒤 (te_pitcher_* 컬럼을 회귀 입력으로 읽는다)
     axes = skill_axes(args)
     if axes:
@@ -321,6 +329,8 @@ def transform(df, art):
             df, _ = ss.add_recent_relation(df, art["recent_relation"])
     if art.get("te") is not None:
         df, _ = _apply_te(df, art["te"])
+    if art.get("h1"):
+        df, _, _ = _apply_h1(df, (art.get("std") or {}).get("season_prior"))
     if art.get("skill_packs"):
         import skill as sk_mod
         for pk in art["skill_packs"]:
@@ -393,6 +403,45 @@ def _apply_recent_pair_bins(df, pack):
         out[spec["name"]] = np.char.add(np.char.add(ca, "_"), cb)
         made.append(spec["name"])
     return out, made
+
+
+H1_PRIOR_COL = "asof_pitcher_success_rate"
+H1_DROP = "std_asof_pitcher_success_rate_delta"
+H1_K = 80.0
+
+
+def _apply_h1(df, season_prior):
+    """H1 -- personalise the league prior with the pitcher's batter-hand lean.
+
+        hand_dev           = te_pitcher_batter_hand_ratio / te_pitcher_ratio
+        personalized_prior = clip(prior * hand_dev, 0, 1)
+        H1_delta           = (personalized_prior - prior) * 80 / (std_pitcher_n + 80)
+
+    `hand_dev` already exists as the `--te-dev` column; what does not exist is
+    the rest. CatBoost holds all three inputs and would have to rebuild that
+    expression out of splits, which is the same shape of quantity `src/skill.py`
+    was built for and measured: a learned linear combination explained 59.0% of
+    the pitcher-skill target where a GBDT on the same inputs managed 46.5%.
+
+    Replaces `std_asof_pitcher_success_rate_delta` 1:1 rather than being added,
+    per the method document. No `hand_dev` -> H1_delta = 0, so an absent
+    left/right history invents nothing.
+    """
+    dev = "te_pitcher_batter_hand_ratio_dev"
+    if dev not in df.columns or "std_pitcher_n" not in df.columns:
+        raise KeyError("--feat-h1 needs --te ph --te-dev and --feat-std "
+                       f"(missing: {[c for c in (dev, 'std_pitcher_n') if c not in df.columns]})")
+    if season_prior is None or H1_PRIOR_COL not in getattr(season_prior, "columns", []):
+        raise KeyError("--feat-h1 needs --std-season-prior")
+    df = df.copy()
+    prior = df["season"].map(season_prior[H1_PRIOR_COL]).to_numpy(np.float64)
+    hd = df[dev].to_numpy(np.float64)
+    n = np.nan_to_num(df["std_pitcher_n"].to_numpy(np.float64), nan=0.0)
+    pp = np.clip(prior * hd, 0.0, 1.0)
+    delta = (pp - prior) * H1_K / (n + H1_K)
+    df["h1_hand_delta"] = np.where(np.isfinite(delta), delta, 0.0)
+    dropped = [H1_DROP] if H1_DROP in df.columns else []
+    return df, ["h1_hand_delta"], dropped
 
 
 def _apply_std(df, std):

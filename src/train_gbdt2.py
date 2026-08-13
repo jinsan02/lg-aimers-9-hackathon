@@ -1059,6 +1059,10 @@ def main():
     ap.add_argument("--skill-neutral-first", action="store_true",
                     help="first season gets a missing skill estimate instead of "
                          "coefficients fit on the whole frame")
+    ap.add_argument("--feat-h1", action="store_true",
+                    help="H1: personalise the season prior with the pitcher's "
+                         "batter-hand lean, shrunk by current-season sample "
+                         "count. Replaces std_asof_pitcher_success_rate_delta 1:1")
     ap.add_argument("--skill-neutral-mode", default="missing",
                     choices=["missing", "const"],
                     help="what the first season gets when there is no past. "
