@@ -153,7 +153,7 @@ def _future(df, axis=""):
     return pd.Series(fn, index=d.index), pd.Series(fr, index=d.index)
 
 
-def build(train, axis="", neutral_first=False):
+def build(train, axis="", neutral_first=False, neutral_mode="missing"):
     """시즌별 계수 묶음을 만든다. 시즌 S 계수는 **S 미만 시즌**으로만 적합.
 
     axis="count" (E117) 타깃 = 그 투수의 이 볼카운트에서의 남은 성공률.
@@ -175,7 +175,21 @@ def build(train, axis="", neutral_first=False):
             # 2019 training rows receive a regression built from future-season
             # targets. `neutral_first` says the honest thing instead -- there is
             # no past, so the estimate is missing and CatBoost treats it as such.
-            b = "neutral" if neutral_first else _fit(df, med, axis=axis)
+            if not neutral_first:
+                b = _fit(df, med, axis=axis)
+            elif neutral_mode == "const":
+                # Measured 2026-08-13: making the first season missing costs the
+                # binary family **-16.34** on unseen 2024 (t -3.92) while helping
+                # the cell family. One change, 211,627 rows of 2019 (15.4% of the
+                # frame). A tree splitting on "is this NaN" learns a 2019 marker,
+                # which is a season indicator, not the absence of information the
+                # flag is meant to express. The honest constant for "no past
+                # season" is the target's own average -- predict the mean when
+                # there is nothing to condition on.
+                b = ("neutral", float(np.nanmedian(
+                    df.loc[df["_futn"] >= MINF, "_futr"].to_numpy(np.float64))))
+            else:
+                b = "neutral"
         coef[s] = b
     coef[max(seasons) + 1] = _fit(df, med, axis=axis)   # 2025 행용
     return {"coef": coef, "med": med, "last": max(seasons) + 1, "axis": axis}
@@ -193,6 +207,9 @@ def add(df, pack):
     out = np.full(len(df), np.nan)
     for s in np.unique(se):
         b = coef.get(int(s))
+        if isinstance(b, tuple):           # ("neutral", value) -- fixed constant
+            out[se == s] = b[1]
+            continue
         if isinstance(b, str):             # "neutral" -- no past season exists
             continue                       # leave NaN; CatBoost reads it natively
         if b is None:                      # 학습에 없던 시즌 = 마지막 계수

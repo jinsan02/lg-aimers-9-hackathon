@@ -1059,6 +1059,12 @@ def main():
     ap.add_argument("--skill-neutral-first", action="store_true",
                     help="first season gets a missing skill estimate instead of "
                          "coefficients fit on the whole frame")
+    ap.add_argument("--skill-neutral-mode", default="missing",
+                    choices=["missing", "const"],
+                    help="what the first season gets when there is no past. "
+                         "'missing' leaves NaN (default); 'const' uses the "
+                         "target's own median, so a tree cannot read the gap "
+                         "as a 2019 indicator")
     ap.add_argument("--anchor-last-pitch", action="store_true",
                     help="season anchors count the season's final pitch "
                          "(audit 4.1). Independent arm -- the direction is "

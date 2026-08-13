@@ -257,7 +257,8 @@ def fit(train, args, is_fit, tm_table=None, verbose=True):
         import skill as sk_mod
         art["skill_packs"] = [
             sk_mod.build(train, axis=a,
-                         neutral_first=getattr(args, "skill_neutral_first", False))
+                         neutral_first=getattr(args, "skill_neutral_first", False),
+                         neutral_mode=getattr(args, "skill_neutral_mode", "missing"))
             for a in axes]
         cols = []
         for pk in art["skill_packs"]:
