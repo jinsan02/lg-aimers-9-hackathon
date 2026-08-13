@@ -38,7 +38,7 @@ MODES = ("middle", "ball", "reverse")
 MIN_SHARE = 0.005          # 이보다 드문 셀은 성공 여부만 남기고 묶는다
 
 
-def _pitch_labels(df, modes=MODES):
+def _pitch_labels(df, modes=MODES, legacy_shift=False):
     """(투수 그룹 안에서) 한 투구 차분으로 실패모드 라벨을 복원한다.
 
     반환은 그 **행 자신의 투구** 기준이다. asof(t) 는 t 직전까지이므로
@@ -66,12 +66,18 @@ def _pitch_labels(df, modes=MODES):
         # (6.72%) 이 다음 투수의 첫 차분을 가져왔고, middle 라벨만 31,293행
         # (2.12%) 이 실제로 틀렸다 (2026-08-13 실측). groupby 를 빼먹으면
         # 셀 다중분류가 학습하는 보조 기하 전체가 조용히 어긋난다.
-        out[m] = pd.Series(v, index=d.index).groupby(pid).shift(-1)
+        ser = pd.Series(v, index=d.index)
+        # legacy_shift reproduces the pre-2026-08-13 bug on purpose, so the
+        # label correction can be attributed. Nothing else about the pipeline
+        # changes, which is the point: P0S showed P1 is a null on this surface,
+        # so whatever produced the +5.744 is inside P0, and this is the only
+        # part of P0 large enough to be it.
+        out[m] = ser.shift(-1) if legacy_shift else ser.groupby(pid).shift(-1)
     return pd.DataFrame(out).reindex(df.index)
 
 
 def build_cells(train, modes=MODES, verbose=True, context="",
-                min_share=MIN_SHARE, fit_mask=None):
+                min_share=MIN_SHARE, fit_mask=None, legacy_shift=False):
     """(성공, 실투, 볼, 반대) 조합을 다중분류 셀로 만든다.
 
     셀에 **타깃 자신을 포함**하는 것이 핵심이다. 실패모드만으로는 타깃이
@@ -91,10 +97,11 @@ def build_cells(train, modes=MODES, verbose=True, context="",
     """
     if fit_mask is not None:
         fit_mask = pd.Series(np.asarray(fit_mask, bool), index=train.index)
-        lab = pd.concat([_pitch_labels(train[fit_mask], modes),
-                         _pitch_labels(train[~fit_mask], modes)]).reindex(train.index)
+        lab = pd.concat([_pitch_labels(train[fit_mask], modes, legacy_shift),
+                         _pitch_labels(train[~fit_mask], modes, legacy_shift)]
+                        ).reindex(train.index)
     else:
-        lab = _pitch_labels(train, modes)
+        lab = _pitch_labels(train, modes, legacy_shift)
     y = train[TARGET].to_numpy(np.int8)
     parts = [pd.Series(y, index=train.index).astype(str)]
     known = pd.Series(True, index=train.index)
