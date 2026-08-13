@@ -43,7 +43,10 @@ shift
 shift
 :more
 if "%~1"=="" goto go
-set EXTRA=%EXTRA% %~1
+REM %1 not %~1: cmd splits bat parameters on space, comma AND equals, so a
+REM value like "strikes_before == 2" only survives inside its quotes. %~1
+REM strips them and the next expansion shatters the token.
+set EXTRA=%EXTRA% %1
 shift
 goto more
 :go
