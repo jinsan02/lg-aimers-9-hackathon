@@ -308,7 +308,6 @@ def _guard_two_stage(args):
         ("--tm-context", args.tm_context),
         ("--pca", args.pca), ("--pca-add", args.pca_add),
         ("--missing-strategy", args.missing_strategy not in ("", "native")),
-        ("--row-filter", args.row_filter),
         ("--soft-target", args.soft_target),
         ("--drop-cols", getattr(args, "drop_cols", "")),
         ("--feat-role", getattr(args, "feat_role", False)),
@@ -1518,6 +1517,12 @@ def main():
         # "이 구간은 자기 함수가 필요한가" 하나다.
         _m = train.eval(args.row_filter).to_numpy()
         print(f"행 필터 [{args.row_filter}]: {len(train):,} → {int(_m.sum()):,}행")
+        # The deployment frame is filtered by the same mask, on the same rows.
+        # Without this the refit would train on the whole frame while selection
+        # saw only the segment -- and the two-stage guard used to refuse
+        # row-filter outright for exactly that reason.
+        if train_dep is not None:
+            train_dep = train_dep[_m].reset_index(drop=True)
         train = train[_m].reset_index(drop=True)
         if args.test_season:
             train["_is_test"] = (train["season"] == args.test_season)
