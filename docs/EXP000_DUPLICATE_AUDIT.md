@@ -12,23 +12,59 @@ Searched: `tm-feats`, `pitch_type_group`, `fastball_rate`, `breaking_rate`,
 
 ---
 
-## Blocking: `H1_HAND_MATCHUP_METHOD.md` does not exist
+## H1 — the document exists; the feature does not
 
-The plan names it a source of truth and excludes the whole hand-matchup family
-(§2.3) on the grounds that H1 already implements a hierarchical
-`pitcher_hand_ratio / pitcher_ratio = hand_dev` prior.
+**Correction to the first version of this audit.** `H1_HAND_MATCHUP_METHOD.md`
+was supplied on 2026-08-13 (it lives outside the repo, in the user's KakaoTalk
+downloads). The first version of this file said the plan's hand-matchup
+exclusion was "sound on the evidence" because `--te-dev` already computes the
+ratio H1 describes. That was wrong. It computes H1's *ingredient*, not H1.
 
-It is not in the repository, not in `C:\Users\jinsa\OneDrive\Desktop` (where
-the takeover audit lives), and no file in `src/` or `tools/` defines `hand_dev`
-or anything of that shape.
+What H1 specifies:
 
-What **does** exist is the `ph` target-encoding axis --
-`pitcher_id × batter_hand` -- with `--te-dev` producing
-`te_pitcher_batter_hand_ratio_dev = te_pitcher_batter_hand_ratio /
-te_pitcher_ratio`. That is arithmetically the ratio H1 is described as
-computing. So the *exclusion* in §2.3 is sound on the evidence in this
-repository; the *document* it cites is missing. Not treated as a blocker for
-the excluded axes, since they stay excluded either way.
+```
+hand_dev            = pitcher_hand_ratio / pitcher_ratio       <- exists
+prior               = league mean success of season S-1        <- exists
+personalized_prior  = clip(prior * hand_dev, 0, 1)             <- does not
+H1_delta            = (personalized_prior - prior)
+                      * 80 / (std_pitcher_n + 80)              <- does not
+```
+
+and it **replaces** `std_asof_pitcher_success_rate_delta` 1:1 rather than being
+added to the 121.
+
+Searched `src/` and `tools/` for `hand_dev`, `ph_hier`, `H1_delta`,
+`personalized_prior`, `hier_delta`: **zero hits.** `docs/SETTLED.md` has no H1
+line. The ledger's `H1B22` is an unrelated plain baseline on the 2022 surface
+(`--te p,pc,ph,b,pi --te-dev ... --drop-f-pre 2022`), and `TH1_hl2` is
+te-halflife. **H1 has never been built and never been run.**
+
+Every ingredient is in the champion's 121, verified in the shipped pkl:
+
+| column | present |
+|---|---|
+| `te_pitcher_batter_hand_ratio` | yes |
+| `te_pitcher_batter_hand_ratio_dev` (= `hand_dev`, same k=50 form) | yes |
+| `te_pitcher_ratio` | yes |
+| `std_pitcher_n` | yes |
+| `std_asof_pitcher_success_rate_delta` (the column H1 replaces) | yes |
+| `std_season_prior` in the artifact | yes |
+
+So CatBoost holds all three inputs and would have to reconstruct
+`(clip(prior·hand_dev,0,1) − prior)·80/(n+80)` from splits. That is the exact
+argument `src/skill.py` was built on and measured: a smooth shrinkage weighting
+is a weighted average, trees approximate it in steps, and a learned linear
+combination explained 59.0% of the pitcher-skill target against a GBDT's 46.5%
+on the same inputs. H1 is the same shape of quantity.
+
+**Consequence for the plan.** §2.3 excludes the hand-matchup family on the
+grounds that H1 is already implemented. It is not, so the premise is false. The
+generic members of that family stay excluded on their own merits — `same_hand`,
+`R_R/R_L/...`, and plain `pitcher × batter_hand` interactions really are
+covered by the `ph` TE axis. But **H1 itself is an untested candidate**, and by
+the plan's own duplication test it is the one item in the hand family that is
+not a duplicate. It is not in the plan's five experiments because the plan
+believed it was done.
 
 ---
 
@@ -73,7 +109,7 @@ label recovery, fit-frozen taxonomy) with `tests/test_failmode.py` covering it.
 |---|---|---|---|
 | `B0JL_cell` | val2023 → unseen 2024 | 3 | 882.57 |
 | `B1J6_cell` | same, with `--p1` | 6 | 886.52 (ens. 889.78) |
-| `B1S_cell` | submission shape | 6 | running |
+| `B1S_cell` | submission shape | 6 | 916.42 (ens.) |
 
 What is *not* done is a clean legacy-vs-corrected A/B: the corrected runs also
 carry the P0 season cutoff and the P1 contract fixes, so their delta against
