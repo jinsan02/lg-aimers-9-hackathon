@@ -144,26 +144,68 @@ def main():
         first = dict(zip(sub.iloc[:, 0], v))
 
         # Row independence, checked on the packaged artefact rather than the
-        # source tree. Reversing the test rows must not move any prediction: a
-        # feature built from other rows of test.csv is disqualifying, and this
-        # is the only place that property can be verified on what actually ships.
-        t = pd.read_csv(os.path.join(stage, "data", "test.csv"), encoding="utf-8-sig")
-        t.iloc[::-1].to_csv(os.path.join(stage, "data", "test.csv"), index=False,
-                            encoding="utf-8")
-        r = subprocess.run([sys.executable, "script.py"], cwd=stage,
-                           capture_output=True, text=True, env=env)
-        if r.returncode != 0:
-            sys.stderr.write(r.stderr[-4000:])
-            raise SystemExit("row-independence rerun failed")
-        sub2 = pd.read_csv(out)
-        second = dict(zip(sub2.iloc[:, 0], sub2.iloc[:, 1].to_numpy(float)))
-        if set(first) != set(second):
-            raise SystemExit("row-independence rerun changed the id set")
-        drift = max(abs(first[k] - second[k]) for k in first)
-        if drift > 1e-12:
-            raise SystemExit(f"NOT row independent: reversing test.csv moved a "
-                             f"prediction by {drift:.3e}")
-        print(f"  row independence ok (reversed order, max drift {drift:.1e})")
+        # source tree. A feature built from other rows of test.csv is
+        # disqualifying, and this is the only place that property can be
+        # verified on what actually ships.
+        #
+        # Two checks, because they catch different things. Reversing the rows
+        # catches anything order-dependent (rolling, lag, shift). It does NOT
+        # catch an aggregate over the whole frame -- a groupby mean, a global
+        # quantile, a frequency count are all order-invariant and would sail
+        # through. Dacon's 2026-08-13 notice states the criterion as *set*
+        # membership, not order:
+        #
+        #     the prediction for a row must be identical whether test.csv holds
+        #     that row alone or the whole evaluation set
+        #
+        # so the second check drops rows instead of reordering them. The script
+        # refuses an id set that disagrees with the sample, which is correct
+        # behaviour, so the sample is subset alongside it.
+        t0 = pd.read_csv(os.path.join(stage, "data", "test.csv"), encoding="utf-8-sig")
+        s0 = pd.read_csv(os.path.join(stage, "data", "sample_submission.csv"),
+                         encoding="utf-8-sig")
+        id_col = t0.columns[0]
+
+        def rerun(frame, label):
+            """Write `frame` as test.csv (+ matching sample), rerun, read back."""
+            frame.to_csv(os.path.join(stage, "data", "test.csv"), index=False,
+                         encoding="utf-8")
+            s0[s0.iloc[:, 0].isin(set(frame[id_col]))].to_csv(
+                os.path.join(stage, "data", "sample_submission.csv"),
+                index=False, encoding="utf-8")
+            rr = subprocess.run([sys.executable, "script.py"], cwd=stage,
+                                capture_output=True, text=True, env=env)
+            if rr.returncode != 0:
+                sys.stderr.write(rr.stderr[-4000:])
+                raise SystemExit(f"row-independence rerun failed ({label})")
+            d = pd.read_csv(out)
+            return dict(zip(d.iloc[:, 0], d.iloc[:, 1].to_numpy(float)))
+
+        cases = [("reversed order", t0.iloc[::-1])]
+        if len(t0) >= 4:
+            cases.append(("half the rows", t0.iloc[::2]))
+        if len(t0) >= 2:
+            cases.append(("one row alone", t0.iloc[[0]]))
+
+        for label, frame in cases:
+            got = rerun(frame, label)
+            common = set(first) & set(got)
+            if len(common) != len(frame):
+                raise SystemExit(f"row-independence rerun ({label}) returned "
+                                 f"{len(common)} of {len(frame)} expected ids")
+            drift = max(abs(first[k] - got[k]) for k in common)
+            if drift > 1e-12:
+                raise SystemExit(
+                    f"NOT row independent: with {label}, a prediction moved by "
+                    f"{drift:.3e}. Another row of test.csv is reaching the "
+                    f"inference -- that is a disqualifying feature.")
+            print(f"  row independence ok ({label}, {len(common)} rows, "
+                  f"max drift {drift:.1e})")
+
+        if len(t0) < 200:
+            print(f"  note: the public test.csv is {len(t0)} rows, too few for a "
+                  f"per-player aggregate to show. Run "
+                  f"tools/audit_subset_independence.py for the strong version.")
         shutil.rmtree(os.path.join(stage, "output"), ignore_errors=True)
         shutil.rmtree(os.path.join(stage, "data"), ignore_errors=True)
 

@@ -73,6 +73,33 @@ zero-sample rows are missing → cold start).
 - **Any feature built from other rows of `test.csv`** — cumulative, frequency,
   distribution, rolling, target encoding, post-hoc rescaling
 
+### The organiser states the test as *set* membership, not row order
+
+Dacon re-issued this on 2026-08-13 after disqualifying multiple entrants:
+
+> A row's prediction must be identical whether `test.csv` holds that row alone
+> or the whole evaluation set.
+
+**Reversing the rows is not enough to prove it.** A groupby mean over the test
+frame, a global quantile, a frequency count — all are order-invariant, so they
+pass a reversal check and are still disqualifying. Vary which rows are present.
+
+```bash
+python tools/audit_subset_independence.py --package <unzipped submission>
+```
+
+`tools/build_submission.py` now runs reversal + half-frame + single-row on the
+packaged artefact and refuses to write the zip on any drift. The public
+`test.csv` is 5 rows, too few for a per-player aggregate to surface, so the
+standalone tool synthesises a frame with each pitcher repeated — that one is the
+real check. Verified on `b1s8_20260813.zip`: drift exactly 0 in all cases.
+
+Note also that "the row's own asof history" is safe **because the organiser
+supplies those columns in `test.csv`**. The asof differencing that is worth
++72.6 happens in `season_std.build_profiles` at *fit* time on train, and
+inference only joins the frozen table by `(id, season)`. If it ever moves into
+the inference path it becomes a violation.
+
 ## Rules
 
 | Item | Limit |
