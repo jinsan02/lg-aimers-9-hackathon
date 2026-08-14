@@ -719,11 +719,26 @@ def run_cat(args, train, features, is_val, train_dep=None):
 
 
 
-def _rank_pool(train, features, mask, group_size=64):
-    """시간적으로 가까운 행끼리 고정 블록을 만들어 전역 수준 대신 로컬 순서를 학습."""
+def _rank_pool(train, features, mask, group_size=64, feat_src=None):
+    """시간적으로 가까운 행끼리 고정 블록을 만들어 전역 수준 대신 로컬 순서를 학습.
+
+    `feat_src` is the two-stage deployment frame. `--p1` turns it on, and then
+    the unseen season is scored with deployment-view features -- so the
+    deployment ranker has to be *fitted* on deployment-view features too, or it
+    trains on one set of TE/std/prior tables and is scored on another. run_cat
+    already does this (`Pool(train_dep[features], train[TARGET])`); the ranker
+    did not, which would have made every stage-2 number a measurement of a model
+    nobody could ship. Labels and row ids stay with the selection frame, which is
+    row-aligned with the deployment frame.
+    """
     from catboost import Pool
 
-    d = train.loc[mask, [*features, TARGET, ID]].copy()
+    if feat_src is None:
+        d = train.loc[mask, [*features, TARGET, ID]].copy()
+    else:
+        d = feat_src.loc[mask, list(features)].copy()
+        d[TARGET] = train.loc[mask, TARGET].to_numpy()
+        d[ID] = train.loc[mask, ID].to_numpy()
     d = d.sort_values(ID, kind="stable")
     group = np.arange(len(d), dtype=np.int64) // int(group_size)
     pool = Pool(d[features], d[TARGET].astype(float), cat_features=CAT_COLS,
@@ -797,7 +812,7 @@ def _rank_fingerprint(art):
         return None
 
 
-def run_rank(args, train, features, is_val, art=None):
+def run_rank(args, train, features, is_val, art=None, train_dep=None):
     """O2: Brier의 해상도 항을 직접 노리는 pairwise ranking CatBoost.
 
     Two stages in **two processes**, because one process cannot do both.
@@ -817,7 +832,10 @@ def run_rank(args, train, features, is_val, art=None):
         train[c] = train[c].astype(str)
 
     if args.rank_stage == 2:
-        return _run_rank_stage2(args, train, features, is_val, art)
+        if train_dep is not None:
+            for c in CAT_COLS:
+                train_dep[c] = train_dep[c].astype(str)
+        return _run_rank_stage2(args, train, features, is_val, art, train_dep)
 
     tr, _ = _rank_pool(train, features, ~is_val, args.rank_group_size)
     va, va_order = _rank_pool(train, features, is_val, args.rank_group_size)
@@ -881,7 +899,7 @@ def run_rank(args, train, features, is_val, art=None):
         "--no-refit, then a fresh process with --rank-stage 2.")
 
 
-def _run_rank_stage2(args, train, features, is_val, art):
+def _run_rank_stage2(args, train, features, is_val, art, train_dep=None):
     """Fresh process: read stage 1's scalars, fit the deployment ranker."""
     from catboost import CatBoostRanker
 
@@ -929,7 +947,9 @@ def _run_rank_stage2(args, train, features, is_val, art):
                          "this frame's validation rows")
 
     full, _ = _rank_pool(train, features, np.ones(len(train), dtype=bool),
-                         args.rank_group_size)
+                         args.rank_group_size, feat_src=train_dep)
+    print(f"  deployment features: "
+          f"{'two-stage artifact' if train_dep is not None else 'selection frame'}")
     final = CatBoostRanker(
         iterations=trees,
         learning_rate=args.lr, depth=args.depth, l2_leaf_reg=args.l2,
@@ -1804,7 +1824,8 @@ def main():
         model, p, best_iter = (
             runner(args, train, features, is_val, train_dep=train_dep)
             if (train_dep is not None and args.model == "cat")
-            else runner(args, train, features, is_val, art=art_dep)
+            else runner(args, train, features, is_val, art=art_dep,
+                        train_dep=train_dep)
             if args.model == "rank"
             else runner(args, train, features, is_val))
         score = bss(y_va, p)
