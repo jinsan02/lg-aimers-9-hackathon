@@ -5,6 +5,7 @@
 """
 
 import argparse
+import json
 import os
 import socket
 import sys
@@ -757,12 +758,67 @@ def _rank_probability(raw, calib):
     return 1.0 / (1.0 + np.exp(-np.clip(a + b * z, -30, 30)))
 
 
-def run_rank(args, train, features, is_val):
-    """O2: Brier의 해상도 항을 직접 노리는 pairwise ranking CatBoost."""
+def rank_probability_from_pack(pack, X):
+    """The one inference path a shipped ranker may use.
+
+    A CatBoost object does not carry custom attributes through joblib, so a
+    reloaded ranker has no `_rank_calib` and the generic fallbacks in this file
+    would clip a raw pairwise score into [0, 1] and call it a probability. The
+    calibration therefore travels in the pack dict, and everything downstream --
+    packaging, replay, audits -- must come through here rather than reaching for
+    the attribute. Refusing loudly is the point: a missing calibration must not
+    degrade into a plausible-looking number.
+    """
+    calib = pack.get("rank_calib")
+    if calib is None:
+        raise ValueError(
+            "this pack has no rank_calib; a raw PairLogit score is not a "
+            "probability and must not be clipped into one")
+    a, b, mu, sd = (float(calib[k]) for k in ("a", "b", "mu", "sd")) \
+        if isinstance(calib, dict) else (float(v) for v in calib)
+    model = pack["model"]
+    for c in pack["cat_cols"]:
+        if c in X.columns and X[c].dtype != object:
+            X = X.copy()
+            X[c] = X[c].astype(str)
+    return _rank_probability(model.predict(X[pack["features"]]),
+                             (a, b, mu, sd))
+
+
+def _rank_meta_path(args):
+    return args.rank_meta or f"./out/rank_meta_{args.tag}.json"
+
+
+def _rank_fingerprint(art):
+    """The training-set fingerprint tools/member_fingerprint.py uses."""
+    try:
+        return float(art["priors"]["asof_pitcher_success_rate"])
+    except Exception:
+        return None
+
+
+def run_rank(args, train, features, is_val, art=None):
+    """O2: Brier의 해상도 항을 직접 노리는 pairwise ranking CatBoost.
+
+    Two stages in **two processes**, because one process cannot do both.
+    `FLAG --model rank full-refit` is BANNED: the group16 refit crashes natively
+    on the 4070 and the A100 when the selection ranker's CUDA pair buffers are
+    still alive, and deleting the Python objects was not enough. So stage 1
+    fits the selection ranker, writes scalars to JSON and exits; stage 2 is a
+    fresh interpreter that reads those scalars and never constructs the
+    selection ranker at all. Nothing but numbers crosses the boundary.
+
+      stage 1   --model rank --rank-group-size 16 --rank-stage 1 --no-refit
+      stage 2   same argv, --rank-stage 2 (drop --no-refit)
+    """
     from catboost import CatBoostRanker
 
     for c in CAT_COLS:
         train[c] = train[c].astype(str)
+
+    if args.rank_stage == 2:
+        return _run_rank_stage2(args, train, features, is_val, art)
+
     tr, _ = _rank_pool(train, features, ~is_val, args.rank_group_size)
     va, va_order = _rank_pool(train, features, is_val, args.rank_group_size)
     model = CatBoostRanker(
@@ -779,26 +835,111 @@ def run_rank(args, train, features, is_val):
     calib = _fit_rank_sigmoid(raw, y)
     p = _rank_probability(raw, calib)
     best_iter = model.get_best_iteration()
-    if args.no_refit:
-        model._rank_calib = calib
+    model._rank_calib = calib
+
+    if args.rank_stage == 1 or args.rank_meta:
+        # Scalars only. No CatBoost object, no Pool, no CUDA context.
+        meta = {
+            "tag": args.tag, "seed": int(args.seed),
+            "best_iteration": int(best_iter),
+            "refit_trees": int(_refit_trees(best_iter, args.refit_mult)),
+            "calib": {"a": calib[0], "b": calib[1],
+                      "mu": calib[2], "sd": calib[3]},
+            "group_size": int(args.rank_group_size),
+            "features": list(features), "n_features": len(features),
+            "cat_cols": list(CAT_COLS),
+            "rows": {"total": int(len(train)), "fit": int((~is_val).sum()),
+                     "val": int(is_val.sum())},
+            "fingerprint": _rank_fingerprint(art) if art is not None else None,
+            "val_preds": f"./out/{args.model}_{args.tag}_val_preds.npz",
+            "argv": " ".join(sys.argv[1:]),
+            "host": socket.gethostname(),
+            "val_season": args.val_season, "test_season": args.test_season,
+            "effective_params": model.get_all_params(),
+        }
+        path = _rank_meta_path(args)
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(meta, fh, indent=1, default=str)
+        print(f"rank stage1 meta -> {path} "
+              f"(best_iter {best_iter}, refit_trees {meta['refit_trees']}, "
+              f"a={calib[0]:.6f} b={calib[1]:.6f} mu={calib[2]:.6f} "
+              f"sd={calib[3]:.6f})", flush=True)
+
+    if args.no_refit or args.rank_stage == 1:
         return model, p, best_iter
 
-    # CatBoost GPU ranker keeps its pair buffers alive with the fitted model.
-    # Constructing the refit ranker while ``model`` and both Pools still exist
-    # caused group16 to request another ~2.75 GB and OOM on the 4070; group64
-    # native-crashed even on A100.  Only p/calib/best_iter are needed below.
-    import gc
-    del model, tr, va, raw_sorted
-    gc.collect()
+    # FLAG --model rank full-refit is BANNED in one process: group16 crashed
+    # natively on both the 4070 and the A100 when the refit ranker was built
+    # while the selection ranker's pair buffers were still alive, and deleting
+    # the Python objects first did not help. The contract says implement a
+    # two-stage refit in separate processes before re-running -- so refuse,
+    # rather than reproduce the crash.
+    raise SystemExit(
+        "in-process rank refit is BANNED (docs/SETTLED.md, "
+        "'--model rank full-refit'). Run stage 1 with --rank-stage 1 "
+        "--no-refit, then a fresh process with --rank-stage 2.")
+
+
+def _run_rank_stage2(args, train, features, is_val, art):
+    """Fresh process: read stage 1's scalars, fit the deployment ranker."""
+    from catboost import CatBoostRanker
+
+    path = _rank_meta_path(args)
+    with open(path, encoding="utf-8") as fh:
+        meta = json.load(fh)
+    print(f"rank stage2 reading {path}")
+
+    bad = []
+    if list(meta["features"]) != list(features):
+        bad.append(f"features differ ({meta['n_features']} vs {len(features)})")
+    if list(meta["cat_cols"]) != list(CAT_COLS):
+        bad.append("cat_cols differ")
+    if int(meta["group_size"]) != int(args.rank_group_size):
+        bad.append(f"group_size {meta['group_size']} vs {args.rank_group_size}")
+    if int(meta["seed"]) != int(args.seed):
+        bad.append(f"seed {meta['seed']} vs {args.seed}")
+    if int(meta["rows"]["total"]) != int(len(train)):
+        bad.append(f"row count {meta['rows']['total']} vs {len(train)}")
+    if int(meta["rows"]["val"]) != int(is_val.sum()):
+        bad.append(f"val rows {meta['rows']['val']} vs {int(is_val.sum())}")
+    fp = _rank_fingerprint(art) if art is not None else None
+    if meta.get("fingerprint") is not None and fp is not None \
+            and abs(float(meta["fingerprint"]) - fp) > 1e-12:
+        bad.append(f"training-set fingerprint {meta['fingerprint']} vs {fp}")
+    if bad:
+        raise SystemExit("rank stage2 refuses to run -- stage 1 described a "
+                         "different frame:\n  " + "\n  ".join(bad))
+    print(f"  frame matches stage 1: {len(features)} features, "
+          f"{len(train):,} rows, fingerprint {fp}")
+
+    c = meta["calib"]
+    calib = (float(c["a"]), float(c["b"]), float(c["mu"]), float(c["sd"]))
+    best_iter = int(meta["best_iteration"])
+    trees = int(meta["refit_trees"])
+
+    # Stage 1's validation probabilities, re-attached by row_id rather than by
+    # position -- the frame is rebuilt from scratch here and an order assumption
+    # would fail silently.
+    z = np.load(meta["val_preds"], allow_pickle=True)
+    s = pd.Series(z["pred"].astype(np.float64), index=z["row_id"])
+    p = s.reindex(train.loc[is_val, "row_id"]).to_numpy()
+    if not np.isfinite(p).all():
+        raise SystemExit("rank stage2: stage 1 val predictions do not cover "
+                         "this frame's validation rows")
+
     full, _ = _rank_pool(train, features, np.ones(len(train), dtype=bool),
                          args.rank_group_size)
     final = CatBoostRanker(
-        iterations=_refit_trees(best_iter, args.refit_mult),
+        iterations=trees,
         learning_rate=args.lr, depth=args.depth, l2_leaf_reg=args.l2,
         border_count=args.border_count, task_type=args.device, devices="0",
-        loss_function="PairLogitPairwise", random_seed=args.seed, verbose=0,
+        loss_function="PairLogitPairwise", random_seed=args.seed, verbose=200,
     )
+    print(f"  refit: {trees} trees (best_iter {best_iter} x "
+          f"{args.refit_mult}), group {args.rank_group_size}", flush=True)
     final.fit(full)
+    _snap("rank refit", final)
     final._rank_calib = calib
     return final, p, best_iter
 
@@ -1102,6 +1243,13 @@ def main():
     ap.add_argument("--dump-cell-proba", action="store_true",
                     help="failmode-cells 검증/test의 전체 클래스 확률을 저장. "
                          "학습이나 저장 모델은 바꾸지 않는 분석 전용 출력")
+    ap.add_argument("--rank-stage", type=int, default=0, choices=[0, 1, 2],
+                    help="1 = selection only, write meta and stop; 2 = fresh "
+                         "process, read meta and fit the deployment ranker. "
+                         "0 refuses to refit (SETTLED bans it in one process).")
+    ap.add_argument("--rank-meta", default="",
+                    help="path for the stage1/stage2 handoff JSON "
+                         "(default ./out/rank_meta_<tag>.json)")
     ap.add_argument("--rank-group-size", type=int, default=64,
                     help="PairLogitPairwise 학습 블록 크기. row_id 시간순 고정 블록")
     ap.add_argument("--baseline-col", default="",
@@ -1656,6 +1804,8 @@ def main():
         model, p, best_iter = (
             runner(args, train, features, is_val, train_dep=train_dep)
             if (train_dep is not None and args.model == "cat")
+            else runner(args, train, features, is_val, art=art_dep)
+            if args.model == "rank"
             else runner(args, train, features, is_val))
         score = bss(y_va, p)
         print(f"[{args.model} {args.tag}] val{args.val_season} BSS {score:.2f} "
@@ -1784,6 +1934,12 @@ def main():
                      "fpipe": art_dep, "resid_col": args.resid_col,
                      "baseline_col": args.baseline_col,
                      "fm_success": getattr(model, "_fm_success", None),
+                     # A CatBoost object does not carry custom attributes
+                     # through joblib -- verified: `_rank_calib` comes back
+                     # MISSING. Without this key a reloaded ranker falls
+                     # through to np.clip(predict(), 0, 1) and raw pairwise
+                     # scores get shipped as probabilities.
+                     "rank_calib": getattr(model, "_rank_calib", None),
                      "season_means": season_means},
                     f"./model/{args.model}_{args.tag}.pkl", compress=3)
         print(f"saved: model/{args.model}_{args.tag}.pkl")
