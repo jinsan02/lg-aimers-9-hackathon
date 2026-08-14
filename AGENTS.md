@@ -235,18 +235,47 @@ the ssh session. WSL `tmux` breaks Windows exe interop
 (`UtilAcceptVsock accept4 failed 110`). `schtasks` is the only survivor on the
 4070, and `tools/run4070.sh` wraps it safely (host is the 4th argument).
 
-> ⚠️ **`schtasks` does not work on `desktop-5070`** (2026-08-12). The task creates,
-> `/run` reports success, and `Last Result` is `267011` — but nothing executes: no
-> GPU load, no redirect target created, not even the outer log file. The same batch
-> runs fine when invoked directly. Until that is diagnosed, launch long 5070 jobs as
-> a **backgrounded direct ssh call** and keep the laptop awake:
->
-> ```bash
-> ssh -o ServerAliveInterval=30 desktop-5070 'cmd /c C:\aimers\scripts\X.bat'
-> ```
->
-> Each arm inside the batch must redirect its own stdout to `out\<tag>.log` and write
-> `out\<tag>.exit`, so a dropped ssh session is detectable rather than silent.
+### `desktop-5070` — schtasks works; it was the registration, not the scheduler
+
+Superseded 2026-08-15. The 2026-08-12 note said `schtasks` was broken on the
+5070: the task creates, `/run` reports success, `Last Result` stays `267011`,
+and nothing runs. The cause is not the scheduler.
+
+`schtasks /create` without `/ru` registers the task **Interactive only** — it
+runs as the creating user, when that user is logged on. ssh runs as the local
+account `jinsan`; the console session belongs to `AzureAD\노진산(컴퓨터공학부)`.
+Different users, so the task waits for a session that never arrives. `267011` is
+`SCHED_S_TASK_HAS_NOT_RUN`: not an error, still waiting. (The 5070 has that
+second account because the Azure AD name mixes a domain prefix, Hangul and
+parentheses, which destabilised Windows OpenSSH's user and key handling.)
+
+Register under SYSTEM and the session requirement disappears, so the job
+survives ssh disconnect, logoff and the laptop shutting down:
+
+```bash
+bash tools/run5070.sh <name> 'C:\\aimers\\scripts\\X.bat' 'C:\\aimers\\out\\X.log'
+```
+
+Two traps that each cost a launch:
+
+- **The remote layer eats one level of backslashes.** Hand the wrapper a
+  *doubled* path, quoted. Verify rather than assume —
+  `schtasks /query /tn <name> /v /fo list` must show `Task To Run:` with single
+  backslashes. `C:aimersscriptsX.bat` means they were eaten and the task will
+  fail with `267011`, which looks exactly like the old symptom.
+- **SYSTEM has no user PATH.** Call the interpreter by absolute path inside the
+  batch (`C:\aimers\.conda\python.exe`), never bare `python`.
+
+`Last Result` decoding: `267009` running, `267011` never started, `0` finished.
+Each arm inside the batch still writes its own `out\<tag>.log` and
+`out\<tag>.exit` — the task's own exit code says nothing about the arms.
+
+Do **not** use `tools/run4070.sh` for the 5070: it registers without `/ru` and
+reproduces the original symptom.
+
+If SYSTEM registration is ever unavailable, the fallback is a held-open ssh call
+(`ssh -o ServerAliveInterval=30 desktop-5070 'cmd /c C:\aimers\scripts\X.bat'`),
+but then the laptop and the network become part of the job's lifetime.
 
 ## Environment drift
 
