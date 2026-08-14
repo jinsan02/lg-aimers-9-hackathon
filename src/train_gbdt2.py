@@ -393,7 +393,8 @@ def run_cat(args, train, features, is_val, train_dep=None):
         code, names, succ = fm.build_cells(
             train, modes=_fm_modes, context=args.fm_context,
             min_share=args.fm_min_share, fit_mask=(~is_val).to_numpy(),
-            legacy_shift=args.fm_legacy_shift)
+            legacy_shift=args.fm_legacy_shift,
+            noise_rate=args.fm_noise_rate)
         tr = Pool(train.loc[~is_val, features], code[~is_val],
                   cat_features=CAT_COLS, weight=w_tr)
         va = Pool(train.loc[is_val, features], code[is_val],
@@ -429,7 +430,8 @@ def run_cat(args, train, features, is_val, train_dep=None):
         # fit-frozen taxonomy to a model trained on more data.
         rcode, rnames, rsucc = fm.build_cells(
             train_dep, modes=_fm_modes, verbose=False, context=args.fm_context,
-            min_share=args.fm_min_share, legacy_shift=args.fm_legacy_shift)
+            min_share=args.fm_min_share, legacy_shift=args.fm_legacy_shift,
+            noise_rate=args.fm_noise_rate)
         full = Pool(train_dep[features], rcode, cat_features=CAT_COLS,
                     weight=_refit_weights(args, train_dep))
         final = CatBoostClassifier(
@@ -1059,6 +1061,10 @@ def main():
     ap.add_argument("--skill-neutral-first", action="store_true",
                     help="first season gets a missing skill estimate instead of "
                          "coefficients fit on the whole frame")
+    ap.add_argument("--fm-noise-rate", type=float, default=0.0,
+                    help="deterministic structured auxiliary-label corruption. "
+                         "0.03873 is the pre-registered rate measured off the "
+                         "legacy bug; do not sweep it (2026-08-14 plan section 10).")
     ap.add_argument("--fm-legacy-shift", action="store_true",
                     help="reproduce the pre-fix global shift in the failure-mode "
                          "labels. Attribution only -- never ship this")

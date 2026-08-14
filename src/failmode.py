@@ -37,6 +37,61 @@ TARGET = "control_success"
 MODES = ("middle", "ball", "reverse")
 MIN_SHARE = 0.005          # 이보다 드문 셀은 성공 여부만 남기고 묶는다
 
+# ── 의도적 보조 라벨 잡음 (2026-08-14 사전등록) ────────────────────────────
+#
+# legacy 전역 shift 는 corrected 대비 +3.97 을 낸다. 두 가지가 동시에 바뀌어서
+# 원인이 분리되지 않았다: (i) 3.87% 셀 오배정, (ii) taxonomy 12 → 14.
+#
+# tools/failmode_taxonomy_audit.py 로 (ii) 를 먼저 판정했다. legacy 만 가진 두 셀
+# `1001`(8,968행)·`1100`(8,084행)은 **100% 가 오배정으로 도착한 행**이다. 버그를
+# 없애면 그 셀의 모집단은 0 이므로 "legacy 의 14 에서 버그만 뺀 CLEAN14" 는
+# 존재하지 않는다. 그래서 (i) 만 단독으로 재는 것이 유일하게 정의 가능한 실험이다.
+#
+# 아래 표는 legacy 자신의 전이 행렬에서 뽑았고, corrected-12 에 없는 목적지는
+# 제거한 뒤 재정규화했다. 그 결과 legacy 이동의 29.74% 는 재현되지 않는다 —
+# 이 팔이 답하는 질문이 "같은 셀 집합 안에서의 잡음만으로 충분한가" 인 이유다.
+#
+# 성공 비트는 절대 움직이지 않는다. 표의 모든 전이가 같은 성공 블록 안에 있고,
+# 그것이 legacy 의 실제 성질이기도 하다(셀 첫 글자는 control_success 에서 직접
+# 오므로 차분 오류가 닿지 않는다). 감사에서 양쪽 다 True 로 확인했다.
+# 한 행이 옮겨질 확률. 그 행의 **셀과 row_id 만으로** 정해진다 — 프레임 구성에
+# 의존하는 값이 하나라도 끼면 선택 뷰(전체)와 배치 뷰(테스트 제외)가 서로 다른
+# 행을 오염시킨다. tests/test_fm_noise.py 가 그 결함을 실제로 잡았다.
+#
+# 값 = legacy 의 셀별 이동률 x 0.99649845. 계수는 2026-08-14 에 official train
+# 1,475,092 행에서 한 번 구했고(총 이동률이 사전등록 3.873% 가 되도록), 이후
+# 재유도하거나 탐색하지 않는다.
+NOISE_SRC_RATE = {
+    "0000": 0.058057, "0001": 0.075843, "0010": 0.006451, "0011": 0.008301,
+    "0100": 0.086098, "0101": 0.098015, "0110": 0.007505, "0111": 0.006629,
+    "0xxx": 0.559012, "1000": 0.039245, "1010": 0.006169, "1xxx": 0.547424,
+}
+NOISE_DEST = {
+    "0000": {"0001": .421475, "0010": .058204, "0011": .030105, "0100": .350728,
+             "0101": .100853, "0110": .007025, "0111": .003011, "0xxx": .028600},
+    "0001": {"0000": .721001, "0010": .034308, "0011": .012847, "0100": .161188,
+             "0101": .056299, "0110": .001965, "0111": .000453, "0xxx": .011940},
+    "0010": {"0000": .562319, "0001": .180676, "0011": .019324, "0100": .169082,
+             "0101": .043478, "0110": .006763, "0111": .000966, "0xxx": .017391},
+    "0011": {"0000": .597458, "0001": .159958, "0010": .042373, "0100": .128178,
+             "0101": .045551, "0110": .009534, "0111": .001059, "0xxx": .015890},
+    "0100": {"0000": .701314, "0001": .184116, "0010": .031049, "0011": .011131,
+             "0101": .056490, "0110": .003264, "0111": .000670, "0xxx": .011968},
+    "0101": {"0000": .619499, "0001": .184537, "0010": .027231, "0011": .009725,
+             "0100": .148796, "0110": .001702, "0111": .000729, "0xxx": .007780},
+    "0110": {"0000": .612500, "0001": .141667, "0010": .041667, "0011": .016667,
+             "0100": .129167, "0101": .037500, "0xxx": .020833},
+    "0111": {"0000": .517857, "0001": .196429, "0010": .053571, "0011": .017857,
+             "0100": .160714, "0101": .053571},
+    "0xxx": {"0000": .554348, "0001": .180435, "0010": .034783, "0011": .010870,
+             "0100": .184783, "0101": .030435, "0110": .004348},
+    "1000": {"1010": .268547, "1xxx": .731453},
+    "1010": {"1000": .897196, "1xxx": .102804},
+    "1xxx": {"1000": .927500, "1010": .072500},
+}
+NOISE_RATE = 0.03873         # 사전등록. 스윕 금지 (§10)
+_NOISE_SALT = np.uint64(0x9E3779B97F4A7C15)
+
 
 def _pitch_labels(df, modes=MODES, legacy_shift=False):
     """(투수 그룹 안에서) 한 투구 차분으로 실패모드 라벨을 복원한다.
@@ -76,8 +131,63 @@ def _pitch_labels(df, modes=MODES, legacy_shift=False):
     return pd.DataFrame(out).reindex(df.index)
 
 
+def _unit_hash(row_id):
+    """행마다 고정된 [0,1) 값. 프로세스·시드·행 순서와 무관해야 한다.
+
+    파이썬 `hash()` 는 프로세스마다 소금이 달라 못 쓴다 — 같은 명령을 두 번
+    돌리면 다른 행이 오염되고, 그러면 '결정적 손상' 이라는 전제가 무너진다.
+    선택 뷰와 배치 뷰가 build_cells 를 따로 부르므로 두 호출이 **같은 행을**
+    골라야 하고, 그래서 키는 row_id 하나뿐이다.
+    """
+    h = pd.util.hash_pandas_object(pd.Series(np.asarray(row_id)), index=False)
+    return ((h.to_numpy(np.uint64) ^ _NOISE_SALT) >> np.uint64(11)) / float(1 << 53)
+
+
+def _apply_noise(cell, row_id, rate, names):
+    """사전정의 구조로 정확히 `rate` 비율의 보조 라벨을 결정적으로 옮긴다.
+
+    taxonomy 가 정해진 **뒤에** 부른다. 목적지는 전부 corrected-12 안이므로
+    셀 집합은 변하지 않는다 — 이 팔에서 바뀌는 건 라벨 하나뿐이다.
+
+    `rate` 는 표가 이미 그 총량이 되도록 눈금이 맞춰져 있다는 **선언**이다.
+    여기서 프레임을 보고 다시 맞추지 않는다 — 그러면 행의 운명이 같이 실린
+    다른 행들에 좌우되고, 뷰마다 다른 행이 오염된다.
+    """
+    if rate <= 0:
+        return cell
+    if abs(rate - NOISE_RATE) > 1e-12:
+        raise ValueError(f"표는 {NOISE_RATE} 에 맞춰져 있다. 다른 비율을 쓰려면 "
+                         f"표를 다시 유도해야 하고, 그건 사전등록 위반이다(§10).")
+    u = _unit_hash(row_id)
+    src = cell.to_numpy()
+    take = u < np.array([NOISE_SRC_RATE.get(c, 0.0) for c in src])
+
+    out = cell.to_numpy().copy()
+    # 두 번째 균등값. 선택과 목적지에 같은 난수를 쓰면 목적지가 셀 안에서
+    # 단조로 배열돼 손상이 한쪽으로 쏠린다.
+    v = _unit_hash(pd.Series(np.asarray(row_id)).astype(str) + "|dest")
+    for s, dest in NOISE_DEST.items():
+        m = take & (src == s)
+        if not m.any():
+            continue
+        ds = [d for d in dest if d in names]
+        if not ds:
+            continue
+        p = np.array([dest[d] for d in ds], dtype=np.float64)
+        p /= p.sum()
+        idx = np.searchsorted(np.cumsum(p), v[m], side="right")
+        out[m] = np.asarray(ds)[np.clip(idx, 0, len(ds) - 1)]
+    moved = (out != cell.to_numpy()).mean()
+    # English on purpose: this line is captured by tools that decode the pipe
+    # with the console's cp949, and a Korean byte here crashes the reader.
+    print(f"auxiliary-label corruption {moved * 100:.4f}% "
+          f"(pre-registered {rate * 100:.3f}%)")
+    return pd.Series(out, index=cell.index)
+
+
 def build_cells(train, modes=MODES, verbose=True, context="",
-                min_share=MIN_SHARE, fit_mask=None, legacy_shift=False):
+                min_share=MIN_SHARE, fit_mask=None, legacy_shift=False,
+                noise_rate=0.0):
     """(성공, 실투, 볼, 반대) 조합을 다중분류 셀로 만든다.
 
     셀에 **타깃 자신을 포함**하는 것이 핵심이다. 실패모드만으로는 타깃이
@@ -144,6 +254,16 @@ def build_cells(train, modes=MODES, verbose=True, context="",
         unseen = ~cell.isin(names)
         if unseen.any():                       # 있으면 안 되지만 조용히 두지 않는다
             cell = cell.where(~unseen, fallback)
+
+    if noise_rate:
+        if "row_id" not in train.columns:
+            raise KeyError("의도적 손상은 row_id 로 결정된다 — 컬럼이 없다")
+        before = cell
+        cell = _apply_noise(cell, train["row_id"], noise_rate, set(names))
+        # 주 이진 의미는 절대 바뀌면 안 된다 (§8). 표가 같은 성공 블록 안에서만
+        # 움직이도록 돼 있지만, 표를 고칠 사람을 위해 여기서 강제한다.
+        if not (cell.str[0] == before.str[0]).all():
+            raise RuntimeError("손상이 성공 비트를 움직였다 — 표가 잘못됐다")
 
     code = cell.map({v: i for i, v in enumerate(names)}).astype(np.int16)
     succ = {i for i, v in enumerate(names) if v[0] == "1"}
