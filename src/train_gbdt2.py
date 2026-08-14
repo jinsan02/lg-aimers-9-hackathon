@@ -202,6 +202,35 @@ def _extra(args, features):
     return ex
 
 
+def _cell_params(args):
+    """Optional CatBoost params for the failure-mode cell arm.
+
+    The cell arm builds its own CatBoostClassifier instead of reusing the
+    binary arm's `params` dict, so anything added there is silently dropped
+    here. `--max-ctr-complexity 3` was measured that way on 2026-08-14: the
+    packaged model reported 4 and seed 4 landed on 910.23, byte-identical to the
+    control it was supposed to differ from. Exit code 0 throughout.
+
+    Only explicitly-requested flags are returned. Passing the unguarded ones
+    (bagging_temperature, random_strength) would change this arm's defaults and
+    break comparability with every cell result already on record, so they stay
+    out -- and anything that still cannot reach here raises instead of
+    vanishing.
+    """
+    out = {}
+    if args.max_ctr_complexity:
+        out["max_ctr_complexity"] = args.max_ctr_complexity
+    if args.boosting_type:
+        out["boosting_type"] = args.boosting_type
+    blocked = [n for n, v in (("--bootstrap-type", args.bootstrap_type),) if v]
+    if blocked:
+        raise SystemExit(
+            f"{' '.join(blocked)} cannot reach the failure-mode cell arm. "
+            f"Wire it into _cell_params before running, or the cell half of "
+            f"the comparison is a duplicate of the control.")
+    return out
+
+
 def _bootstrap_only(args):
     """Bootstrap parameters shared by classifier and RMSE regressor paths."""
     ex = {}
@@ -404,7 +433,7 @@ def run_cat(args, train, features, is_val, train_dep=None):
             l2_leaf_reg=args.l2, border_count=args.border_count,
             task_type=args.device, devices="0", loss_function="MultiClass",
             classes_count=len(names), early_stopping_rounds=args.es,
-            random_seed=args.seed, verbose=200)
+            random_seed=args.seed, verbose=200, **_cell_params(args))
         clf.fit(tr, eval_set=va)
         cell_proba = clf.predict_proba(train.loc[is_val, features])
         p = fm.success_prob(cell_proba, succ)
@@ -439,7 +468,7 @@ def run_cat(args, train, features, is_val, train_dep=None):
             learning_rate=args.lr, depth=args.depth, l2_leaf_reg=args.l2,
             border_count=args.border_count, task_type=args.device, devices="0",
             loss_function="MultiClass", classes_count=len(rnames),
-            random_seed=args.seed, verbose=0)
+            random_seed=args.seed, verbose=0, **_cell_params(args))
         final.fit(full)
         final._fm_success = sorted(rsucc)
         final._fm_names = rnames
