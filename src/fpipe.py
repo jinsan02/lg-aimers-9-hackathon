@@ -254,10 +254,13 @@ def fit(train, args, is_fit, tm_table=None, verbose=True):
     # 3.5 H1 — pitcher x batter-hand hierarchical prior adjustment.
     # Needs the TE dev ratio and std_pitcher_n, so it sits after both.
     art["h1"] = bool(getattr(args, "feat_h1", False))
+    art["h1_additive"] = bool(getattr(args, "h1_additive", False))
     if art["h1"]:
-        train, cols, dropped = _apply_h1(train, art.get("std", {}).get("season_prior"))
+        train, cols, dropped = _apply_h1(
+            train, art.get("std", {}).get("season_prior"), art["h1_additive"])
         new_cols = [c for c in new_cols if c not in dropped] + cols
-        say(f"H1 hand-matchup prior: +{len(cols)} / -{len(dropped)}")
+        say(f"H1 hand-matchup prior: +{len(cols)} / -{len(dropped)}"
+            f"{' (additive)' if art['h1_additive'] else ''}")
 
     # 4. 실력 추정 — TE 뒤 (te_pitcher_* 컬럼을 회귀 입력으로 읽는다)
     axes = skill_axes(args)
@@ -330,7 +333,8 @@ def transform(df, art):
     if art.get("te") is not None:
         df, _ = _apply_te(df, art["te"])
     if art.get("h1"):
-        df, _, _ = _apply_h1(df, (art.get("std") or {}).get("season_prior"))
+        df, _, _ = _apply_h1(df, (art.get("std") or {}).get("season_prior"),
+                             art.get("h1_additive", False))
     if art.get("skill_packs"):
         import skill as sk_mod
         for pk in art["skill_packs"]:
@@ -410,7 +414,7 @@ H1_DROP = "std_asof_pitcher_success_rate_delta"
 H1_K = 80.0
 
 
-def _apply_h1(df, season_prior):
+def _apply_h1(df, season_prior, additive=False):
     """H1 -- personalise the league prior with the pitcher's batter-hand lean.
 
         hand_dev           = te_pitcher_batter_hand_ratio / te_pitcher_ratio
@@ -423,8 +427,13 @@ def _apply_h1(df, season_prior):
     was built for and measured: a learned linear combination explained 59.0% of
     the pitcher-skill target where a GBDT on the same inputs managed 46.5%.
 
-    Replaces `std_asof_pitcher_success_rate_delta` 1:1 rather than being added,
-    per the method document. No `hand_dev` -> H1_delta = 0, so an absent
+    By default this replaces `std_asof_pitcher_success_rate_delta` 1:1, per the
+    method document. `additive=True` keeps that column instead, which is a
+    different question: the replacement arm changed two things at once -- it
+    removed a delta that was already earning its place and added H1 -- and
+    scored base +3.88 (SE 2.82) against cell -1.55, core +0.63, PARK. Keeping
+    both isolates "does the composed hand prior add anything" from "was the old
+    delta worth keeping". No `hand_dev` -> H1_delta = 0, so an absent
     left/right history invents nothing.
     """
     dev = "te_pitcher_batter_hand_ratio_dev"
@@ -440,7 +449,7 @@ def _apply_h1(df, season_prior):
     pp = np.clip(prior * hd, 0.0, 1.0)
     delta = (pp - prior) * H1_K / (n + H1_K)
     df["h1_hand_delta"] = np.where(np.isfinite(delta), delta, 0.0)
-    dropped = [H1_DROP] if H1_DROP in df.columns else []
+    dropped = [] if additive else ([H1_DROP] if H1_DROP in df.columns else [])
     return df, ["h1_hand_delta"], dropped
 
 

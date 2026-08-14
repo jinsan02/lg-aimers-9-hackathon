@@ -1126,6 +1126,11 @@ def main():
     ap.add_argument("--fm-legacy-shift", action="store_true",
                     help="reproduce the pre-fix global shift in the failure-mode "
                          "labels. Attribution only -- never ship this")
+    ap.add_argument("--h1-additive", action="store_true",
+                    help="keep std_asof_pitcher_success_rate_delta instead of "
+                         "replacing it. The replacement arm moved two things at "
+                         "once and parked at core +0.63; this isolates whether "
+                         "the composed hand prior adds anything on its own.")
     ap.add_argument("--feat-h1", action="store_true",
                     help="H1: personalise the season prior with the pitcher's "
                          "batter-hand lean, shrunk by current-season sample "
