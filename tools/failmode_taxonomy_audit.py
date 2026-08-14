@@ -78,6 +78,10 @@ def main():
     ap.add_argument("--val-season", type=int, default=2024,
                     help="2024 = submission surface (where +3.97 was measured)")
     ap.add_argument("--min-share", type=float, default=fm.MIN_SHARE)
+    ap.add_argument("--deep", action="store_true",
+                    help="also describe the shape of the corruption: class "
+                         "creation vs reshuffling, season profile, and how much "
+                         "of it sits on the pitcher boundary")
     a = ap.parse_args()
 
     tr = pd.read_csv(os.path.join(ROOT, "data", "train.csv"),
@@ -153,6 +157,56 @@ def main():
     y = tr["control_success"].astype(int).astype(str)
     print(f"  corrected cell success bit == control_success : {(cs == y).all()}")
     print(f"  legacy    cell success bit == control_success : {(ls == y).all()}")
+    print(f"  corruption crosses the success blocks           : "
+          f"{(cs[moved] != ls[moved]).any()}")
+
+    if not a.deep:
+        return 0
+
+    # ---- Is this random regularisation, or is it class creation? ------------
+    #
+    # The two readings make different predictions and NOISE12 can only test the
+    # first: it redistributes rows among the existing 12 cells and never
+    # creates a class. So the shape of the legacy corruption is worth having on
+    # record before that arm reports, and the numbers below are descriptive --
+    # nothing here licenses designing a new taxonomy (plan section 13).
+    print("\n" + "=" * 78)
+    print("SHAPE OF THE CORRUPTION")
+    print("=" * 78)
+
+    into_new = lser.isin(only_legacy)
+    print(f"  moves that CREATE a class absent from corrected : "
+          f"{into_new.sum():,} / {moved.sum():,} ({into_new.sum() / moved.sum() * 100:.2f}%)")
+    print(f"  moves that only reshuffle existing classes      : "
+          f"{(moved & ~into_new).sum():,} "
+          f"({(moved & ~into_new).sum() / moved.sum() * 100:.2f}%)")
+    print("  NOISE12 can reproduce the second group only.")
+
+    print("\n  where the two legacy-only cells come from")
+    for n in only_legacy:
+        src = cser[lser == n].value_counts()
+        tot = src.sum()
+        head = "  ".join(f"{k} {v / tot * 100:.1f}%" for k, v in src.head(4).items())
+        print(f"    {n}  <- {head}")
+
+    print("\n  corruption rate by season")
+    by = pd.DataFrame({"season": tr["season"], "moved": moved,
+                       "new": into_new}).groupby("season").mean() * 100
+    for s, r in by.iterrows():
+        print(f"    {int(s)}  moved {r['moved']:6.3f}%   into a new class {r['new']:6.3f}%")
+
+    # The bug is a global shift(-1), so a row is corrupted exactly when the row
+    # after it belongs to a different pitcher. Concentration at that boundary is
+    # the signature, and it is what makes the noise structured rather than iid.
+    print("\n  concentration at the pitcher boundary")
+    d = tr.sort_values("row_id", kind="stable")
+    nxt_other = d["pitcher_id"].to_numpy() != np.roll(d["pitcher_id"].to_numpy(), -1)
+    nxt_other = pd.Series(nxt_other, index=d.index).reindex(tr.index)
+    print(f"    rows whose next row is another pitcher : {nxt_other.mean() * 100:.3f}%")
+    print(f"    of those, corrupted                    : "
+          f"{moved[nxt_other].mean() * 100:.3f}%")
+    print(f"    of the rest, corrupted                 : "
+          f"{moved[~nxt_other].mean() * 100:.3f}%")
     return 0
 
 
