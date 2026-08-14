@@ -202,6 +202,31 @@ def _extra(args, features):
     return ex
 
 
+WATCH = ("depth", "learning_rate", "l2_leaf_reg", "border_count",
+         "max_ctr_complexity", "boosting_type", "bootstrap_type",
+         "random_strength", "random_seed", "loss_function")
+_PARAMS = {}
+
+
+def _snap(where, model):
+    """Record what a fitted CatBoost actually ran with.
+
+    On 2026-08-14 `--max-ctr-complexity 3` reached the binary arm and not the
+    cell arm, because the cell arm builds its own classifier. The packaged model
+    said 4, one seed reproduced the control to the cent, and the run exited 0.
+    Reading the flag back off the shipped pkl only covers the refit model, so
+    the selection model -- which picks best_iter -- was never checkable at all.
+    Both are snapshotted here and travel in the pack.
+    """
+    try:
+        a = model.get_all_params()
+    except Exception:
+        return
+    _PARAMS[where] = {k: a.get(k) for k in WATCH}
+    print("effective params [" + where + "] "
+          + " ".join(f"{k}={a.get(k)}" for k in WATCH if a.get(k) is not None))
+
+
 def _cell_params(args):
     """Optional CatBoost params for the failure-mode cell arm.
 
@@ -435,6 +460,7 @@ def run_cat(args, train, features, is_val, train_dep=None):
             classes_count=len(names), early_stopping_rounds=args.es,
             random_seed=args.seed, verbose=200, **_cell_params(args))
         clf.fit(tr, eval_set=va)
+        _snap("cell select", clf)
         cell_proba = clf.predict_proba(train.loc[is_val, features])
         p = fm.success_prob(cell_proba, succ)
         best_iter = clf.get_best_iteration()
@@ -470,6 +496,7 @@ def run_cat(args, train, features, is_val, train_dep=None):
             loss_function="MultiClass", classes_count=len(rnames),
             random_seed=args.seed, verbose=0, **_cell_params(args))
         final.fit(full)
+        _snap("cell refit", final)
         final._fm_success = sorted(rsucc)
         final._fm_names = rnames
         return final, np.clip(p, 0.0, 1.0), best_iter
@@ -636,6 +663,7 @@ def run_cat(args, train, features, is_val, train_dep=None):
         params.pop("bagging_temperature", None)
     model = CatBoostClassifier(**params)
     model.fit(tr, eval_set=va)
+    _snap("base select", model)
     if args.baseline_col:
         # baseline 은 예측에도 같이 줘야 한다 (안 주면 오프셋 없이 예측된다)
         p = model.predict_proba(va)[:, 1]
@@ -683,6 +711,7 @@ def run_cat(args, train, features, is_val, train_dep=None):
         fp.pop("bagging_temperature", None)
     final = CatBoostClassifier(**fp)
     final.fit(full)
+    _snap("base refit", final)
     if args.baseline_col:
         final._baseline_col = args.baseline_col
     return final, p, best_iter
@@ -1745,6 +1774,7 @@ def main():
         # them the same way. Storing the selection artifact would give the
         # submission a shrink prior one season staler than its own training set.
         joblib.dump({"model": model, "features": features, "cat_cols": CAT_COLS,
+                     "effective_params": dict(_PARAMS),
                      "best_iteration": best_iter, "val_bss": score,
                      "fpipe": art_dep, "resid_col": args.resid_col,
                      "baseline_col": args.baseline_col,
