@@ -60,59 +60,108 @@ def debias(p):
     return np.clip(1 / (1 + np.exp(-SLOPE * np.log(q / (1 - q)))) - SHIFT, 0, 1)
 
 
+# Keyed by n, not by degrees of freedom: T975[6] is t(.975, df=5) = 2.571.
+T975 = {2: 12.706, 3: 4.303, 4: 3.182, 5: 2.776, 6: 2.571, 7: 2.447, 8: 2.365}
+
+
+def stats(name, d):
+    d = np.asarray(d, dtype=float)
+    n = len(d)
+    se = d.std(ddof=1) / np.sqrt(n)
+    t = d.mean() / se if se else float("nan")
+    crit = T975.get(n, 1.96)
+    lo, hi = d.mean() - crit * se, d.mean() + crit * se
+    print(f"\n{name}")
+    print(f"  per-seed {np.round(d, 2)}")
+    print(f"  mean {d.mean():+.3f}  SE {se:.3f}  t {t:+.2f}  "
+          f"95% CI [{lo:+.2f}, {hi:+.2f}]")
+    # Heavy tails were what made the legacy headline hard to read, so the
+    # stability diagnostics print alongside -- they do not change the rule.
+    print(f"  median {np.median(d):+.3f}  trimmed {np.sort(d)[1:-1].mean():+.3f}  "
+          f"positive {int((d > 0).sum())}/{n}")
+    ok = d.mean() >= 3 and t >= 2.4 and n >= 6
+    print(f"  adoption: delta>=+3 {'Y' if d.mean() >= 3 else 'N'}  "
+          f"t>=2.4 {'Y' if t >= 2.4 else 'N'}  n>=6 {'Y' if n >= 6 else 'N'}  "
+          f"95% upper>=+3 {'Y' if hi >= 3 else 'N (reject)'}  "
+          f"-> {'KEEP' if ok else ('DROP' if hi < 3 else 'PARK')}")
+    return d
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", required=True)
-    ap.add_argument("--ref", required=True)
+    ap.add_argument("--ref", required=True, help="the champion's cell arm")
     ap.add_argument("--cand", required=True)
+    ap.add_argument("--control", default=None,
+                    help="a re-run of --ref under a different tag. When given, "
+                         "cand-vs-control is reported too and is the cleaner "
+                         "mechanism estimate: both sides were trained in the "
+                         "same session, so anything that drifted between the "
+                         "champion's run and today cancels.")
     ap.add_argument("--split", default="val")
     a = ap.parse_args()
 
-    B, R, C = (load(t, a.split) for t in (a.base, a.ref, a.cand))
-    seeds = sorted(set(B) & set(R) & set(C), key=int)
+    tags = {"base": a.base, "ref": a.ref, "cand": a.cand}
+    if a.control:
+        tags["control"] = a.control
+    got = {k: load(v, a.split) for k, v in tags.items()}
+    seeds = sorted(set.intersection(*[set(v) for v in got.values()]), key=int)
     if len(seeds) < 2:
-        raise SystemExit(f"need paired seeds; got base {sorted(B)} ref {sorted(R)} "
-                         f"cand {sorted(C)}")
+        raise SystemExit("need paired seeds; got "
+                         + "  ".join(f"{k} {sorted(v)}" for k, v in got.items()))
 
     # Same rows, same targets, or the pairing is fiction.
-    y0 = B[seeds[0]][1]
-    for tag, d in (("base", B), ("ref", R), ("cand", C)):
+    y0 = got["base"][seeds[0]][1]
+    for k, d in got.items():
         for s in seeds:
             if len(d[s][1]) != len(y0) or not np.array_equal(d[s][1], y0):
-                raise SystemExit(f"{tag} seed {s} disagrees with the base on y -- "
+                raise SystemExit(f"{k} seed {s} disagrees with the base on y -- "
                                  f"different rows, the comparison is void")
 
     print(f"base {a.base} held fixed | {len(seeds)} paired seeds {seeds} | "
           f"{len(y0):,} rows")
-    print(f"\n{'seed':>5} {'ref':>10} {'cand':>10} {'delta':>9}   "
-          f"{'cell-only ref':>13} {'cand':>10} {'delta':>9}")
-    core_d, cell_d = [], []
-    for s in seeds:
-        b = B[s][0]
-        cr = (1 - W_CELL) * b + W_CELL * R[s][0]
-        cc = (1 - W_CELL) * b + W_CELL * C[s][0]
-        r_, c_ = bss(debias(cr), y0), bss(debias(cc), y0)
-        rc, cc_ = bss(debias(R[s][0]), y0), bss(debias(C[s][0]), y0)
-        core_d.append(c_ - r_)
-        cell_d.append(cc_ - rc)
-        print(f"{s:>5} {r_:10.2f} {c_:10.2f} {c_ - r_:+9.2f}   "
-              f"{rc:13.2f} {cc_:10.2f} {cc_ - rc:+9.2f}")
 
-    for name, d in (("core (0.45 base + 0.55 cell)", core_d), ("cell arm alone", cell_d)):
-        d = np.asarray(d)
-        se = d.std(ddof=1) / np.sqrt(len(d))
-        t = d.mean() / se if se else float("nan")
-        lo, hi = d.mean() - 2.571 * se, d.mean() + 2.571 * se     # t(.975, 5)
-        print(f"\n{name}")
-        print(f"  mean {d.mean():+.3f}  SE {se:.3f}  t {t:+.2f}  "
-              f"95% CI [{lo:+.2f}, {hi:+.2f}]")
-        # Heavy tails were what made the legacy headline hard to read, so the
-        # stability diagnostics print alongside -- they do not change the rule.
-        print(f"  median {np.median(d):+.3f}  trimmed {np.sort(d)[1:-1].mean():+.3f}  "
-              f"positive {int((d > 0).sum())}/{len(d)}")
-        print(f"  adoption: delta>=+3 {'Y' if d.mean() >= 3 else 'N'}  "
-              f"t>=2.4 {'Y' if t >= 2.4 else 'N'}  "
-              f"95% upper>=+3 {'Y' if hi >= 3 else 'N (reject)'}")
+    def core(tag, s):
+        return bss(debias((1 - W_CELL) * got["base"][s][0]
+                          + W_CELL * got[tag][s][0]), y0)
+
+    def cell(tag, s):
+        return bss(debias(got[tag][s][0]), y0)
+
+    cols = ["ref", "control", "cand"] if a.control else ["ref", "cand"]
+    hdr = {"ref": a.ref, "control": a.control, "cand": a.cand}
+    print("\ncell arm alone")
+    print("  " + "".join(f"{'seed':>5}" if i == 0 else "" for i in [0])
+          + "".join(f"{hdr[c][:12]:>13}" for c in cols))
+    for s in seeds:
+        print(f"  {s:>5}" + "".join(f"{cell(c, s):>13.2f}" for c in cols))
+    print("\ncore (0.45 base + 0.55 cell)")
+    print("   seed" + "".join(f"{hdr[c][:12]:>13}" for c in cols))
+    for s in seeds:
+        print(f"  {s:>5}" + "".join(f"{core(c, s):>13.2f}" for c in cols))
+
+    print("\n" + "=" * 70)
+    print(f"A.  {a.cand} vs {a.ref}   (challenger vs the champion's own run)")
+    print("=" * 70)
+    stats("core", [core("cand", s) - core("ref", s) for s in seeds])
+    stats("cell arm alone", [cell("cand", s) - cell("ref", s) for s in seeds])
+
+    if a.control:
+        print("\n" + "=" * 70)
+        print(f"B.  {a.cand} vs {a.control}   (challenger vs a same-session re-run)")
+        print("    the mechanism estimate: run-to-run drift cancels on both sides")
+        print("=" * 70)
+        stats("core", [core("cand", s) - core("control", s) for s in seeds])
+        stats("cell arm alone", [cell("cand", s) - cell("control", s) for s in seeds])
+
+        print("\n" + "=" * 70)
+        print(f"C.  {a.control} vs {a.ref}   (re-run variation -- NOT a result)")
+        print("    same command, same seeds, different invocation. This is the")
+        print("    scale against which A and B have to be read, and it is")
+        print("    specific to this machine, surface, cell family and seed set.")
+        print("=" * 70)
+        stats("core", [core("control", s) - core("ref", s) for s in seeds])
+        stats("cell arm alone", [cell("control", s) - cell("ref", s) for s in seeds])
     return 0
 
 
