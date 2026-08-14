@@ -12,13 +12,14 @@ Claude
 
 ## Status
 
-`IDLE` — no GPU job running. `desktop-5070` free (4% util, desktop processes only);
-`desktop-4070` and `hsu-server` offline. Last updated 2026-08-15 01:21.
+`IDLE` — no GPU job running, and none was run today. `desktop-5070` free;
+`desktop-4070` and `hsu-server` offline. Last updated 2026-08-15 03:40.
 `.deployed_commit` on the 5070 is `b4024c41`; `src/` is identical to it at HEAD.
 
 Champion is **B1S8, LB 1108.4333490288, rank #34** (`submissions/b1s8_20260813.zip`,
 sha256 `c2771bfdbbd9d81f9e43632d57fea5befeb16ff59478af06fb86114a4c6e7332`).
-Unchanged — nothing has cleared the bar since. Ledger 691 rows, SETTLED 136 FLAG lines.
+Unchanged — nothing has cleared the bar since. Ledger 691 rows (the season-transfer
+map trains nothing, so it adds none), SETTLED 141 FLAG lines.
 
 ---
 
@@ -121,6 +122,25 @@ league gap is column-specific and does not survive the regime break uniformly. O
 family has **converged to ~0** (+1.282 in 2022 → +0.451 → −0.002) and batter success
 is collapsing. The leagues differ in *how pitchers miss*, not in *how good they are*.
 
+## skill-hand: measured, and it goes the wrong way
+
+`MATCHUP` holding 6/6 across boundaries would, read carelessly, reopen the hand
+axis. It splits into the platoon (`pitcher_hand`, `batter_hand`,
+`matchup_same_hand`, `dom_same_*`) and the pitcher's own record by handedness
+(`te_pitcher_batter_hand_*`) — **both closed**, so both are information.
+
+```
+HAND_TE / HAND_RAW   in-sample 1.039 (.779-1.236)   unseen 0.646 (.576-.761)
+retention  2021->22  RAW .320  TE .279
+           2022->23  RAW .400  TE .366
+           2023->24  RAW .431-.493   TE .215-.236
+```
+
+The pitcher-specific hand record is worth about as much as the platoon
+in-sample and about two thirds as much out of sample, on every boundary, worst
+at the most recent. **MATCHUP's stability is the platoon.** Combined with the
+paragraph below, the axis is now **DO NOT BUILD**, not merely deprioritised.
+
 ## skill-hand: open in provenance, overlapping in mechanism
 
 `skill.py` implements `axis="hand"` and it has **never run** — `--skill-axes` 0
@@ -133,13 +153,55 @@ correlation **+0.0108**, transfer **−191.952**. With H1 now DROP on the same
 input family, a richer supervised fit on those inputs has no independent
 rationale. Do not promote it without one.
 
-## Next candidates (neither started)
+## The season-transfer map is done — read it before proposing a feature
 
-1. **season-transfer attribution map** — CPU. Which of the 121 features survive
-   into the next season, by family. Not yet designed; this is the queue's head.
-2. **FM_MULTILABEL_V2** — needs the implementation repaired first (partition-safe
-   label recovery, no `nan_to_num(...,0)` on unknown auxiliary labels), which is
-   a rewrite, not a re-run.
+Full report: [docs/SEASON_TRANSFER_MAP_20260815.md](docs/SEASON_TRANSFER_MAP_20260815.md).
+It cost no GPU and no training: the champion refits on fit+val and so has **no
+unseen season**, but `MV21_*`, `MVB22_native`/`MVCELL22_s42` and
+`MVN3_s3,4,5`/`MVCELL_s42` were run with `--test-season`, which splits the test
+season out before the refit. Same host, feature lists identical to B1S8's,
+every reconstruction pinned at `replay_max_abs_diff = 0`.
+
+**Three things it establishes.**
+
+1. **Permuting a family measures routing, not information.** The numeric frame
+   is **rank 90 of 112**: `std = asof + delta`, `dev = level / te_pitcher_ratio`,
+   `shr = (rate·n+p·k)/(n+k)` at k=200 — all exact. `SEASON_STD` leaks on
+   **13/13** columns, so its first place in every family table says nothing about
+   information. Use the six closed blocks for information questions; they test
+   CLOSED. And no deletion follows from a zero: `STD_DELTA` reads ~0 next season
+   while deleting it actually costs **−16.22**.
+2. **What survives a boundary is the pitcher and the platoon.**
+   `PITCHER_HISTORY` STABLE 6/6 with its share *rising* out of sample (50–65% →
+   63–74%), `MATCHUP` STABLE 6/6. Against that `BATTER_HISTORY` 0.21–0.43,
+   `GAME_STATE` 0.03–0.50, `RECENT` median 0.31, `CALENDAR` median 0.00.
+   **Do not build new derived features on the batter, game-state or calendar
+   axes** — that is the reason `--feat-v4` (−18.72), `--feat-count-cat` (−9.57)
+   and `--feat-count` (−1.07) all failed.
+3. **Base and cell use the same information.** Agreement is spearman **+0.678**
+   by representation family but **+0.943** by information block. A family sign
+   split is a candidate competing with a shape the other arm already uses. This
+   is the standing explanation for base-only arms looking good and failing at
+   the blend — it is not a licence to pick an arm after seeing the split.
+
+**Scope limit that matters.** Base surrogates match B1S8 at block spearman
+0.94–1.00, so base conclusions carry. Cell surrogates match at **0.31–0.49** and
+do not: the MV taxonomy has 14 cells against B1S8's 12. Every cell-side number
+in the report describes *a* cell model, not the champion's.
+
+## Next candidates
+
+1. **Diagnostic, not a candidate** — run the B1S8 recipe once on the judging
+   surface (`--val-season 2023 --test-season 2024 --drop-f-pre 2022`, one seed,
+   base and cell) and re-run `tools/season_transfer_map.py --groups block`
+   against those packs. Two runs, ~10 min, adopts nothing. It is the missing
+   input for every cell-side decision, and the cell arm carries 55% of the blend.
+2. **FM_MULTILABEL_V2** — HOLD. The cell geometry does retain better than base
+   on 4 of 6 blocks (`GAME_STATE` 0.50 vs 0.15, `COUNT` 1.10 vs 0.63), which is
+   the condition that would raise its priority — but that is measured on the
+   cell model that does *not* match B1S8. Do not act before (1). It also needs
+   the implementation repaired (partition-safe label recovery, no
+   `nan_to_num(...,0)` on unknown auxiliary labels), which is a rewrite.
 
 HOLD, low expected value: `--refit-mult 2.0`, `--loss RMSE`, `--te-halflife 2`.
 
