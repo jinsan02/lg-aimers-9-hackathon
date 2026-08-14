@@ -12,12 +12,13 @@ Claude
 
 ## Status
 
-`IDLE` — no GPU job running. `desktop-5070` free (12% util, desktop processes only);
-`desktop-4070` and `hsu-server` offline. Last updated 2026-08-14 23:47.
+`IDLE` — no GPU job running. `desktop-5070` free (4% util, desktop processes only);
+`desktop-4070` and `hsu-server` offline. Last updated 2026-08-15 01:21.
+`.deployed_commit` on the 5070 is `b4024c41`; `src/` is identical to it at HEAD.
 
 Champion is **B1S8, LB 1108.4333490288, rank #34** (`submissions/b1s8_20260813.zip`,
 sha256 `c2771bfdbbd9d81f9e43632d57fea5befeb16ff59478af06fb86114a4c6e7332`).
-Unchanged today — nothing cleared the bar. Ledger 679 rows, SETTLED 135 FLAG lines.
+Unchanged — nothing has cleared the bar since. Ledger 691 rows, SETTLED 136 FLAG lines.
 
 ---
 
@@ -31,6 +32,7 @@ Unchanged today — nothing cleared the bar. Ledger 679 rows, SETTLED 135 FLAG l
 | `--max-ctr-complexity 3` | DROP — core −0.277, 95% CI [−1.36, +0.81] |
 | `GENERAL_SKILL_ADD` | **PARK** — core +1.104, 95% CI [−1.69, +3.90] |
 | F league-relative representation | DUPLICATE, not run — see below |
+| `H1_ADDITIVE` (`--feat-h1 --h1-additive`) | DROP — core −0.304, 95% CI [−3.25, +2.64] |
 
 ## The three things that will change how you read numbers
 
@@ -61,6 +63,26 @@ packaged model said 4 and one seed reproduced its own control to the cent, exit 
 for all four constructors into the pack. Scope audited: 158 prior cell runs, none
 affected, **no old verdict reopened**.
 
+## H1 is finished, both ways
+
+The parked replacement arm bundled two changes: it added `h1_hand_delta` and
+dropped `std_asof_pitcher_success_rate_delta`, and dropping delta families is
+separately worth −4.99. `--h1-additive` keeps the column, so only the composed
+prior moves — 121 → 122 features, nothing removed.
+
+```
+primary fresh-vs-fresh core  -0.304  SE 1.145  t -0.27  CI [-3.25, +2.64]
+base  +2.161  SE 2.346  median +3.761  5/6 positive
+cell  -1.235  SE 0.900  2/6 positive
+```
+
+Removing the confound did not rescue it. Base is still the only positive family
+and still imprecise — its SE here is **the largest measured**, because the base
+arm's stopping point moved by 255.8 iterations on average and 712 on seed 5,
+which alone cost −8.42. **Base-only is not reopened by this**: choosing a family
+after seeing the split is what pre-registration exists to prevent, and this base
+estimate is looser than the one that already parked.
+
 ## Open signals, none scheduled
 
 - **Legacy failure-mode labels**: base-fixed core **+4.15, SE 1.11, t 3.76,
@@ -81,6 +103,7 @@ affected, **no old verdict reopened**.
 H1 replacement  +1.28    expected pitch mix  +1.64
 anchor-last-pitch +0.88  GENERAL_SKILL_ADD   +1.10
 ```
+(H1 *additive* is DROP, not PARK — it does not join this list.)
 "1+1+1 is +3" reasoning is banned. No seed extension to rescue a PARK.
 
 ## Why F is not the next GPU job
@@ -98,11 +121,25 @@ league gap is column-specific and does not survive the regime break uniformly. O
 family has **converged to ~0** (+1.282 in 2022 → +0.451 → −0.002) and batter success
 is collapsing. The leagues differ in *how pitchers miss*, not in *how good they are*.
 
-## Next candidates (both need pre-registration; neither is started)
+## skill-hand: open in provenance, overlapping in mechanism
 
-1. **H1 additive** — keep `std_asof_pitcher_success_rate_delta`, *add* `h1_hand_delta`.
-   Structurally different from the PARKed replacement arm, which confounded the two.
-2. **H1 base-only** — an independent hypothesis, not a rescue of the mixed result.
+`skill.py` implements `axis="hand"` and it has **never run** — `--skill-axes` 0
+runs, `skill_hand` 0, `axis=hand` 0. But its three extra inputs
+(`te_pitcher_batter_hand_ratio` / `_dev` / `_n`) are all already champion
+features, `_dev` is the exact input H1 composes, and the axis's stated
+motivation — "+31 in the cross-fit residual" — is the same +31 that
+`FLAG pitcher-batter-hand-residual | CLOSED` rejected: year-over-year
+correlation **+0.0108**, transfer **−191.952**. With H1 now DROP on the same
+input family, a richer supervised fit on those inputs has no independent
+rationale. Do not promote it without one.
+
+## Next candidates (neither started)
+
+1. **season-transfer attribution map** — CPU. Which of the 121 features survive
+   into the next season, by family. Not yet designed; this is the queue's head.
+2. **FM_MULTILABEL_V2** — needs the implementation repaired first (partition-safe
+   label recovery, no `nan_to_num(...,0)` on unknown auxiliary labels), which is
+   a rewrite, not a re-run.
 
 HOLD, low expected value: `--refit-mult 2.0`, `--loss RMSE`, `--te-halflife 2`.
 
