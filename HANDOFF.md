@@ -184,24 +184,48 @@ every reconstruction pinned at `replay_max_abs_diff = 0`.
    is the standing explanation for base-only arms looking good and failing at
    the blend — it is not a licence to pick an arm after seeing the split.
 
-**Scope limit that matters.** Base surrogates match B1S8 at block spearman
-0.94–1.00, so base conclusions carry. Cell surrogates match at **0.31–0.49** and
-do not: the MV taxonomy has 14 cells against B1S8's 12. Every cell-side number
-in the report describes *a* cell model, not the champion's.
+**The scope limit is now closed.** The surrogate's cell half was suspect because
+the MV taxonomy has 14 cells against B1S8's 12. `B1SMOKE_base`/`B1SMOKE_cell`
+(2026-08-13, the 5070) turned out to be the B1S8 recipe on exactly the judging
+surface at seed 3 — **12 classes, 3 success cells, feature list identical,
+replay 0** — so the calibration cost no GPU. On the champion's own taxonomy:
+
+```
+block            base same->next (ret)   cell same->next (ret)   gap
+PITCHER_HISTORY  48.92 -> 66.16  1.35    55.14 -> 64.15  1.16   -2.01
+MATCHUP          15.36 -> 17.54  1.14    14.21 -> 15.88  1.12   -1.66
+CALENDAR_ID       7.61 ->  5.30  0.70     7.68 ->  5.36  0.70   +0.06
+COUNT             7.37 ->  4.93  0.67     8.23 ->  8.52  1.04   +3.59
+BATTER_HISTORY   12.30 ->  4.59  0.37     8.98 ->  3.88  0.43   -0.71
+GAME_STATE        8.42 ->  1.48  0.18     5.76 ->  2.21  0.38   +0.73
+base-cell spearman +0.943   max gap 3.59pp   (pre-registered: >=.85 and <=10pp)
+```
+
+Same information, different routing — **confirmed on the champion itself**, not
+just on a surrogate. The proxy's cell advantage on COUNT and GAME_STATE
+reproduces but smaller (+0.37 and +0.21 against +0.47 and +0.36), and every
+other block reproduces within ±0.02. So the MV surrogate was a good stand-in for
+*transfer* all along; its poor PredictionValuesChange agreement measured
+routing, which is exactly what the two taxonomies disagree about.
 
 ## Next candidates
 
-1. **Diagnostic, not a candidate** — run the B1S8 recipe once on the judging
-   surface (`--val-season 2023 --test-season 2024 --drop-f-pre 2022`, one seed,
-   base and cell) and re-run `tools/season_transfer_map.py --groups block`
-   against those packs. Two runs, ~10 min, adopts nothing. It is the missing
-   input for every cell-side decision, and the cell arm carries 55% of the blend.
-2. **FM_MULTILABEL_V2** — HOLD. The cell geometry does retain better than base
-   on 4 of 6 blocks (`GAME_STATE` 0.50 vs 0.15, `COUNT` 1.10 vs 0.63), which is
-   the condition that would raise its priority — but that is measured on the
-   cell model that does *not* match B1S8. Do not act before (1). It also needs
-   the implementation repaired (partition-safe label recovery, no
+1. **FM_MULTILABEL_V2 — HOLD.** The calibration fired the branch that
+   deprioritises it: family-specific feature admission is not supported, and it
+   may only be revisited as *the same information under a different supervision
+   geometry*, never as a family-specialisation play. It still needs the
+   implementation repaired first (partition-safe label recovery, no
    `nan_to_num(...,0)` on unknown auxiliary labels), which is a rewrite.
+2. **next-season latent skill — dead, do not build.** The obvious follow-up to
+   `PITCHER_HISTORY` rising out of sample was that `skill.py` aims at the rest of
+   the *current* season. Retargeting it at the next season is genuinely unbuilt
+   and leakage-clean, but it is a duplicate (pearson +0.926 with the current
+   estimator, R² 0.990 on the frame) and it is **worse on its own ground**: on
+   the same 205,033 rows of 2024, rest-of-season target explains 63.7%, plain
+   k=80 shrinkage 61.4%, next-season target **59.5%**. The right horizon costs a
+   season of history and 20% of pitchers, and that costs more than it buys.
+
+No GPU candidate is licensed. The GPU has been idle since 2026-08-14.
 
 HOLD, low expected value: `--refit-mult 2.0`, `--loss RMSE`, `--te-halflife 2`.
 

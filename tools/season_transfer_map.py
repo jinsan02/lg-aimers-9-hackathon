@@ -93,6 +93,13 @@ MODELS = [
     ("cat_MV21_cell.pkl",     "cell", 2021, 2022, 42),
     ("cat_MVCELL22_s42.pkl",  "cell", 2022, 2023, 42),
     ("cat_MVCELL_s42.pkl",    "cell", 2023, 2024, 42),
+    # Diagnostic calibration, 2026-08-15. The B1S8 recipe itself on the judging
+    # surface, seed 3, 12-cell taxonomy -- the packs the MV surrogates were only
+    # standing in for. Trained on DESKTOP-053T952, not on this laptop like every
+    # row above, so its block *shares* may be compared with the surrogates' but
+    # no score of any kind may be. Select it with `--only B1SMOKE`.
+    ("cat_B1SMOKE_base.pkl",  "base", 2023, 2024, 3),
+    ("cat_B1SMOKE_cell.pkl",  "cell", 2023, 2024, 3),
 ]
 
 # test npz that pins each model's reconstruction. The val npz cannot be used:
@@ -107,6 +114,8 @@ REPLAY = {
     "cat_MV21_cell.pkl": "cat_MV21_cell_test_preds.npz",
     "cat_MVCELL22_s42.pkl": "cat_MVCELL22_s42_test_preds.npz",
     "cat_MVCELL_s42.pkl": "cat_MVCELL_s42_test_preds.npz",
+    "cat_B1SMOKE_base.pkl": "cat_B1SMOKE_base_test_preds.npz",
+    "cat_B1SMOKE_cell.pkl": "cat_B1SMOKE_cell_test_preds.npz",
 }
 
 
@@ -151,6 +160,8 @@ def main():
                     help="family = 12 representation groups, reads as routing; "
                          "block = 6 closed information groups, reads as "
                          "information (see tools/feature_blocks.py)")
+    ap.add_argument("--only", default="",
+                    help="run only models whose filename contains this")
     args = ap.parse_args()
     grouping = ff if args.groups == "family" else fb
     key = "FAMILY_OF" if args.groups == "family" else "BLOCK_OF"
@@ -162,6 +173,10 @@ def main():
     print(f"train {len(full):,} rows, seasons {sorted(full.season.unique())}")
 
     models = MODELS[2:3] if args.quick else MODELS
+    if args.only:
+        models = [m for m in models if args.only in m[0]]
+        if not models:
+            raise SystemExit(f"--only {args.only!r} matched no model")
     rows = []
     t_start = time.time()
 
