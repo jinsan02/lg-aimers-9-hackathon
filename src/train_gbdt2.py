@@ -838,7 +838,7 @@ def run_rank(args, train, features, is_val, art=None, train_dep=None):
         return _run_rank_stage2(args, train, features, is_val, art, train_dep)
 
     tr, _ = _rank_pool(train, features, ~is_val, args.rank_group_size)
-    va, va_order = _rank_pool(train, features, is_val, args.rank_group_size)
+    va, _ = _rank_pool(train, features, is_val, args.rank_group_size)
     model = CatBoostRanker(
         iterations=args.iters, learning_rate=args.lr, depth=args.depth,
         l2_leaf_reg=args.l2, border_count=args.border_count,
@@ -847,12 +847,23 @@ def run_rank(args, train, features, is_val, art=None, train_dep=None):
         random_seed=args.seed, verbose=200,
     )
     model.fit(tr, eval_set=va)
-    raw_sorted = model.predict(va)
-    raw = pd.Series(raw_sorted, index=va_order).reindex(train.index[is_val]).to_numpy()
+    best_iter_ = model.get_best_iteration()
+
+    # Free both GPU pools before scoring anything. Holding them costs ~15.2 GB
+    # of the 5070 Ti's 16.3, and predicting on top of that died with exit 255
+    # and no traceback -- a native abort, the same failure mode the refit is
+    # BANNED for, this time straight after early stopping shrank the model.
+    # Groups are a training construct: prediction only needs the rows, so score
+    # a plain frame in the original order and skip the reindex entirely.
+    import gc
+    del tr, va
+    gc.collect()
+
+    raw = model.predict(train.loc[is_val, features])
     y = train.loc[is_val, TARGET].to_numpy(np.float64)
     calib = _fit_rank_sigmoid(raw, y)
     p = _rank_probability(raw, calib)
-    best_iter = model.get_best_iteration()
+    best_iter = best_iter_
     model._rank_calib = calib
 
     if args.rank_stage == 1 or args.rank_meta:

@@ -35,8 +35,18 @@ REM      selection ranker (a legitimate no-refit reference), then exits.
 %PYU% src\train_gbdt2.py %CORE% %RANK% --rank-stage 1 --no-refit --seed 3 --tag RANK16S1_s3 > out\RANK16S1_s3.log 2>&1
 echo %ERRORLEVEL% > out\RANK16S1_s3.exit
 
+REM ---- stage 2 only runs if stage 1 actually produced the handoff. The first
+REM      attempt died with exit 255 and no traceback after early stopping, so
+REM      stage 2 started anyway and failed on a missing file, which reads like a
+REM      stage-2 bug when the fault was upstream.
+if not exist out\rank_meta_s3.json (
+  echo STAGE1_PRODUCED_NO_META > out\RANK16_s3.exit
+  goto :end
+)
+
 REM ---- stage 2: fresh interpreter, fresh CUDA context, deployment ranker.
 %PYU% src\train_gbdt2.py %CORE% %RANK% --rank-stage 2 --seed 3 --tag RANK16_s3 > out\RANK16_s3.log 2>&1
 echo %ERRORLEVEL% > out\RANK16_s3.exit
 
+:end
 echo DONE > out\RANK16_s3.done
