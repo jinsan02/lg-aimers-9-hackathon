@@ -833,6 +833,14 @@ def run_rank(args, train, features, is_val, art=None, train_dep=None):
     for c in CAT_COLS:
         train[c] = train[c].astype(str)
 
+    if args.rank_stage == 15:
+        return _run_rank_stage15(args, train, features, is_val, art)
+    if args.rank_stage not in (1, 2):
+        # FLAG --model rank full-refit is BANNED in one process: group16 crashed
+        # natively on both the 4070 and the A100. Refuse rather than reproduce.
+        raise SystemExit(
+            "rank requires the staged path (docs/SETTLED.md, '--model rank "
+            "full-refit'): --rank-stage 1, then 15, then 2.")
     if args.rank_stage == 2:
         if train_dep is not None:
             for c in CAT_COLS:
@@ -869,32 +877,80 @@ def run_rank(args, train, features, is_val, art=None, train_dep=None):
     print(f"eval curve: {len(_v)} iterations, best {best_iter_} "
           f"at {_v[best_iter_]:.10f} (last {_v[-1]:.10f})", flush=True)
 
-    # Write what stage 2 needs *before* anything else can abort. If the process
-    # dies later, the handoff still exists and the crash is attributable.
+    # Stage 1 ends here. Three runs died with exit 255 and no traceback at
+    # three different points after fit -- the best-model shrink, and then (with
+    # the shrink off) the very next step. The pattern is not one bad operation
+    # but touching this model again at all inside the process that fitted it.
+    # So persist what was learned and leave; scoring happens in a fresh
+    # interpreter that never opens a CUDA context.
+    _cbm = f"./out/rank_stage1_{args.tag}.cbm"
+    print("MARK fit_returned / curve_read", flush=True)
+    model.save_model(_cbm)
+    print(f"MARK model_saved -> {_cbm}", flush=True)
     _partial = _rank_meta_path(args)
     os.makedirs(os.path.dirname(_partial) or ".", exist_ok=True)
     with open(_partial, "w", encoding="utf-8") as _fh:
-        json.dump({"stage": "partial", "best_iteration": best_iter_,
+        json.dump({"stage": "partial", "best_iteration": int(best_iter_),
+                   "ntree_end": int(best_iter_ + 1),
                    "refit_trees": int(_refit_trees(best_iter_,
-                                                   args.refit_mult))}, _fh)
+                                                   args.refit_mult)),
+                   "model_file": _cbm, "seed": int(args.seed),
+                   "group_size": int(args.rank_group_size),
+                   "features": list(features), "n_features": len(features),
+                   "cat_cols": list(CAT_COLS),
+                   "rows": {"total": int(len(train)),
+                            "fit": int((~is_val).sum()),
+                            "val": int(is_val.sum())},
+                   "fingerprint": (_rank_fingerprint(art)
+                                   if art is not None else None),
+                   "argv": " ".join(sys.argv[1:]),
+                   "host": socket.gethostname(),
+                   "val_season": args.val_season,
+                   "test_season": args.test_season}, _fh, indent=1)
+    print(f"MARK partial_meta -> {_partial}", flush=True)
+    # os._exit skips interpreter teardown too, which is itself a candidate for
+    # the abort (tearing down a CUDA context at exit). Nothing further in stage
+    # 1 is wanted, and a clean exit code is what the chain checks.
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(0)
 
-    import gc
-    del tr, va
-    gc.collect()
+
+def _run_rank_stage15(args, train, features, is_val, art):
+    """Score and calibrate stage 1's ranker in a process that never saw a GPU.
+
+    Loads the saved model from disk, predicts the validation season on CPU,
+    fits the sigmoid there, and completes the handoff stage 2 reads. No Pool,
+    no CUDA context, nothing that has ever aborted.
+    """
+    from catboost import CatBoostRanker
+
+    path = _rank_meta_path(args)
+    with open(path, encoding="utf-8") as fh:
+        meta = json.load(fh)
+    if list(meta["features"]) != list(features):
+        raise SystemExit("stage1b: stage 1 described a different feature list")
+    if int(meta["rows"]["val"]) != int(is_val.sum()):
+        raise SystemExit("stage1b: validation row count differs from stage 1")
+    model = CatBoostRanker()
+    model.load_model(meta["model_file"])
+    best_iter_ = int(meta["best_iteration"])
+    print(f"loaded {meta['model_file']} ({model.tree_count_} trees), "
+          f"slicing at ntree_end={meta['ntree_end']}", flush=True)
 
     raw = model.predict(train.loc[is_val, features],
-                        ntree_start=0, ntree_end=best_iter_ + 1)
+                        ntree_start=0, ntree_end=int(meta["ntree_end"]))
     y = train.loc[is_val, TARGET].to_numpy(np.float64)
     calib = _fit_rank_sigmoid(raw, y)
     p = _rank_probability(raw, calib)
     # The stage-1 model keeps every tree (use_best_model is off), so every
     # later prediction has to slice at the same place the calibration was fitted
     # at, or the sigmoid is applied to a different function.
-    model._rank_ntree_end = int(best_iter_ + 1)
+    model._rank_ntree_end = int(meta["ntree_end"])
     best_iter = best_iter_
     model._rank_calib = calib
 
-    if args.rank_stage == 1 or args.rank_meta:
+    if True:
         # Scalars only. No CatBoost object, no Pool, no CUDA context.
         meta = {
             "tag": args.tag, "seed": int(args.seed),
@@ -919,24 +975,11 @@ def run_rank(args, train, features, is_val, art=None, train_dep=None):
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
         with open(path, "w", encoding="utf-8") as fh:
             json.dump(meta, fh, indent=1, default=str)
-        print(f"rank stage1 meta -> {path} "
+        print(f"rank stage1b meta -> {path} "
               f"(best_iter {best_iter}, refit_trees {meta['refit_trees']}, "
               f"a={calib[0]:.6f} b={calib[1]:.6f} mu={calib[2]:.6f} "
               f"sd={calib[3]:.6f})", flush=True)
-
-    if args.no_refit or args.rank_stage == 1:
-        return model, p, best_iter
-
-    # FLAG --model rank full-refit is BANNED in one process: group16 crashed
-    # natively on both the 4070 and the A100 when the refit ranker was built
-    # while the selection ranker's pair buffers were still alive, and deleting
-    # the Python objects first did not help. The contract says implement a
-    # two-stage refit in separate processes before re-running -- so refuse,
-    # rather than reproduce the crash.
-    raise SystemExit(
-        "in-process rank refit is BANNED (docs/SETTLED.md, "
-        "'--model rank full-refit'). Run stage 1 with --rank-stage 1 "
-        "--no-refit, then a fresh process with --rank-stage 2.")
+    return model, p, best_iter
 
 
 def _run_rank_stage2(args, train, features, is_val, art, train_dep=None):
@@ -947,6 +990,11 @@ def _run_rank_stage2(args, train, features, is_val, art, train_dep=None):
     with open(path, encoding="utf-8") as fh:
         meta = json.load(fh)
     print(f"rank stage2 reading {path}")
+    if meta.get("stage") == "partial":
+        raise SystemExit(
+            "rank stage2: the handoff is still stage 1's partial write, so "
+            "stage 1b never finished. Fix that instead of refitting against "
+            "a calibration that does not exist.")
 
     bad = []
     if list(meta["features"]) != list(features):
@@ -1303,7 +1351,8 @@ def main():
     ap.add_argument("--dump-cell-proba", action="store_true",
                     help="failmode-cells 검증/test의 전체 클래스 확률을 저장. "
                          "학습이나 저장 모델은 바꾸지 않는 분석 전용 출력")
-    ap.add_argument("--rank-stage", type=int, default=0, choices=[0, 1, 2],
+    ap.add_argument("--rank-stage", type=int, default=0,
+                    choices=[0, 1, 15, 2],
                     help="1 = selection only, write meta and stop; 2 = fresh "
                          "process, read meta and fit the deployment ranker. "
                          "0 refuses to refit (SETTLED bans it in one process).")

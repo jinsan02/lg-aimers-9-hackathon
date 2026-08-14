@@ -30,17 +30,27 @@ set PYU=%PY% -u
 set CORE=--feat-v2 --feat-k 200 --te p,pc,ph,b,pi --te-k 50 --te-dev --feat-std --std-k 80 --std-to-prior --std-season-prior --feat-domain --feat-skill-pc --lr 0.01 --iters 3000 --es 500 --l2 10 --border-count 254 --refit-mult 1.5 --drop-f-pre 2022 --max-train-season 2024 --val-season 2023 --test-season 2024 --p1 --depth 8
 set RANK=--model rank --rank-group-size 16 --rank-meta out\rank_meta_s3.json
 
-REM ---- stage 1: selection only. Writes scalars, scores unseen 2024 with the
-REM      selection ranker (a legitimate no-refit reference), then exits.
+REM ---- stage 1: fit only. Saves the ranker natively, writes the handoff, and
+REM      exits without touching the model again -- three runs aborted with exit
+REM      255 and no traceback when anything followed the fit in this process.
 %PYU% src\train_gbdt2.py %CORE% %RANK% --rank-stage 1 --no-refit --seed 3 --tag RANK16S1_s3 > out\RANK16S1_s3.log 2>&1
 echo %ERRORLEVEL% > out\RANK16S1_s3.exit
 
-REM ---- stage 2 only runs if stage 1 actually produced the handoff. The first
-REM      attempt died with exit 255 and no traceback after early stopping, so
-REM      stage 2 started anyway and failed on a missing file, which reads like a
-REM      stage-2 bug when the fault was upstream.
+REM ---- stage 1b: fresh interpreter, CPU only. Loads the saved ranker, scores
+REM      the validation season, fits the sigmoid, completes the handoff, and
+REM      scores unseen 2024 with the selection ranker (a no-refit reference).
 if not exist out\rank_meta_s3.json (
-  echo STAGE1_PRODUCED_NO_META > out\RANK16_s3.exit
+  echo STAGE1_PRODUCED_NO_META > out\RANK16S15_s3.exit
+  goto :end
+)
+%PYU% src\train_gbdt2.py %CORE% %RANK% --rank-stage 15 --no-refit --device CPU --seed 3 --tag RANK16S1_s3 > out\RANK16S15_s3.log 2>&1
+echo %ERRORLEVEL% > out\RANK16S15_s3.exit
+
+REM ---- stage 2 only runs if stage 1b completed the handoff. An upstream crash
+REM      must not reappear downstream as a missing key.
+findstr /B /C:"0" out\RANK16S15_s3.exit >nul 2>&1
+if errorlevel 1 (
+  echo STAGE1B_DID_NOT_COMPLETE > out\RANK16_s3.exit
   goto :end
 )
 
