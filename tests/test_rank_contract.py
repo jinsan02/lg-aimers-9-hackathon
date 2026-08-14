@@ -143,6 +143,23 @@ def main():
           f"mean {rawp.mean():.4f} vs {p_pack.mean():.4f}, "
           f"max|diff| {np.max(np.abs(rawp - p_pack)):.4f}")
 
+    # 11. the tree slice must travel with the calibration. Stage 1 keeps every
+    #     tree (use_best_model is off, because shrinking aborts on the GPU) and
+    #     calibrates on a prefix, so a pack that forgets ntree_end applies the
+    #     sigmoid to a different function than it was fitted for.
+    half = max(2, got["model"].tree_count_ // 2)
+    sliced = dict(got)
+    sliced["rank_ntree_end"] = half
+    manual = T._rank_probability(
+        got["model"].predict(X[got["features"]], ntree_start=0, ntree_end=half),
+        calib)
+    p_half = T.rank_probability_from_pack(sliced, X)
+    check("11 rank_ntree_end slices exactly as a manual prefix does",
+          np.array_equal(manual, p_half), f"ntree_end={half}")
+    check("11b a forgotten slice really is a different answer",
+          not np.allclose(p_half, p_pack, atol=1e-6),
+          f"max|diff| {np.max(np.abs(p_half - p_pack)):.4f}")
+
     os.remove(path)
     print("\n" + ("all passed" if not FAIL else f"{len(FAIL)} FAILED: {FAIL}"))
     return 1 if FAIL else 0

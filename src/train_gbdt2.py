@@ -796,8 +796,10 @@ def rank_probability_from_pack(pack, X):
         if c in X.columns and X[c].dtype != object:
             X = X.copy()
             X[c] = X[c].astype(str)
-    return _rank_probability(model.predict(X[pack["features"]]),
-                             (a, b, mu, sd))
+    ne = int(pack.get("rank_ntree_end") or 0)
+    raw = (model.predict(X[pack["features"]], ntree_start=0, ntree_end=ne)
+           if ne else model.predict(X[pack["features"]]))
+    return _rank_probability(raw, (a, b, mu, sd))
 
 
 def _rank_meta_path(args):
@@ -844,25 +846,51 @@ def run_rank(args, train, features, is_val, art=None, train_dep=None):
         l2_leaf_reg=args.l2, border_count=args.border_count,
         task_type=args.device, devices="0", loss_function="PairLogitPairwise",
         eval_metric="PairLogit", early_stopping_rounds=args.es,
+        # Do NOT let CatBoost shrink to the best model. Two stage-1 runs died
+        # with exit 255 and no traceback immediately after printing
+        # "Shrink model to first N iterations" -- a native abort at the end of
+        # fit, on the GPU ranker, with early stopping already decided (977 and
+        # 762). Freeing both pools first did not help, so the fault is the
+        # shrink itself and not memory pressure from scoring. Keeping every
+        # tree and slicing at prediction time with ntree_end is the same
+        # function without the operation that aborts.
+        use_best_model=False,
         random_seed=args.seed, verbose=200,
     )
     model.fit(tr, eval_set=va)
-    best_iter_ = model.get_best_iteration()
 
-    # Free both GPU pools before scoring anything. Holding them costs ~15.2 GB
-    # of the 5070 Ti's 16.3, and predicting on top of that died with exit 255
-    # and no traceback -- a native abort, the same failure mode the refit is
-    # BANNED for, this time straight after early stopping shrank the model.
-    # Groups are a training construct: prediction only needs the rows, so score
-    # a plain frame in the original order and skip the reindex entirely.
+    # best_iter has to come from the eval curve now, because get_best_iteration
+    # is only populated when use_best_model shrinks the model.
+    _curve = model.get_evals_result()
+    _vk = "validation" if "validation" in _curve else list(_curve)[-1]
+    _mk = "PairLogit" if "PairLogit" in _curve[_vk] else list(_curve[_vk])[0]
+    _v = np.asarray(_curve[_vk][_mk], np.float64)
+    best_iter_ = int(np.argmin(_v))
+    print(f"eval curve: {len(_v)} iterations, best {best_iter_} "
+          f"at {_v[best_iter_]:.10f} (last {_v[-1]:.10f})", flush=True)
+
+    # Write what stage 2 needs *before* anything else can abort. If the process
+    # dies later, the handoff still exists and the crash is attributable.
+    _partial = _rank_meta_path(args)
+    os.makedirs(os.path.dirname(_partial) or ".", exist_ok=True)
+    with open(_partial, "w", encoding="utf-8") as _fh:
+        json.dump({"stage": "partial", "best_iteration": best_iter_,
+                   "refit_trees": int(_refit_trees(best_iter_,
+                                                   args.refit_mult))}, _fh)
+
     import gc
     del tr, va
     gc.collect()
 
-    raw = model.predict(train.loc[is_val, features])
+    raw = model.predict(train.loc[is_val, features],
+                        ntree_start=0, ntree_end=best_iter_ + 1)
     y = train.loc[is_val, TARGET].to_numpy(np.float64)
     calib = _fit_rank_sigmoid(raw, y)
     p = _rank_probability(raw, calib)
+    # The stage-1 model keeps every tree (use_best_model is off), so every
+    # later prediction has to slice at the same place the calibration was fitted
+    # at, or the sigmoid is applied to a different function.
+    model._rank_ntree_end = int(best_iter_ + 1)
     best_iter = best_iter_
     model._rank_calib = calib
 
@@ -875,6 +903,7 @@ def run_rank(args, train, features, is_val, art=None, train_dep=None):
             "calib": {"a": calib[0], "b": calib[1],
                       "mu": calib[2], "sd": calib[3]},
             "group_size": int(args.rank_group_size),
+            "ntree_end": int(getattr(model, "_rank_ntree_end", 0) or 0),
             "features": list(features), "n_features": len(features),
             "cat_cols": list(CAT_COLS),
             "rows": {"total": int(len(train)), "fit": int((~is_val).sum()),
@@ -1883,7 +1912,10 @@ def main():
                 _cell_proba = model.predict_proba(Xt)
                 pt = _cell_proba[:, _succ].sum(axis=1)
             elif getattr(model, "_rank_calib", None) is not None:
-                pt = _rank_probability(model.predict(Xt), model._rank_calib)
+                _ne = int(getattr(model, "_rank_ntree_end", 0) or 0)
+                pt = _rank_probability(
+                    model.predict(Xt, ntree_start=0, ntree_end=_ne)
+                    if _ne else model.predict(Xt), model._rank_calib)
             elif getattr(model, "_fm_multilabel", False):
                 pt = model.predict_proba(Xt)[:, 0]
             elif getattr(model, "_baseline_col", None):
@@ -1972,6 +2004,8 @@ def main():
                      # through to np.clip(predict(), 0, 1) and raw pairwise
                      # scores get shipped as probabilities.
                      "rank_calib": getattr(model, "_rank_calib", None),
+                     "rank_ntree_end": int(getattr(model, "_rank_ntree_end",
+                                                   0) or 0),
                      "season_means": season_means},
                     f"./model/{args.model}_{args.tag}.pkl", compress=3)
         print(f"saved: model/{args.model}_{args.tag}.pkl")
