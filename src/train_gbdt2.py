@@ -299,6 +299,56 @@ def _refit_weights(args, train):
     return w
 
 
+def _p3c2_contract(labels, names, succ, where):
+    """Frozen structured-success weighting contract for P3-C2."""
+    y = np.asarray(labels, dtype=np.int64)
+    names = list(names)
+    success = sorted(int(x) for x in succ)
+    if len(names) != 12 or success != [9, 10, 11]:
+        raise ValueError(
+            f"P3-C2 taxonomy contract failed at {where}: "
+            f"classes={len(names)}, success={success}")
+    if y.ndim != 1 or len(y) == 0 or y.min() < 0 or y.max() >= 12:
+        raise ValueError(f"P3-C2 invalid labels at {where}")
+    counts = np.bincount(y, minlength=12).astype(np.int64)
+    if counts[9] <= 0 or counts[10] <= 0:
+        raise ValueError(f"P3-C2 cells 9/10 must be nonempty at {where}")
+    weights = np.ones(12, dtype=np.float64)
+    structured_n = float(counts[9] + counts[10])
+    weights[9] = structured_n / (2.0 * float(counts[9]))
+    weights[10] = structured_n / (2.0 * float(counts[10]))
+    # Pre-registered safety gates. Never clip or repair a rejected vector.
+    if float(weights.max()) > 5.0 or float(weights.min()) < 0.2:
+        raise ValueError(
+            f"P3-C2 unsafe weights at {where}: min={weights.min():.9f}, "
+            f"max={weights.max():.9f}")
+    if weights[11] != 1.0 or not np.array_equal(weights[:9], np.ones(9)):
+        raise AssertionError("P3-C2 changed residual/failure weights")
+    raw_mass = float(counts[9] + counts[10] + counts[11])
+    weighted_mass = float(np.dot(counts[[9, 10, 11]],
+                                 weights[[9, 10, 11]]))
+    mass_error = abs(weighted_mass - raw_mass)
+    if mass_error > 1e-9:
+        raise ValueError(
+            f"P3-C2 mass preservation failed at {where}: {mass_error:.3e}")
+    rec = {
+        "where": where,
+        "counts": counts.tolist(),
+        "weights": weights.tolist(),
+        "success_cells": success,
+        "balanced_cells": [9, 10],
+        "residual_cells": [11],
+        "raw_success_mass": raw_mass,
+        "weighted_success_mass": weighted_mass,
+        "mass_error": mass_error,
+    }
+    print(f"P3-C2 {where}: n9={counts[9]:,} n10={counts[10]:,} "
+          f"n11={counts[11]:,} | w9={weights[9]:.8f} "
+          f"w10={weights[10]:.8f} w11={weights[11]:.1f} | "
+          f"mass_error={mass_error:.3e}")
+    return rec
+
+
 def _sample_weights(args, train, is_val, features):
     """표본 가중치 — 피처를 늘리지 않고 손실만 재배분한다.
 
@@ -535,19 +585,38 @@ def run_cat(args, train, features, is_val, train_dep=None):
             min_share=args.fm_min_share, fit_mask=(~is_val).to_numpy(),
             legacy_shift=args.fm_legacy_shift,
             noise_rate=args.fm_noise_rate)
+        _p3_select = None
+        if args.p3c2_balanced:
+            if w_tr is not None:
+                raise ValueError(
+                    "P3-C2 refuses simultaneous sample weights; its effective "
+                    "class mass would no longer match the pre-registration")
+            _p3_select = _p3c2_contract(
+                code[~is_val], names, succ, "selection")
         tr = Pool(train.loc[~is_val, features], code[~is_val],
                   cat_features=CAT_COLS, weight=w_tr)
         va = Pool(train.loc[is_val, features], code[is_val],
                   cat_features=CAT_COLS)
+        _select_cell_params = _cell_params(args)
+        if _p3_select is not None:
+            _select_cell_params["class_weights"] = _p3_select["weights"]
         clf = CatBoostClassifier(
             iterations=args.iters, learning_rate=args.lr, depth=args.depth,
             l2_leaf_reg=args.l2, border_count=args.border_count,
             task_type=args.device, devices="0", loss_function="MultiClass",
             classes_count=len(names), early_stopping_rounds=args.es,
-            random_seed=args.seed, verbose=200, **_cell_params(args))
+            random_seed=args.seed, verbose=200, **_select_cell_params)
         clf.fit(tr, eval_set=va)
+        if (args.p3c2_balanced
+                and [int(x) for x in clf.classes_.tolist()] != list(range(12))):
+            raise RuntimeError(f"P3-C2 class order drift: {clf.classes_.tolist()}")
         _snap("cell select", clf)
         cell_proba = clf.predict_proba(train.loc[is_val, features])
+        _cell_weighted_val_proba = None
+        if _p3_select is not None:
+            _cell_weighted_val_proba = cell_proba.copy()
+            cell_proba = fpipe.deweight_multiclass(
+                cell_proba, _p3_select["weights"], list(range(12)))
         p = fm.success_prob(cell_proba, succ)
         best_iter = clf.get_best_iteration()
         if args.d12_base_preds:
@@ -571,6 +640,21 @@ def run_cat(args, train, features, is_val, train_dep=None):
                                            ntree_start=0, ntree_end=best_iter)
             p = fm.success_prob(cell_proba, succ)
         clf._fm_success = sorted(succ)      # 추론에서 성공 셀을 알아야 한다
+        if _p3_select is not None:
+            clf._p3c2_meta = {
+                "analytic_deweight": True,
+                "class_weights": _p3_select["weights"],
+                "classes_order": list(range(12)),
+                "fm_success": [9, 10, 11],
+                "balanced_cells": [9, 10],
+                "residual_cells": [11],
+                "selection_counts": _p3_select["counts"],
+                "selection_weights": _p3_select["weights"],
+                "selection_mass_error": _p3_select["mass_error"],
+                "refit_counts": None,
+                "refit_weights": _p3_select["weights"],
+                "refit_mass_error": _p3_select["mass_error"],
+            }
         if args.dump_cell_proba:
             # 성공 셀을 합친 스칼라만 저장하면 14개 실패 구성의 정보가 사라진다.
             # 검증 모델의 전체 분포를 별도 산출물로 남겨 시간 전이 메타모델을
@@ -582,6 +666,8 @@ def run_cat(args, train, features, is_val, train_dep=None):
                 proba=cell_proba.astype(np.float32),
                 success=np.array(sorted(succ), dtype=np.int16),
                 names=np.array(names),
+                **({"weighted_proba": _cell_weighted_val_proba.astype(np.float32)}
+                   if _cell_weighted_val_proba is not None else {}),
             )
         if args.no_refit:
             return clf, np.clip(p, 0.0, 1.0), best_iter
@@ -593,18 +679,48 @@ def run_cat(args, train, features, is_val, train_dep=None):
             train_dep, modes=_fm_modes, verbose=False, context=args.fm_context,
             min_share=args.fm_min_share, legacy_shift=args.fm_legacy_shift,
             noise_rate=args.fm_noise_rate)
+        _refit_row_weights = _refit_weights(args, train_dep)
+        _p3_refit = None
+        if args.p3c2_balanced:
+            if _refit_row_weights is not None:
+                raise ValueError(
+                    "P3-C2 refuses simultaneous refit row weights; its "
+                    "effective class mass would change")
+            _p3_refit = _p3c2_contract(rcode, rnames, rsucc, "refit")
         full = Pool(train_dep[features], rcode, cat_features=CAT_COLS,
-                    weight=_refit_weights(args, train_dep))
+                    weight=_refit_row_weights)
+        _refit_cell_params = _cell_params(args)
+        if _p3_refit is not None:
+            _refit_cell_params["class_weights"] = _p3_refit["weights"]
         final = CatBoostClassifier(
             iterations=_refit_trees(best_iter, args.refit_mult),
             learning_rate=args.lr, depth=args.depth, l2_leaf_reg=args.l2,
             border_count=args.border_count, task_type=args.device, devices="0",
             loss_function="MultiClass", classes_count=len(rnames),
-            random_seed=args.seed, verbose=0, **_cell_params(args))
+            random_seed=args.seed, verbose=0, **_refit_cell_params)
         final.fit(full)
+        if (args.p3c2_balanced
+                and [int(x) for x in final.classes_.tolist()] != list(range(12))):
+            raise RuntimeError(f"P3-C2 refit class order drift: "
+                               f"{final.classes_.tolist()}")
         _snap("cell refit", final)
         final._fm_success = sorted(rsucc)
         final._fm_names = rnames
+        if _p3_refit is not None:
+            final._p3c2_meta = {
+                "analytic_deweight": True,
+                "class_weights": _p3_refit["weights"],
+                "classes_order": list(range(12)),
+                "fm_success": [9, 10, 11],
+                "balanced_cells": [9, 10],
+                "residual_cells": [11],
+                "selection_counts": _p3_select["counts"],
+                "selection_weights": _p3_select["weights"],
+                "selection_mass_error": _p3_select["mass_error"],
+                "refit_counts": _p3_refit["counts"],
+                "refit_weights": _p3_refit["weights"],
+                "refit_mass_error": _p3_refit["mass_error"],
+            }
         return final, np.clip(p, 0.0, 1.0), best_iter
 
     # E141b: **다중라벨** (MultiLogloss). 셀 다중분류가 심플렉스(합=1)라면
@@ -1690,6 +1806,11 @@ def main():
                     help="E124: (성공,실투,볼,반대) 셀 다중분류로 학습하고 "
                          "P(성공)=성공 셀 합으로 복원. 출력 기하가 심플렉스로 "
                          "바뀌어 형제 CatBoost 와 불일치(rms)가 커진다")
+    ap.add_argument("--p3c2-balanced", action="store_true",
+                    help="P3-C2: balance only structured success cells 9/10, "
+                         "leave residual 11 and every failure cell at weight "
+                         "one, then analytically deweight at inference. See "
+                         "docs/P3C2_PREREGISTRATION_20260815.md.")
     ap.add_argument("--dump-cell-proba", action="store_true",
                     help="failmode-cells 검증/test의 전체 클래스 확률을 저장. "
                          "학습이나 저장 모델은 바꾸지 않는 분석 전용 출력")
@@ -1847,6 +1968,14 @@ def main():
     ap.add_argument("--no-refit", action="store_true",
                     help="검증만 하고 전체 재학습 생략 (실험용)")
     args = ap.parse_args()
+
+    if args.p3c2_balanced:
+        if not args.failmode_cells:
+            raise ValueError("--p3c2-balanced requires --failmode-cells")
+        if args.fm_multilabel or args.d12_base_preds or args.common_budget:
+            raise ValueError(
+                "P3-C2 is a single-change cell-CE experiment and cannot be "
+                "combined with multilabel, D12 or common-budget")
 
     if args.p1:
         args.te_fit_prior = True
@@ -2341,8 +2470,15 @@ def main():
             # rms 0.37 로 나온 원인). 검증 경로처럼 성공 셀을 합산해야 한다.
             _succ = getattr(model, "_fm_success", None)
             _cell_proba = None
+            _cell_weighted_proba = None
             if _succ is not None:
                 _cell_proba = model.predict_proba(Xt)
+                _p3_meta = getattr(model, "_p3c2_meta", None)
+                if _p3_meta is not None:
+                    _cell_weighted_proba = _cell_proba.copy()
+                    _cell_proba = fpipe.deweight_multiclass(
+                        _cell_proba, _p3_meta["class_weights"],
+                        _p3_meta["classes_order"])
                 pt = _cell_proba[:, _succ].sum(axis=1)
             elif getattr(model, "_rank_calib", None) is not None:
                 _ne = int(getattr(model, "_rank_ntree_end", 0) or 0)
@@ -2393,6 +2529,9 @@ def main():
             if args.dump_cell_proba and _cell_proba is not None:
                 _test_payload["cell_proba"] = _cell_proba.astype(np.float32)
                 _test_payload["cell_success"] = np.asarray(_succ, dtype=np.int16)
+                if _cell_weighted_proba is not None:
+                    _test_payload["cell_proba_weighted"] = \
+                        _cell_weighted_proba.astype(np.float32)
             np.savez_compressed(f"./out/{args.model}_{args.tag}_test_preds.npz",
                                 **_test_payload)
 
@@ -2425,7 +2564,12 @@ def main():
         # model was trained on features it produced, so inference has to rebuild
         # them the same way. Storing the selection artifact would give the
         # submission a shrink prior one season staler than its own training set.
-        joblib.dump({"model": model, "features": features, "cat_cols": CAT_COLS,
+        _p3_meta = getattr(model, "_p3c2_meta", None)
+        _member_lineage = (dict(_pack_lineage)
+                           if isinstance(_pack_lineage, dict) else _pack_lineage)
+        if _p3_meta is not None and isinstance(_member_lineage, dict):
+            _member_lineage["p3c2"] = _p3_meta
+        _pack = {"model": model, "features": features, "cat_cols": CAT_COLS,
                      "effective_params": dict(_PARAMS),
                      "best_iteration": best_iter, "val_bss": score,
                      "fpipe": art_dep, "resid_col": args.resid_col,
@@ -2451,8 +2595,20 @@ def main():
                      # fit era both ends, val/test season, ordered feature
                      # hash, feat_k and the training-relevant flags. Compared
                      # across members by tools/member_fingerprint.py.
-                     "lineage": _pack_lineage},
-                    f"./model/{args.model}_{args.tag}.pkl", compress=3)
+                     "lineage": _member_lineage}
+        if _p3_meta is not None:
+            _pack.update({
+                "class_weights": _p3_meta["class_weights"],
+                "classes_order": _p3_meta["classes_order"],
+                "balanced_cells": _p3_meta["balanced_cells"],
+                "residual_cells": _p3_meta["residual_cells"],
+                "analytic_deweight": True,
+                "selection_counts": _p3_meta["selection_counts"],
+                "selection_weights": _p3_meta["selection_weights"],
+                "refit_counts": _p3_meta["refit_counts"],
+                "refit_weights": _p3_meta["refit_weights"],
+            })
+        joblib.dump(_pack, f"./model/{args.model}_{args.tag}.pkl", compress=3)
         print(f"saved: model/{args.model}_{args.tag}.pkl")
         _lineage_seeds[str(_sd)] = {
             "tag": args.tag,
@@ -2465,6 +2621,7 @@ def main():
             "val_target_mean": round(float(np.mean(y_va)), 6),
             "test_bss_raw": (round(locals().get("test_raw"), 4)
                              if "test_raw" in locals() else None),
+            "p3c2": _p3_meta,
         }
 
     try:

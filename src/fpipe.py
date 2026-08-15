@@ -543,6 +543,33 @@ def _rank_probability(raw, calib):
     return 1.0 / (1.0 + np.exp(-np.clip(a + b * z, -30, 30)))
 
 
+def deweight_multiclass(proba, class_weights, classes_order=None):
+    """Undo a class-weighted softmax and restore a probability simplex."""
+    q = np.asarray(proba, dtype=np.float64)
+    w = np.asarray(class_weights, dtype=np.float64)
+    if q.ndim != 2 or w.ndim != 1 or q.shape[1] != len(w):
+        raise ValueError(
+            f"analytic deweight shape mismatch: proba={q.shape}, weights={w.shape}")
+    if classes_order is not None:
+        order = np.asarray(classes_order)
+        if order.ndim != 1 or len(order) != len(w):
+            raise ValueError("analytic deweight classes_order length mismatch")
+    if not np.isfinite(q).all() or not np.isfinite(w).all() or (w <= 0).any():
+        raise ValueError(
+            "analytic deweight requires finite probabilities and positive weights")
+    # Preserve the incumbent path bit-for-bit when the correction is identity.
+    if np.array_equal(w, np.ones_like(w)):
+        return q
+    z = q / w[None, :]
+    den = z.sum(axis=1, keepdims=True)
+    if not np.isfinite(den).all() or (den <= 0).any():
+        raise ValueError("analytic deweight produced an invalid normaliser")
+    p = z / den
+    if not np.isfinite(p).all() or (p < 0).any() or (p > 1).any():
+        raise ValueError("analytic deweight produced invalid probabilities")
+    return p
+
+
 def predict(pack, test):
     """아티팩트 하나로 예측까지 — **pack 종류를 명시적으로 분기한다**.
 
@@ -610,6 +637,26 @@ def predict(pack, test):
     if pack.get("fm_success"):
         # E124: 실패모드 셀 다중분류. P(성공) = 성공 비트를 가진 셀들의 합.
         # 셀에 타깃 비트를 넣었으므로 이 합산은 근사가 아니라 정확하다.
+        if pack.get("analytic_deweight"):
+            weights = pack.get("class_weights")
+            order = pack.get("classes_order")
+            if weights is None or order is None:
+                raise ValueError(
+                    "fpipe.predict: analytic_deweight pack lacks class_weights "
+                    "or classes_order")
+            model_order = [int(x) for x in np.asarray(model.classes_).tolist()]
+            pack_order = [int(x) for x in order]
+            if model_order != pack_order:
+                raise ValueError(
+                    f"fpipe.predict: model classes {model_order} != pack order "
+                    f"{pack_order}")
+            if pack_order != list(range(len(pack_order))):
+                raise ValueError(
+                    "fpipe.predict: P3-C2 requires positional classes 0..K-1")
+            if [int(x) for x in pack["fm_success"]] != [9, 10, 11]:
+                raise ValueError(
+                    "fpipe.predict: P3-C2 success set must remain [9,10,11]")
+            proba = deweight_multiclass(proba, weights, order)
         return proba[:, pack["fm_success"]].sum(axis=1)
     if pack.get("fm_multilabel"):
         # MultiLogloss over [control_success, middle, ball, reverse]: four
