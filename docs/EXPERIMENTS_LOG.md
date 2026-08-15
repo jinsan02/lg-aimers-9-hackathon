@@ -1292,3 +1292,9 @@ scored `1088.4373257989` (32 s) and the `-0.010` probe scored
 less harmful. The pre-registered quadratic gives second difference
 `-80.4926571357`, optimum `delta=+0.002515795361`, expected gain `+2.547281`
 and expected score `1110.980630`. No other model, weight or constant changed.
+
+The final `delta=+0.002515795361` package then scored **`1110.9806302398`** in
+30 seconds, a gain of **`+2.5472812110`** over B1S8. The observed score matches
+the quadratic forecast within approximately `6.4e-11`, confirming negligible
+clipping at this scale and exact recovery of the one-dimensional Brier optimum.
+This is now the champion; no further global-SHIFT probes are warranted.

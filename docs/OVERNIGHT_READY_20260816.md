@@ -57,6 +57,12 @@ shift, but the asymmetric losses identify a small positive optimum. The optimum
 is inside the pre-registered +/-0.02 bound. A final script-only package is built
 with the 12-decimal fixed delta and must be fully re-audited before submission.
 
+The final package was submitted by the user and scored **`1110.9806302398`** in
+30 seconds. This differs from the fitted prediction by only about `6.4e-11` and
+improves B1S8 by **`+2.5472812110`**. E-LB1 is the new champion and the global
+SHIFT axis is closed at its exact optimum; do not spend submissions probing
+nearby shifts.
+
 ## GSK2 result
 
 GSK2 is **HOLD**, not ready for submission: six-seed fixed-core mean +3.141,

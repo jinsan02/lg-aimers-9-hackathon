@@ -8,17 +8,20 @@ Codex
 
 ## Next Agent
 
-User in the morning — submit only the two pre-audited E-LB1 probes if desired;
-then give both official scores to Codex. Claude/team review is requested for the
-GSK2 HOLD before any model promotion.
+Codex continues until 09:00 KST — finish GSK3, then review remaining PARK/HOLD
+axes. The user has completed E-LB1 submission; no further submission is allowed
+without a new explicit request.
 
 ## Status
 
-`IDLE` — overnight queue complete. GSK2 finished **HOLD** (core mean +3.141,
+`RUNNING` — GSK3 independent historical transfer confirmation is running on
+`desktop-5070` under SYSTEM task `AimersGSK3`; no other GPU work. E-LB1 final
+was submitted by the user and scored **1110.9806302398**, exactly matching the
+quadratic forecast and becoming the new champion (+2.547281211 over B1S8).
+GSK2 finished **HOLD** (core mean +3.141,
 t=4.168, ensemble +3.108, but F -3.126 violates the frozen gate); no extension
-or model submission. E-LB1 +/-0.010 probe ZIPs are built and fully audited, but
-not submitted. `desktop-5070` is idle (GPU 736 MiB / 1%), its finished scheduled
-task is deleted. `desktop-4070` and `hsu-server` remain offline. Morning details
+or model submission. The two E-LB1 probes and final were submitted by the user;
+the final is the champion. `desktop-4070` and `hsu-server` remain offline. Details
 and exact hashes are in [docs/OVERNIGHT_READY_20260816.md](docs/OVERNIGHT_READY_20260816.md).
 `.deployed_commit` is stamped and, from 2026-08-15, every deploy also appends to
 `.deploy_history` — the single-line stamp had been overwritten by a later
