@@ -811,6 +811,19 @@ def run_cat(args, train, features, is_val, train_dep=None):
     else:
         p = model.predict_proba(train.loc[is_val, features])[:, 1]
     best_iter = model.get_best_iteration()
+    if args.common_budget:
+        # P3-B: every seed's deployment refit is scaled from ONE pre-registered
+        # budget instead of from its own early-stopping pick. The selection fit
+        # still runs and still early-stops -- its pick is kept only as a
+        # diagnostic, printed below -- because the hypothesis is that the pick
+        # is lottery, and to show that we have to see what the lottery drew.
+        # The budget is fixed in docs/P3B_PREREGISTRATION_20260815.md and is
+        # NOT recomputed from this session's picks.
+        print(f"P3-B: early stopping picked {best_iter}; the pre-registered "
+              f"common budget is {args.common_budget} "
+              f"(diff {args.common_budget - best_iter:+d}). Using the budget.",
+              flush=True)
+        best_iter = int(args.common_budget)
     if args.no_refit:
         return model, p, best_iter
 
@@ -1690,6 +1703,15 @@ def main():
                          "(default ./out/rank_meta_<tag>.json)")
     ap.add_argument("--rank-group-size", type=int, default=64,
                     help="PairLogitPairwise 학습 블록 크기. row_id 시간순 고정 블록")
+    ap.add_argument("--common-budget", type=int, default=0,
+                    help="P3-B: scale the deployment refit from this fixed "
+                         "selection budget for every seed instead of from each "
+                         "seed's own early-stopping pick. The pick is still "
+                         "made and printed as a diagnostic. The value is "
+                         "pre-registered (803, the median of B1J6_base's "
+                         "val2023 stopping points) and must not be recomputed "
+                         "from the current session. See "
+                         "docs/P3B_PREREGISTRATION_20260815.md.")
     ap.add_argument("--d12-base-preds", default="",
                     help="D12: path to the FIXED base predictions npz for the "
                          "selection season. When set (with --failmode-cells), "
