@@ -12,14 +12,16 @@ Claude
 
 ## Status
 
-`IDLE` — no GPU job running, and none was run today. `desktop-5070` free;
-`desktop-4070` and `hsu-server` offline. Last updated 2026-08-15 03:40.
-`.deployed_commit` on the 5070 is `b4024c41`; `src/` is identical to it at HEAD.
+`IDLE` — no GPU job running. `desktop-5070` free; `desktop-4070` and
+`hsu-server` offline. Last updated 2026-08-15 14:50.
+`.deployed_commit` on the 5070 matches HEAD (redeploy after every src change —
+five happened during the rank night).
 
 Champion is **B1S8, LB 1108.4333490288, rank #34** (`submissions/b1s8_20260813.zip`,
 sha256 `c2771bfdbbd9d81f9e43632d57fea5befeb16ff59478af06fb86114a4c6e7332`).
-Unchanged — nothing has cleared the bar since. Ledger 691 rows (the season-transfer
-map trains nothing, so it adds none), SETTLED 141 FLAG lines.
+Unchanged — nothing has cleared the bar since. Ledger 692 rows (only `ML2_s3`
+was added; the rank runs never reached a ledger write and the CPU maps train
+nothing), SETTLED 147 FLAG lines.
 
 ---
 
