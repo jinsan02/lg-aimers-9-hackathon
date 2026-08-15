@@ -12,13 +12,24 @@ Claude
 
 ## Status
 
-`RUNNING` — `desktop-5070` is fitting **RK16S3B stage 1**, the one permitted
-re-fit of the RANK16 scout, under the worker/supervisor termination contract
-(`AimersRK16S3B1` + `AimersRK16S3B1SUP`, run id `20260815b`). `desktop-4070` and
-`hsu-server` offline. `.deployed_commit` on the 5070 is stamped and, from
-2026-08-15, every deploy also appends to `.deploy_history` — the single-line
-stamp had been overwritten by a later deploy, which is how the first scout's
-source commit was lost.
+`IDLE` — no GPU job. `desktop-5070` has 0 Aimers scheduled tasks, 0 python
+processes, GPU 695 MiB / 1%. `desktop-4070` and `hsu-server` offline.
+`.deployed_commit` is stamped and, from 2026-08-15, every deploy also appends to
+`.deploy_history` — the single-line stamp had been overwritten by a later
+deploy, which is how the first RANK16 scout's source commit was lost.
+
+**RANK16 is closed, FAIL on performance.** Seed-3 gate on the judging surface,
+all three members on the same host with identical `row_id` and target arrays:
+base 865.50, cell 881.02, **rank 28.73**; `CONTROL_CORE 888.81` vs
+`RANK_CORE 669.08` = **−219.73**. Resolution 0.000364 against base's 0.002174.
+Stages 2 and 25 were not run and the 6-seed extension is cancelled. Artifacts and
+the gate output are preserved with sha256 under `out/scout_recovered/`. Two
+claims were narrowed in the closure audit — see the `RANK16 closure audit` entry
+in `docs/SETTLED.md`: the GPU early-stopping corruption is a **3/3 reproduction
+on the RANK16 production stage-1 path with fixed-length two-pass as a working
+avoidance route**, *not* a general property of the library (earlier sessions
+recorded healthy positive controls on an ES path), and the synthetic 40k/60k OOM
+was an unrepresentative control excluded from the performance verdict.
 
 Champion is **B1S8, LB 1108.4333490288, rank #34** (`submissions/b1s8_20260813.zip`,
 sha256 `c2771bfdbbd9d81f9e43632d57fea5befeb16ff59478af06fb86114a4c6e7332`).

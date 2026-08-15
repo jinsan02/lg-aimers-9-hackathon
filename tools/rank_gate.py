@@ -124,14 +124,18 @@ def main():
     print(f"  fixed-core delta >= +5               {delta >= 5} ({delta:+.2f})")
     print(f"  RMS >= 0.003 (preferred)             {rms >= 0.003} ({rms:.6f})")
 
+    # ASCII only. The em dashes below used to crash this line with
+    # UnicodeEncodeError on a cp949 console -- after every number had printed,
+    # so the run looked complete and the one line that states the verdict was
+    # the only thing missing. Measured 2026-08-15 on the RANK16 gate.
     if not ok_out or standalone <= 0 or bias >= 0.03:
-        v = "FAIL — broken artifact or unstable calibration"
+        v = "FAIL -- broken artifact or unstable calibration"
     elif delta <= 0:
-        v = "FAIL — fixed-weight replacement does not help"
+        v = "FAIL -- fixed-weight replacement does not help"
     elif delta >= 5:
-        v = "PASS — proceed to 6 paired seeds, group16 fixed, nothing else changed"
+        v = "PASS -- proceed to 6 paired seeds, group16 fixed, nothing else changed"
     else:
-        v = f"HOLD — {delta:+.2f} is inside (0, +5); no multiseed, no rescue"
+        v = f"HOLD -- {delta:+.2f} is inside (0, +5); no multiseed, no rescue"
     print(f"\nVERDICT: {v}")
 
 
