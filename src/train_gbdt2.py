@@ -507,28 +507,61 @@ def run_cat(args, train, features, is_val, train_dep=None):
     # 한 트리가 성공/실투/볼/반대 4개를 동시에 설명해야 하므로 분할 기준이
     # 이진 모델과 계통적으로 달라진다. P(성공) 은 0번 헤드를 그대로 쓴다.
     if args.fm_multilabel:
+        # V2, 2026-08-15. The original path had two defects that made its
+        # numbers unusable, both fixed here and neither swept:
+        #
+        #  * it called `_pitch_labels(train)` on the whole frame, so the last
+        #    fit rows recovered their label from the validation season's first
+        #    pitch. `build_cells` has taken a `fit_mask` since 2026-08-13; this
+        #    path never did. Measured on the judging surface the leak touches
+        #    113 rows -- small, but it is a leak and it is free to remove.
+        #  * unrecoverable auxiliary labels were passed through
+        #    `np.nan_to_num(..., 0)`, which asserts "this failure mode did not
+        #    happen" for a row where it is simply unknown. MultiLogloss has no
+        #    per-head mask, so the pre-registered alternative is COMPLETE-CASE:
+        #    a row trains only when every auxiliary label is observed. On the
+        #    judging surface that keeps 99.849% of rows and drops 1,691.
+        #
+        # The success head is head 0 and is exact on every row either way --
+        # it is read from the target column, not recovered by differencing.
         import failmode as fm
-        lab = fm._pitch_labels(train)
+        _fitm = (~is_val).to_numpy()
+        lab = pd.concat([fm._pitch_labels(train[~is_val]),
+                         fm._pitch_labels(train[is_val])]).reindex(train.index)
+        known = pd.Series(True, index=train.index)
+        for _m in fm.MODES:
+            known &= lab[_m].notna()
+        known_np = known.to_numpy()
         Y = np.column_stack([train[TARGET].to_numpy(np.float32)]
-                            + [np.nan_to_num(lab[m].to_numpy(np.float32),
-                                             nan=0.0) for m in fm.MODES])
-        print(f"다중라벨 {Y.shape} (성공 + 실패모드 {len(fm.MODES)}개)")
-        tr = Pool(train.loc[~is_val, features], Y[(~is_val).to_numpy()],
-                  cat_features=CAT_COLS)
-        va = Pool(train.loc[is_val, features], Y[is_val.to_numpy()],
-                  cat_features=CAT_COLS)
+                            + [lab[m].to_numpy(np.float32) for m in fm.MODES])
+        print(f"다중라벨 {Y.shape} (성공 + 실패모드 {len(fm.MODES)}개) | "
+              f"complete-case {100 * known.mean():.3f}% "
+              f"(drop {int((~known).sum()):,} rows: fit "
+              f"{int((~known_np & _fitm).sum()):,}, val "
+              f"{int((~known_np & ~_fitm).sum()):,})", flush=True)
+        if not np.isfinite(Y[known_np]).all():
+            raise SystemExit("multilabel: complete-case rows still hold NaN")
+        _trm, _vam = _fitm & known_np, (~_fitm) & known_np
+        tr = Pool(train.loc[_trm, features], Y[_trm], cat_features=CAT_COLS)
+        va = Pool(train.loc[_vam, features], Y[_vam], cat_features=CAT_COLS)
         clf = CatBoostClassifier(
             iterations=args.iters, learning_rate=args.lr, depth=args.depth,
             l2_leaf_reg=args.l2, border_count=args.border_count,
             task_type=args.device, devices="0", loss_function="MultiLogloss",
             early_stopping_rounds=args.es, random_seed=args.seed, verbose=200)
         clf.fit(tr, eval_set=va)
+        # Scored on **every** validation row, including the ones held out of
+        # training -- the comparison against base and cell has to be on the
+        # same rows or the delta is measuring a different denominator.
         p = clf.predict_proba(train.loc[is_val, features])[:, 0]
         best_iter = clf.get_best_iteration()
         clf._fm_multilabel = True
+        _snap("multilabel select", clf)
         if args.no_refit:
             return clf, np.clip(p, 0.0, 1.0), best_iter
-        full = Pool(train[features], Y, cat_features=CAT_COLS)
+        _src = train_dep if train_dep is not None else train
+        full = Pool(_src.loc[known_np, features], Y[known_np],
+                    cat_features=CAT_COLS)
         final = CatBoostClassifier(
             iterations=_refit_trees(best_iter, args.refit_mult),
             learning_rate=args.lr, depth=args.depth, l2_leaf_reg=args.l2,
@@ -536,6 +569,7 @@ def run_cat(args, train, features, is_val, train_dep=None):
             loss_function="MultiLogloss", random_seed=args.seed, verbose=0)
         final.fit(full)
         final._fm_multilabel = True
+        _snap("multilabel refit", final)
         return final, np.clip(p, 0.0, 1.0), best_iter
 
     # E120 재검정: skill 추정치를 **baseline(로짓 오프셋)** 으로 준다.
@@ -2118,6 +2152,13 @@ def main():
                      # through to np.clip(predict(), 0, 1) and raw pairwise
                      # scores get shipped as probabilities.
                      "rank_calib": getattr(model, "_rank_calib", None),
+                     # Same trap as rank_calib: a CatBoost object drops custom
+                     # attributes through joblib, so without this key a
+                     # reloaded multilabel model looks like a plain binary one
+                     # and inference reads column 1 -- P(middle) -- as
+                     # P(success).
+                     "fm_multilabel": bool(getattr(model, "_fm_multilabel",
+                                                   False)),
                      "rank_ntree_end": int(getattr(model, "_rank_ntree_end",
                                                    0) or 0),
                      "season_means": season_means},
