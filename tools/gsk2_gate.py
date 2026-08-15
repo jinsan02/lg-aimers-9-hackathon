@@ -193,6 +193,13 @@ def main():
     masks = {"first": first, "second": ~first,
              "R": gt.to_numpy() == "R", "F": gt.to_numpy() == "F"}
     segments = {k: gain(y[m], p0[m], p1[m], den) for k, m in masks.items()}
+    # The ensemble segment sign is the gate, but retain seed-level signs so a
+    # thin league cannot look stable merely because averaging hid disagreement.
+    for i, row in enumerate(rows):
+        p0i = ((1-W_CELL)*base_test[i] + W_CELL*ctl_test[i])
+        p1i = ((1-W_CELL)*base_test[i] + W_CELL*cand_test[i])
+        row["segments"] = {k: gain(y[m], p0i[m], p1i[m], den)
+                           for k, m in masks.items()}
     rel0, res0 = murphy(y, p0); rel1, res1 = murphy(y, p1)
     verdict = gate_verdict(mean, tval, ensemble_delta, segments, ci[1])
     report = {"rows": rows, "mean": mean, "se": se, "t": tval,
