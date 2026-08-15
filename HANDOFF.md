@@ -218,17 +218,32 @@ decomposition agreed: on the judging surface a perfect recalibration of the core
 is worth **+13.3 BSS** (reliability is 0.013% of uncertainty) while +0.001 of
 absolute resolution is worth **+400**. Two supervision geometries were tried.
 
-**Ranking (PairLogitPairwise, group16) — BLOCKED, not judged.** The fitted model
-cannot be scored. Loading the saved `.cbm` and predicting **100 rows on the
-laptop's CPU** segfaults. Not OOM (22 GB free), not this machine (two hosts),
-not `task_type=GPU` alone (40k x 60 trees is fine), not the categorical set
-(121 features and 9 categoricals at 60k x 30 trees is fine) — it is scale: at
-300 trees `predict` hangs, at 1224 it segfaults. The old BANNED note blamed the
-refit; the refit was only the first thing that ever touched the model. CPU
-training is the sole remaining route at a measured **9.7 h/seed**, so ~58 h for
-the 6-seed judgement. No number was produced and no verdict is claimed on the
-hypothesis. The four-process infrastructure (`--rank-stage 1/15/2/25`), the
-handoff frame-equivalence guard and `tests/test_rank_contract.py` survive.
+**Ranking (PairLogitPairwise, group16) — BLOCKED by one corrupt artifact, not
+judged.** The stage-1 model loads cleanly, reports 1224 trees and 121 features,
+dumps 18.7 MB of valid JSON, and dies with `0xC0000005` on a **one-row**
+predict. **The configuration is fully exonerated** — every parameter was
+reproduced fresh at the failing scale and all of them score in 0.0s:
+
+```
+(60k,1200) 5,067,284B   (870k,300) 1,277,572B   (870k,1200) 5,067,268B
+300-tree matrix: full254 / border32 / ctr1 / ctr1_b32 / nocat   all OK
+early stopping itself: iters3000+es500+eval_set -> 1476 trees, 6,281,140B  OK
+plus l2_leaf_reg=10 on that path -> 1889 trees, 8,033,988B                 OK
+```
+
+After the last arm **no parameter separates the broken artifact from a working
+one.** Ruled out: OOM (one row kills it), rows, trees, model size,
+`border_count`, CTRs and one-hot (both dump `cat 0, ctrs 0, one_hot 0` — a
+groupwise loss leaves the applier 112 float features), the hardware, and
+CatBoost 1.2.10. What is left is unique to that run: after `save_model` returned
+it spun on two threads for **8h36m** and was force-killed, and three earlier
+attempts on the same path aborted with exit 255 and no traceback. The mechanism
+needs a debugger; it is **not** predictable from configuration, which is exactly
+why the defence is per-artifact: fixed-length fitting off the early-stopping
+path, `_assert_scoreable()`, and **save → load in a new process → predict one
+row** at every consumer stage. That last check is the only one the broken model
+ever failed. Re-running is a normal ~1.5 h/seed job now, but it is a new
+pre-registration, not a resumption.
 
 **FM_MULTILABEL_V2 — FAIL at the single-seed gate.** Both label defects repaired
 first: partition-safe recovery (113 rows) and complete-case training (99.849%

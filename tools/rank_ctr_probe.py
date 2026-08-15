@@ -73,6 +73,9 @@ ARMS = {
     "ctr1":     {"border_count": 254, "max_ctr_complexity": 1},
     "ctr1_b32": {"border_count": 32, "max_ctr_complexity": 1},
     "nocat":    {"border_count": 254, "_drop_cat": True},
+    # The last parameter separating the broken artifact from a probe model that
+    # carries the same early-stopping fingerprint and scores fine.
+    "l2_10":    {"border_count": 254, "l2_leaf_reg": 10},
 }
 
 
