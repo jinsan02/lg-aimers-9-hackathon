@@ -1,0 +1,54 @@
+H1ADD 0815 학습·검증 파일 목록
+
+이 목록은 팀원이 변경 범위와 재현 근거를 빠르게 확인하기 위한 것이다.
+대회 데이터, 모델 PKL, 예측 NPZ, 제출 ZIP은 저장소 정책과 재배포 제한에 따라
+GitHub에 올리지 않는다.
+
+1. src/fpipe.py
+   역할: h1_hand_delta 생성, 기존 delta 유지 여부, 학습·추론 동일 변환
+   최신 0815 브랜치 SHA-256:
+   85ea0766073c44bfc2b78351ac6884c688a28a4e26d85227c793893c3b4b475a
+
+2. src/train_gbdt2.py
+   역할: --feat-h1, --h1-additive 인자 처리와 CatBoost 학습
+   최신 0815 브랜치 SHA-256:
+   1ed99525146717a882938e100ca8f457324d6c414769af67d1309de23f0d3a61
+
+3. tests/test_h1_additive.py
+   역할: replacement와 additive 차이, 기존 delta 유지, 행 독립성 회귀 검증
+   최신 0815 브랜치 SHA-256:
+   e108cc8d1f3e44fd439df543cab04fde137096ddec7e2fa98315b62a82b90c70
+
+4. scripts/chain_h1add_5070.bat
+   역할: 팀원 RTX 5070의 fresh-control H1ADD 6시드 학습 명령
+   최신 0815 브랜치 SHA-256:
+   eb253e96fc168c377db5d2353eb788dad72a91461881f6788565465b7216a7a8
+
+5. tools/arm_compare.py
+   역할: base, cell, 전체 core의 대응 BSS와 신뢰구간 비교
+   최신 0815 브랜치 SHA-256:
+   8d1c539af0cfdc6d4cb6e3ae6e252c976d4ba030620a1b591ba43805e79669f0
+
+6. docs/lineage/h1add_mac_base8_0815.json
+   역할: Mac 8시드 B0/H1ADD 결과, 데이터·소스 해시, 재학습 트리 수, ZIP 검증 요약
+
+7. docs/H1ADD_0815_KO.md
+   역할: 무엇을 바꿨고 왜 로컬과 팀 GPU 결과가 달랐는지 설명하는 한국어 보고서
+
+Mac에서 실제 학습한 과거 소스 해시
+
+- 소스 묶음:
+  9b01cd8543461aeada291ec142e04033a53877cd081fb95370429b213ebdaef2
+- src/fpipe.py:
+  5a0e1e90fe442aafd4e650c7758b71fa055f9a3d2206464e0a4b304d6cb3d764
+- src/train_gbdt2.py:
+  c5f07b2e63f26c6d268b38d47e5980bde12e9a036f0ed82e694f3c4ec481e1e5
+- 학습 데이터 train.csv:
+  d2081186b458b49f60b082be480c273135833e15ba59a76d033af28bcf8763ff
+- 전체 행·타깃 순서:
+  c15588240bdc341b195f782a3ad6edcabb5fdb23705e1922c42db09608c1a9a7
+
+최종 ZIP 해시
+
+- h1add_b1s8_0814.zip:
+  d18a2896d3db642c6bd2f1532f5aa59ca50b140f9cbcab1261ed6c9a94a3439c

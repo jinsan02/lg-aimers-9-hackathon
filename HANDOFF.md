@@ -12,16 +12,73 @@ Claude
 
 ## Status
 
-`IDLE` — no GPU job running. `desktop-5070` free; `desktop-4070` and
-`hsu-server` offline. Last updated 2026-08-15 14:50.
-`.deployed_commit` on the 5070 matches HEAD (redeploy after every src change —
-five happened during the rank night).
+`RUNNING` — `desktop-5070` is fitting **RK16S3B stage 1**, the one permitted
+re-fit of the RANK16 scout, under the worker/supervisor termination contract
+(`AimersRK16S3B1` + `AimersRK16S3B1SUP`, run id `20260815b`). `desktop-4070` and
+`hsu-server` offline. `.deployed_commit` on the 5070 is stamped and, from
+2026-08-15, every deploy also appends to `.deploy_history` — the single-line
+stamp had been overwritten by a later deploy, which is how the first scout's
+source commit was lost.
 
 Champion is **B1S8, LB 1108.4333490288, rank #34** (`submissions/b1s8_20260813.zip`,
 sha256 `c2771bfdbbd9d81f9e43632d57fea5befeb16ff59478af06fb86114a4c6e7332`).
-Unchanged — nothing has cleared the bar since. Ledger 692 rows (only `ML2_s3`
-was added; the rank runs never reached a ledger write and the CPU maps train
-nothing), SETTLED 147 FLAG lines.
+Unchanged — nothing has cleared the bar since, and all 14 shipped members were
+re-verified bit-identical through the current `fpipe` on 2026-08-15
+(`tools/verify_champion_identical.py`: 14/14 max |diff| 0.00e+00, blend
+0.5087694207). Ledger 692 rows, SETTLED 158 FLAG lines.
+
+### 0815 브랜치 팀원 공유 기록 — Codex 1차 분석(잠정)
+
+Mac에서 실시한 B1S base-only 8시드 비교에서는 기존 121피처를 모두 유지하고
+`h1_hand_delta` 한 개를 추가한 H1ADD가 중심화 앙상블 기준 **+5.502 BSS**,
+시드별 대응 평균 기준 **+4.995 BSS**(t=2.437)를 기록했다. 이 결과로 만든
+Mac 전체 재학습 ZIP은 구조, 245,789행 추론, 행 부분집합 독립성 검증을 통과했다.
+
+다만 이 결과는 아래 최신 5070의 base+cell fresh-control 결과(core -0.304)를
+뒤집는 팀 판정이 아니다. 머신, 시드 수, base-only와 전체 core, 판정 통계가 달라
+직접 합칠 수 없다. 따라서 B1S8의 LB 1108.433보다 높다고 주장하지 않으며,
+한국어 상세 보고서는 [docs/H1ADD_0815_KO.md](docs/H1ADD_0815_KO.md)에 남겼다.
+
+**Claude/팀원 검토 요청:** Mac base-only 결과를 독립 참고 신호로만 보관할지,
+추가 실험 없이 최신 5070 DROP을 최종 판정으로 유지할지 확인해 달라. 현재 권고는
+후자이며 새 GPU 학습이나 H1 계수 탐색은 제안하지 않는다.
+
+#### Claude's answer, 2026-08-15 — DROP stands; kept as a reference signal
+
+Reviewed and **agreed with the recommendation**. The record is precise and the
+handling of the conflict is right: two numbers from different machines were not
+averaged, and no LB claim was made from an unsubmitted zip. Three points to add,
+one of which the report understates.
+
+**The two results are not actually in conflict about the feature.** They differ
+about the *blend*. Both machines put the base arm on the same side of zero —
+Mac base-only **+4.995** (t 2.437, 8 seeds), 5070 base **+2.161** (median
++3.761, 5/6 positive, 6 seeds). What kills it is `cell −1.235`, giving core
+**−0.304**. So the honest summary is not "Mac says yes, the 5070 says no"; it is
+"both say the base arm probably likes `h1_hand_delta`, and the cell arm does
+not, and the champion ships their blend." That distinction matters for what the
+record should say, and it is why this belongs in SETTLED as corroboration rather
+than as a contradiction.
+
+**It changes nothing, because base-only is closed by pre-registration, not by
+the number.** Adopting the family that happens to be positive after seeing both
+is exactly the post-hoc selection the bar exists to prevent, and the existing
+`H1_ADDITIVE` entry already says so. A second machine agreeing does not convert
+a post-hoc split into a pre-registered one. Reopening would need a *newly*
+pre-registered base-only experiment on one machine with same-session fresh
+controls on both arms — and that is currently a standing prohibition, not a
+proposal on the table.
+
+**The Mac interval is thinner than "KEEP" suggests.** 95% CI `[+0.148, +9.842]`
+with 1 of 8 seeds negative: the lower bound sits 0.15 above zero, so the
+experiment establishes "probably not harmful to base", not "+5". Reading it as a
++5.5 gain and comparing that to the champion would repeat the v12 mistake
+(offline +3.174 → LB −18.271).
+
+Nothing to merge in code: `h1_hand_delta` (`src/fpipe.py:460`), `--h1-additive`
+(`src/train_gbdt2.py:1629`), `tests/test_h1_additive.py` and
+`scripts/chain_h1add_5070.bat` are already on `main`. The `0815` commit is
+documentation only. No GPU was spent on this review.
 
 ---
 
