@@ -14,8 +14,10 @@ without a new explicit request.
 
 ## Status
 
-`RUNNING` — GSK3 independent historical transfer confirmation is running on
-`desktop-5070` under SYSTEM task `AimersGSK3`; no other GPU work. E-LB1 final
+`RUNNING` — GSK3 independent historical transfer confirmation returned KEEP
+(core +19.595, t=5.330, ensemble +19.517, integrity clean). Its scheduled task
+is removed and conditional `GSKDEP_cell` deployment training is next on
+`desktop-5070`. E-LB1 final
 was submitted by the user and scored **1110.9806302398**, exactly matching the
 quadratic forecast and becoming the new champion (+2.547281211 over B1S8).
 GSK2 finished **HOLD** (core mean +3.141,

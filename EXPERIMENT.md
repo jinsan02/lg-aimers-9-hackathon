@@ -525,6 +525,27 @@ FAIL 방향은 일치한다. 상세:
 [`docs/P3C2_LOCAL_REPLICATION_20260815.md`](docs/P3C2_LOCAL_REPLICATION_20260815.md).
 # 2026-08-16 overnight closeout — GSK2 and E-LB1 preparation
 
+## GSK3 historical transfer confirmation — Codex first pass: KEEP
+
+The exact GSK2 121->123 cell change was repeated with fresh base/control on
+`DESKTOP-053T952`, fit<=2021 / val2022 / untouched2023, six paired seeds. All
+18 members shared fit hash `76d7bf72e7b6480a`; candidate added only
+`skill_hat,skill_hat_vs_std`. New-process replay and subset drift were zero.
+
+Untouched-2023 fixed-core deltas were
+`[+7.753,+33.045,+23.987,+13.951,+23.482,+15.349]`: mean **+19.595**,
+SE 3.676, t **5.330**, Student-t CI **[+10.145,+29.045]**, 6/6 positive,
+ensemble **+19.517**. First/second halves were +26.869/+12.165; ensemble R/F
+were +0.785/+179.839. The frozen gate therefore returns **KEEP** and licenses
+deployment training.
+
+Risk is explicit: source-2022 deltas were all strongly negative, R was mixed by
+seed (`-0.59,+2.65,-0.90,-2.23,+5.86,+0.33`), and the very large historical
+gain is F-driven while GSK2's 2024 F delta was -3.126. The stable statement is
+that both untouched transitions improved overall (+19.52 and +3.11), not that
+F transfer is stable. Deployment and packaging proceed under the pre-written
+contract, but Codex does not decide a submission from this provisional review.
+
 ## GSK2 GENERAL_SKILL_ADD cell-only — Codex first pass (provisional): HOLD
 
 Fresh control `GSK2CTL_cell` and candidate `GSK2CAND_cell` ran in one session on
