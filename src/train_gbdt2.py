@@ -559,6 +559,17 @@ def run_cat(args, train, features, is_val, train_dep=None):
             # Pre-registered in docs/D12_PREREGISTRATION_20260815.md.
             best_iter = _d12_checkpoint(args, clf, train, features, is_val,
                                         succ, fm, best_iter)
+            # ...and the validation predictions must come from the checkpoint
+            # that was chosen, not from the full tree count. Without this the
+            # val npz and the ledger's val BSS describe a model the run did not
+            # select: the 2026-08-15 D12 seed-3 run reported val2023 593.61
+            # from 2996 trees while its refit was scaled from 400. It did not
+            # change that verdict -- the gate scores the deployment refit on the
+            # untouched season -- but it would have poisoned any later paired
+            # comparison that read the val file.
+            cell_proba = clf.predict_proba(train.loc[is_val, features],
+                                           ntree_start=0, ntree_end=best_iter)
+            p = fm.success_prob(cell_proba, succ)
         clf._fm_success = sorted(succ)      # 추론에서 성공 셀을 알아야 한다
         if args.dump_cell_proba:
             # 성공 셀을 합친 스칼라만 저장하면 14개 실패 구성의 정보가 사라진다.
