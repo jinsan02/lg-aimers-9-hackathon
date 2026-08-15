@@ -4,28 +4,58 @@ Read first: [AGENTS.md](AGENTS.md) -> [EXPERIMENT.md](EXPERIMENT.md) -> this fil
 
 ## Current Agent
 
-Claude
+Codex
 
 ## Next Agent
 
-Codex — P3-C2 implementation, see docs/P3C2_HANDOFF_TO_CODEX.md
+Claude — review Codex's P3-C2 first pass and choose the next research axis
 
 ## Status
 
-`IDLE` — no GPU job. `desktop-5070` has 0 Aimers scheduled tasks, 0 python
-processes, GPU 695 MiB / 1%. `desktop-4070` and `hsu-server` offline.
+`IDLE` — P3-C2 finished **FAIL** at the seed-3 gate; no extension and no
+submission candidate. `desktop-5070` is idle (python 0, GPU 787 MiB / 1%); the
+finished scheduled task is removed during closeout. `desktop-4070` and
+`hsu-server` remain offline.
 `.deployed_commit` is stamped and, from 2026-08-15, every deploy also appends to
 `.deploy_history` — the single-line stamp had been overwritten by a later
 deploy, which is how the first RANK16 scout's source commit was lost.
 
-**Next agent: Codex.** P3-C2 is pre-registered with its safety gate passed and
-its implementation not started — the brief is
-[docs/P3C2_HANDOFF_TO_CODEX.md](docs/P3C2_HANDOFF_TO_CODEX.md), with the frozen
-contract in [docs/P3C2_PREREGISTRATION_20260815.md](docs/P3C2_PREREGISTRATION_20260815.md).
-Weights `w9 = 0.70575412, w10 = 1.71504249, w11 = 1.0`, mass preserved exactly,
-all eight checks PASS. The predecessor P3-C stays **HOLD** (its gate fired at
-`w11 = 207.03`) and must not be re-run. **Five axes closed on 2026-08-15 with no
-submission candidate; zero GPU was spent on P3-C or P3-C2.**
+**P3-C2 completed.** The implementation follows the frozen contract in
+[docs/P3C2_PREREGISTRATION_20260815.md](docs/P3C2_PREREGISTRATION_20260815.md):
+inference success `[9,10,11]` unchanged, only cells 9/10 balanced, cell 11 and
+all failure cells weight 1, analytic deweight before the success sum. Tests
+17/17 modules passed, the dedicated contract passed 11 checks, and all 14
+champion members remained bit-identical (blend `0.5087694207`).
+
+Fresh control and candidate ran on `DESKTOP-053T952`, seed 3,
+`val2023->test2024`, with identical row_id and target arrays elementwise and
+strong matching fit/feature hashes across the two new cell members. Selection
+weights were `0.70376927/1.72687783/1`; refit weights
+`0.70778679/1.70315634/1`, both mass error 0. New-process prediction parity and
+subset/reversal/half/single-row drift were exactly 0 for both artifacts.
+
+**Untouched 2024 result:** cell `880.957 -> 878.993` (**-1.965**); fixed core
+`888.772 -> 887.550` (**-1.222**). Source 2023 core delta **-6.671**; first half
+`+8.346`, second `-10.790`, R `-0.078`, F `-9.748`. Reliability
+`0.00003310 -> 0.00003315`, resolution `0.00222055 -> 0.00221857`, RMS
+`0.0065013`, correlation `0.9902601`. The pre-registered rule says delta <= 0
+is **FAIL**, so no n=6 extension. P3-C/P3-C2 class-weight variants are closed;
+do not try cell 9-only, cell 10-only, weight/temperature/cap sweeps, or change
+the success set. Champion B1S8 remains unchanged and nothing was submitted.
+
+### Codex first pass (provisional)
+
+The weighting/deweighting algebra is functioning: candidate weighted mass moves
+cell 9/10 to `0.2373/0.2542`, and analytic correction returns them to
+`0.3367/0.1512`, close to control `0.3357/0.1516`. The failure is therefore not
+an extraction or calibration-routing bug. It changes the tree split geometry
+enough to reduce resolution, especially late-season and F, while buying no
+overall reliability. Recommendation: accept the pre-registered FAIL, do not
+extend or submit, and choose a genuinely different core-resolution axis.
+
+**Review requested from Claude:** verify the fixed-core arithmetic and the
+mechanism above, then decide the next pre-registered research axis. There is no
+live GPU work and no pending submission action.
 
 The five: RANK16 **FAIL** (−219.73), H1ADD base-only **DROP** (+0.387, CI upper
 +2.61), D12 **FAIL** (−62.96), P3-A **CLOSED** (−0.23), P3-B **DROP** (+0.278,
@@ -53,7 +83,7 @@ sha256 `c2771bfdbbd9d81f9e43632d57fea5befeb16ff59478af06fb86114a4c6e7332`).
 Unchanged — nothing has cleared the bar since, and all 14 shipped members were
 re-verified bit-identical through the current `fpipe` on 2026-08-15
 (`tools/verify_champion_identical.py`: 14/14 max |diff| 0.00e+00, blend
-0.5087694207). Ledger 706 rows, SETTLED 168 FLAG lines.
+0.5087694207). Ledger 708 rows after P3-C2 merge, SETTLED 169 FLAG lines.
 
 ### 0815 브랜치 팀원 공유 기록 — Codex 1차 분석(잠정)
 

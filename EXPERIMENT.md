@@ -11,7 +11,26 @@
 Brier Skill Score 최대화. 1차 목표 **1120대 합법 진입**. 사용자 제공 리더보드에서
 최근 확인한 최고점은 1,288.180881이며 실시간 현재값은 별도 확인 전이다.
 
-## 2026-08-15 네 축 종료 — 제출 후보 없음, 챔피언 불변
+## 2026-08-15 P3-C2 종료 — 제출 후보 없음, 챔피언 불변
+
+Success cell 9·10만 CE 질량을 균형화하고 residual cell 11은 weight 1로
+유지한 P3-C2를 fresh control과 같은 5070 세션에서 seed 3으로 판정했다.
+추론 success 집합 `[9,10,11]`, taxonomy, base, 0.45/0.55 blend는 고정했다.
+
+```
+cell       880.957 -> 878.993   delta -1.965
+fixed core 888.772 -> 887.550   delta -1.222   => FAIL
+source 2023 core delta -6.671
+first +8.346 / second -10.790 / R -0.078 / F -9.748
+```
+
+가중치와 analytic deweight는 계약대로 작동했지만 resolution이
+`0.00222055 -> 0.00221857`로 감소했다. 후반과 F에서 크게 악화됐고,
+seed-3 고정코어 delta가 0 이하이므로 사전등록대로 6시드 확장 없이
+P3-C/P3-C2 class-weight 계열 전체를 닫는다. 챔피언 14멤버는 bit-identical,
+두 artifact의 새 프로세스 예측 및 subset/reversal/half/single-row drift는 0이다.
+
+## 2026-08-15 앞선 축 종료 — 제출 후보 없음, 챔피언 불변
 
 | 축 | 판정 | 고정코어 delta | GPU |
 |---|---|---|---|
@@ -28,7 +47,8 @@ P3-A는 8시드가 RMS 0.000464로 이미 일치해 극단값을 버릴 여지�
 `refit-mult 1.5`가 그 스파이크를 1.5배 해서 골짜기에 착륙시켰다 —
 **뾰족한 체크포인트와 refit 배수는 함께 쓸 수 없다.**
 
-다음 미착수 항목은 **P3-B(base 공통 tree budget)** 이며 사전등록 전이다.
+후속 P3-B는 +0.278로 DROP, P3-C는 안전 게이트에서 HOLD, P3-C2는 위와 같이
+FAIL했다. 현재 사전등록된 GPU 후속 축은 없다.
 
 ## 2026-08-15 RANK16 — 성능 FAIL, 축 종료 (제출 없음)
 
