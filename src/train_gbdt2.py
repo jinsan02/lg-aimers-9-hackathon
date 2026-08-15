@@ -68,6 +68,22 @@ def _refit_trees(best_iter, mult):
     return max(int((best_iter + 1) * mult), 1)
 
 
+def _rmse_refit_target(args, train_dep, baseline_col=""):
+    """Build the deployment-frame target for the RMSE path.
+
+    The old branch silently refitted on the selection frame even when P1 had
+    built a larger deployment frame.  Keep all target algebra anchored to the
+    same rows that enter the final Pool.
+    """
+    y = train_dep[TARGET].astype(float).copy()
+    if baseline_col:
+        y = y - train_dep[baseline_col].astype(float).fillna(0.5)
+    if args.label_smooth > 0:
+        e = args.label_smooth
+        y = y * (1 - 2 * e) + e
+    return y
+
+
 def load(tm_feats_path="", drop_f_pre=0, drop_unstable=False,
          drop_redundant=False, keep_ids=False, league=""):
     test_cols = pd.read_csv(f"{DATA}/test.csv", encoding="utf-8-sig", nrows=0).columns
@@ -847,14 +863,10 @@ def run_cat(args, train, features, is_val, train_dep=None):
         best_iter = reg.get_best_iteration()
         if args.no_refit:
             return reg, p, best_iter
-        y_all = train[TARGET].astype(float)
-        if bl is not None:
-            y_all = y_all - bl
-        if args.label_smooth > 0:
-            e = args.label_smooth
-            y_all = y_all * (1 - 2 * e) + e
-        full = Pool(train[features], y_all, cat_features=CAT_COLS,
-                    weight=_refit_weights(args, train))
+        baseline_col = args.resid_col if bl is not None else ""
+        y_all = _rmse_refit_target(args, train_dep, baseline_col)
+        full = Pool(train_dep[features], y_all, cat_features=CAT_COLS,
+                    weight=_refit_weights(args, train_dep))
         rfp = dict(
             iterations=_refit_trees(best_iter, args.refit_mult),
             learning_rate=args.lr,
