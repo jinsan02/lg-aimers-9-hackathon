@@ -4,24 +4,39 @@ Read first: [AGENTS.md](AGENTS.md) -> [EXPERIMENT.md](EXPERIMENT.md) -> this fil
 
 ## Current Agent
 
-Claude
+Codex
 
 ## Next Agent
 
-Claude
+Claude / 팀원
 
 ## Status
 
-`IDLE` — no GPU job running. `desktop-5070` free; `desktop-4070` and
-`hsu-server` offline. Last updated 2026-08-15 14:50.
-`.deployed_commit` on the 5070 matches HEAD (redeploy after every src change —
-five happened during the rank night).
+`0815 공유 브랜치` — 새 학습 작업은 실행하지 않았다. 최신 `main`을 기준으로
+Mac H1ADD base-only 결과와 학습 파일 위치를 한국어로 정리했다. 팀 운영 상태와
+챔피언은 아래 기존 기록대로 유지한다. 마지막 갱신 2026-08-15.
 
 Champion is **B1S8, LB 1108.4333490288, rank #34** (`submissions/b1s8_20260813.zip`,
 sha256 `c2771bfdbbd9d81f9e43632d57fea5befeb16ff59478af06fb86114a4c6e7332`).
 Unchanged — nothing has cleared the bar since. Ledger 692 rows (only `ML2_s3`
 was added; the rank runs never reached a ledger write and the CPU maps train
 nothing), SETTLED 147 FLAG lines.
+
+### 0815 브랜치 팀원 공유 기록 — Codex 1차 분석(잠정)
+
+Mac에서 실시한 B1S base-only 8시드 비교에서는 기존 121피처를 모두 유지하고
+`h1_hand_delta` 한 개를 추가한 H1ADD가 중심화 앙상블 기준 **+5.502 BSS**,
+시드별 대응 평균 기준 **+4.995 BSS**(t=2.437)를 기록했다. 이 결과로 만든
+Mac 전체 재학습 ZIP은 구조, 245,789행 추론, 행 부분집합 독립성 검증을 통과했다.
+
+다만 이 결과는 아래 최신 5070의 base+cell fresh-control 결과(core -0.304)를
+뒤집는 팀 판정이 아니다. 머신, 시드 수, base-only와 전체 core, 판정 통계가 달라
+직접 합칠 수 없다. 따라서 B1S8의 LB 1108.433보다 높다고 주장하지 않으며,
+한국어 상세 보고서는 [docs/H1ADD_0815_KO.md](docs/H1ADD_0815_KO.md)에 남겼다.
+
+**Claude/팀원 검토 요청:** Mac base-only 결과를 독립 참고 신호로만 보관할지,
+추가 실험 없이 최신 5070 DROP을 최종 판정으로 유지할지 확인해 달라. 현재 권고는
+후자이며 새 GPU 학습이나 H1 계수 탐색은 제안하지 않는다.
 
 ---
 
