@@ -32,14 +32,22 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "src"))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 import feature_families as ff                                    # noqa: E402
+from invalidated import guard as _guard_invalidated              # noqa: E402
 from season_transfer_map import TARGET, bss, frames, predict     # noqa: E402
 
 W_CELL = 0.55                      # the champion's fixed blend weight
 
 # (label, base pkl, cell pkl, fit era, unseen season)
+#
+# T21 and T22 are INVALID: both pairs were fitted before 5b61fbd, when the
+# trainer removed only `season == test_season` and left every later season in
+# the pool. T21 trained on 499,032 rows of 2023-2024, T22 on 253,507 rows of
+# 2024, so neither is a "next season unseen" measurement. Only T23 survives,
+# and it survives because no season exists after 2024 -- which makes the whole
+# tool a *single boundary* instrument now, not a three-boundary one.
 PAIRS = [
-    ("T21", "cat_MV21_base.pkl", "cat_MV21_cell.pkl", 2021, 2022),
-    ("T22", "cat_MVB22_native.pkl", "cat_MVCELL22_s42.pkl", 2022, 2023),
+    ("T21", "cat_MV21_base.pkl", "cat_MV21_cell.pkl", 2021, 2022),        # INVALID
+    ("T22", "cat_MVB22_native.pkl", "cat_MVCELL22_s42.pkl", 2022, 2023),  # INVALID
     ("T23", "cat_MVN3_s3.pkl", "cat_MVCELL_s42.pkl", 2023, 2024),
 ]
 
@@ -49,6 +57,8 @@ def main():
     ap.add_argument("--out", default="out/season_transfer_core.csv")
     ap.add_argument("--repeats", type=int, default=5)
     args = ap.parse_args()
+
+    _guard_invalidated([p[i][4:-4] for p in PAIRS for i in (1, 2)])
 
     header = list(pd.read_csv(os.path.join(ROOT, "data", "test.csv"), nrows=0,
                               encoding="utf-8-sig").columns)

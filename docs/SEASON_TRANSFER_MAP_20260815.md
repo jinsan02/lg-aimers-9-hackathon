@@ -1,5 +1,41 @@
 # Season-transfer attribution map — 2026-08-15
 
+> ## ⚠ PARTIALLY RETRACTED — 2026-08-15 P0 contradiction audit
+>
+> **Two of the three boundaries in this document do not exist.** The `T21`
+> (2021→2022) and `T22` (2022→2023) pairs were fitted before `5b61fbd`
+> (2026-08-13 03:23:39), when `--test-season S` removed only `season == S` and
+> left every *later* season in the training pool. `MV21_base`/`MV21_cell`
+> trained on **499,032 rows of 2023–2024**; `MVB22_native`/`MVCELL22_s42`
+> trained on **253,507 rows of 2024**. Neither pair carried
+> `--max-train-season`. They are not next-season-unseen models, and
+> `docs/INVALIDATED.tsv` has said so since 2026-08-13 — this document was
+> written without consulting it.
+>
+> **Read nothing below as multi-boundary evidence.** Every "three boundaries",
+> "all nine (arm × boundary) cells", "stable across every boundary measured",
+> and "worst at the most recent boundary" claim is withdrawn, including the
+> per-boundary HAND table in §7 and the F-league BSS −8200 / −779 contrast.
+>
+> **What survives** is the `T23` row (`MVN3_s3,4,5` / `MVCELL_s42`) — valid
+> because no season exists after 2024 — and the `B1SMOKE` calibration in §11,
+> which is post-fix with `--max-train-season 2024` and a verified lineage of
+> `fit_max_season=2022 val=2023 test=2024`. Both are **a single 2023→2024
+> boundary**. The surviving findings (PITCHER_HISTORY / MATCHUP retention,
+> BATTER_HISTORY / GAME_STATE collapse, base–cell block Spearman +0.943, and
+> the `skill --axis hand` verdict) keep their direction but drop to
+> single-boundary strength. **No new axis may be permanently closed on that
+> alone.**
+>
+> **The champion is unaffected.** This map changed no feature and touched no
+> member of B1S8; LB 1108.4333490288 stands. Feature-priority conclusions built
+> on `T21`/`T22` are **held, not reversed** — re-deriving them needs retraining,
+> and no GPU is being spent on transfer diagnostics.
+>
+> `tools/season_transfer_map.py`, `season_transfer_core.py` and
+> `matchup_decomp.py` now call `invalidated.guard()` and **refuse** to reproduce
+> the invalid rows. See `docs/SETTLED.md`, the two `2026-08-15 P0` entries.
+
 CPU only. No GPU used, no submission artifact produced, champion unchanged
 (**B1S8, LB 1108.4333490288**).
 
@@ -21,11 +57,11 @@ deployment model on fit+val, so `cat_B1S_*.pkl` has seen every season in
 Three older runs of the same 121-feature recipe were trained with
 `--test-season`, which splits the test season out *before* the refit:
 
-| model | arm | refit era | unseen | seeds |
-|---|---|---|---|---|
-| `MV21_base` / `MV21_cell` | base / cell | ≤2021 | 2022 | 42 |
-| `MVB22_native` / `MVCELL22_s42` | base / cell | ≤2022 | 2023 | 42 |
-| `MVN3_s3,4,5` / `MVCELL_s42` | base / cell | ≤2023 | 2024 | 3,4,5 / 42 |
+| model | arm | refit era | unseen | seeds | status |
+|---|---|---|---|---|---|
+| `MV21_base` / `MV21_cell` | base / cell | ~~≤2021~~ actually ≤2024 | 2022 | 42 | **INVALID** — 499,032 rows of 2023–24 in fit |
+| `MVB22_native` / `MVCELL22_s42` | base / cell | ~~≤2022~~ actually ≤2024 | 2023 | 42 | **INVALID** — 253,507 rows of 2024 in fit |
+| `MVN3_s3,4,5` / `MVCELL_s42` | base / cell | ≤2023 | 2024 | 3,4,5 / 42 | valid — no season after 2024 |
 
 All six on the same host (`rohjinsan`). Their **feature lists are identical to
 B1S8's, name for name and in order** (asserted in code). Each was scored on

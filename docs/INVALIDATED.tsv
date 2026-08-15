@@ -9,3 +9,5 @@ PMTC21	INVALIDATED_PENDING_RERUN	2026-08-13	val2021->test2022 run: 499,032 rows 
 MV21_base	INVALIDATED_PENDING_RERUN	2026-08-13	val2021->test2022 run: 499,032 rows of 2023-2024 in training
 XCR21	INVALIDATED_PENDING_RERUN	2026-08-13	val2021->test2022 run: 499,032 rows of 2023-2024 in training
 MV21_cell	INVALIDATED_PENDING_RERUN	2026-08-13	val2021->test2022 run: 499,032 rows of 2023-2024 in training
+P0SMOKE_base	INVALIDATED_PENDING_RERUN	2026-08-15	val2022->test2023 smoke at 03:20, three minutes before the 5b61fbd fix at 03:23:39; same 253,507 rows of 2024 in training. Missed by the 08-13 sweep because it was the run that exposed the bug.
+P0SMOKE_cell	INVALIDATED_PENDING_RERUN	2026-08-15	val2022->test2023 smoke at 03:21, before the 5b61fbd fix; same 253,507 rows of 2024 in training.

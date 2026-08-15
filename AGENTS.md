@@ -40,9 +40,11 @@ score          = max(0, 100000 * (1 - brier / baseline_brier))     # higher is b
 
 | | |
 |---|---|
-| Current LB | **1,101.802** — `submissions/v11_pb_posix_0809.zip` |
+| Current LB | **1,108.4333490288** — `submissions/b1s8_20260813.zip` (B1S8), rank #34 |
+| Previous | 1,101.802 — `submissions/v11_pb_posix_0809.zip` |
 | Rank-1 | 1,198.02 |
 | Goal | reach the 1,120s by legal means |
+| Local→LB | B1S family: debiased score **+ 139.03** |
 
 ## Data
 
@@ -303,6 +305,28 @@ counterpart at the same scale over reasoning from a log.
 Corollary for any model whose scoring path is in doubt: fitting is not
 validation. Save, then load in a **new process**, then predict **one row**. The
 2026-08-15 artifact passed every in-process check and failed exactly there.
+
+### A contaminated tag is refused in code, not in a document
+
+Added 2026-08-15 after the P0 audit. `docs/INVALIDATED.tsv` listed ten runs on
+2026-08-13 whose fit partitions held later seasons, and `tools/invalidated.py`
+provided `guard()` to refuse them. Three tools called it. Two days later three
+**new** tools were written, none called it, and the whole season-transfer
+attribution map was built on four listed tags. The list was never wrong; it was
+bypassable.
+
+So: **any tool that names a tag must call `invalidated.guard()`**, and
+`tests/test_invalidated_guard.py` scans every file under `tools/` and fails a
+file that names a contaminated tag without importing the gate. When a run is
+invalidated, add it to `docs/INVALIDATED.tsv` the same day — including the run
+that *exposed* the bug, which is how `P0SMOKE_base`/`P0SMOKE_cell` were missed
+for two days.
+
+The invalidation rule itself: a run is contaminated if it predates `5b61fbd`
+(2026-08-13 03:23:39), carries no `--max-train-season`, and its fit partition
+holds a season later than its validation season. A mechanical sweep of the
+ledger under that rule returns exactly 12 rows of 692 — re-run
+`tools/ledger_temporal_sweep.py` rather than trusting a hand-maintained list.
 
 ## Environment drift
 

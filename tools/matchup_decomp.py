@@ -41,6 +41,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "src"))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 import feature_blocks as fb                                      # noqa: E402
+from invalidated import guard as _guard_invalidated              # noqa: E402
 from season_transfer_map import TARGET, bss, frames, predict     # noqa: E402
 
 GROUPS = {
@@ -58,15 +59,19 @@ RUNS = [
     ("cat_MVN3_s4.pkl", "base", 2023, 2024),
     ("cat_MVN3_s5.pkl", "base", 2023, 2024),
     ("cat_MVCELL_s42.pkl", "cell", 2023, 2024),
-    ("cat_MVB22_native.pkl", "base", 2022, 2023),
-    ("cat_MVCELL22_s42.pkl", "cell", 2022, 2023),
-    ("cat_MV21_base.pkl", "base", 2021, 2022),
-    ("cat_MV21_cell.pkl", "cell", 2021, 2022),
+    # The four below are INVALID (pre-5b61fbd fit partitions held later
+    # seasons). MATCHUP's "stable across every boundary measured" conclusion
+    # rested on them and is withdrawn; only the 2023->2024 row survives.
+    ("cat_MVB22_native.pkl", "base", 2022, 2023),   # INVALID
+    ("cat_MVCELL22_s42.pkl", "cell", 2022, 2023),   # INVALID
+    ("cat_MV21_base.pkl", "base", 2021, 2022),      # INVALID
+    ("cat_MV21_cell.pkl", "cell", 2021, 2022),      # INVALID
 ]
 REPEATS = 5
 
 
 def main():
+    _guard_invalidated([r[0][4:-4] for r in RUNS])
     header = list(pd.read_csv(os.path.join(ROOT, "data", "test.csv"), nrows=0,
                               encoding="utf-8-sig").columns)
     full = pd.read_csv(os.path.join(ROOT, "data", "train.csv"),

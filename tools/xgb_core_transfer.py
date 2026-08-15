@@ -1,5 +1,10 @@
 """Fixed-weight XGBoost diversity gate on three unseen-season transitions."""
 
+import os as _os
+import sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+from invalidated import guard as _guard_invalidated                # noqa: E402
+
 from pathlib import Path
 
 import numpy as np
@@ -198,6 +203,11 @@ def strong_v11_surface():
 
 
 def main():
+    # These runs predate 5b61fbd (2026-08-13 03:23:39): their fit
+    # partitions held later seasons, so the "next season" transitions
+    # below were never next-season transitions. Refuse rather than
+    # reproduce the numbers. See docs/INVALIDATED.tsv.
+    _guard_invalidated(['MV21_base', 'MV21_cell', 'MVB22_native', 'MVCELL22_s42', 'XCR0', 'XCR21'])
     one("2021->2022", "cat_MV21_base", "xgb_XCR21")
     one("2022->2023", "cat_MVB22_native", "xgb_XCR0")
     one("2023->2024", "cat_MVA_native", "xgb_XCR1")

@@ -78,20 +78,31 @@ sys.path.insert(0, os.path.join(ROOT, "tools"))
 import fpipe                                                     # noqa: E402
 import feature_families as ff                                    # noqa: E402
 import feature_blocks as fb                                      # noqa: E402
+from invalidated import guard as _guard_invalidated              # noqa: E402
 
 TARGET = "control_success"
 REPEATS = 5
 
 # model file, arm, fit era (last season in the refit), unseen season, seed.
 # The two in-sample seasons scored are (unseen - 2) and (unseen - 1).
+#
+# The first two rows of each arm are INVALID and are listed only so that the
+# refusal names them. They were fitted before 5b61fbd (2026-08-13 03:23:39),
+# when `--test-season S` flagged only `season == S` and left every *later*
+# season in the training pool: the fit≤2021 models trained on 499,032 rows of
+# 2023-2024, the fit≤2022 models on 253,507 rows of 2024. They are therefore
+# not "fit ≤ era, unseen next" models at all, and every conclusion this tool
+# drew from the 2021→2022 and 2022→2023 boundaries is withdrawn.
+# `docs/INVALIDATED.tsv` has held them since 2026-08-13; this tool did not
+# consult it, which is how they became evidence a second time.
 MODELS = [
-    ("cat_MV21_base.pkl",     "base", 2021, 2022, 42),
-    ("cat_MVB22_native.pkl",  "base", 2022, 2023, 42),
+    ("cat_MV21_base.pkl",     "base", 2021, 2022, 42),   # INVALID
+    ("cat_MVB22_native.pkl",  "base", 2022, 2023, 42),   # INVALID
     ("cat_MVN3_s3.pkl",       "base", 2023, 2024, 3),
     ("cat_MVN3_s4.pkl",       "base", 2023, 2024, 4),
     ("cat_MVN3_s5.pkl",       "base", 2023, 2024, 5),
-    ("cat_MV21_cell.pkl",     "cell", 2021, 2022, 42),
-    ("cat_MVCELL22_s42.pkl",  "cell", 2022, 2023, 42),
+    ("cat_MV21_cell.pkl",     "cell", 2021, 2022, 42),   # INVALID
+    ("cat_MVCELL22_s42.pkl",  "cell", 2022, 2023, 42),   # INVALID
     ("cat_MVCELL_s42.pkl",    "cell", 2023, 2024, 42),
     # Diagnostic calibration, 2026-08-15. The B1S8 recipe itself on the judging
     # surface, seed 3, 12-cell taxonomy -- the packs the MV surrogates were only
@@ -177,6 +188,10 @@ def main():
         models = [m for m in models if args.only in m[0]]
         if not models:
             raise SystemExit(f"--only {args.only!r} matched no model")
+    # The list in docs/INVALIDATED.tsv is the gate, not a note. Three judging
+    # tools already called this; this one did not, and ran the whole map over
+    # four listed tags on 2026-08-15.
+    _guard_invalidated([m[0][4:-4] for m in models])
     rows = []
     t_start = time.time()
 

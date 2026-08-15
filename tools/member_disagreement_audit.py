@@ -1,5 +1,10 @@
 """Transfer audit for base-vs-cell disagreement residual structure."""
 
+import os as _os
+import sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+from invalidated import guard as _guard_invalidated                # noqa: E402
+
 from pathlib import Path
 
 import numpy as np
@@ -126,6 +131,11 @@ def apply_arm(source, target, arm, scale):
 
 
 def main():
+    # These runs predate 5b61fbd (2026-08-13 03:23:39): their fit
+    # partitions held later seasons, so the "next season" transitions
+    # below were never next-season transitions. Refuse rather than
+    # reproduce the numbers. See docs/INVALIDATED.tsv.
+    _guard_invalidated(['MV21_base', 'MV21_cell', 'MVB22_native', 'MVCELL22_s42'])
     cols = ["season", "row_id", "game_month", "game_type", "pitcher_id",
             "batter_id", "asof_pitcher_prev5_game_middle_rate"]
     data = pd.read_csv(ROOT/"data"/"train.csv", usecols=cols)

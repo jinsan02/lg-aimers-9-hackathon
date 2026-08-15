@@ -5,6 +5,11 @@ The residual model is selected on 2022->2023 R rows, refitted on the honest
 left untouched because its 2022->2023 label regime is discontinuous.
 """
 
+import os as _os
+import sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+from invalidated import guard as _guard_invalidated                # noqa: E402
+
 from pathlib import Path
 
 import numpy as np
@@ -111,6 +116,11 @@ def gains(frame, y, p0, adj, weight):
 
 
 def main():
+    # These runs predate 5b61fbd (2026-08-13 03:23:39): their fit
+    # partitions held later seasons, so the "next season" transitions
+    # below were never next-season transitions. Refuse rather than
+    # reproduce the numbers. See docs/INVALIDATED.tsv.
+    _guard_invalidated(['MV21_base', 'MV21_cell', 'MVB22_native', 'MVCELL22_s42'])
     input_cols = list(pd.read_csv(ROOT/"data"/"test.csv", nrows=0).columns)
     features = [c for c in input_cols if c not in
                 ("row_id", "pitcher_id", "batter_id")]

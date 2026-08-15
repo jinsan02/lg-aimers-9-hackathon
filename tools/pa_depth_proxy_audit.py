@@ -7,6 +7,11 @@ script checks whether those frozen, label-free player summaries explain a
 champion's residual in two rolling transitions before any GPU feature run.
 """
 
+import os as _os
+import sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+from invalidated import guard as _guard_invalidated                # noqa: E402
+
 from __future__ import annotations
 
 import numpy as np
@@ -74,6 +79,11 @@ def run(tag, source_year, target_year, all_rows):
 
 
 def main():
+    # These runs predate 5b61fbd (2026-08-13 03:23:39): their fit
+    # partitions held later seasons, so the "next season" transitions
+    # below were never next-season transitions. Refuse rather than
+    # reproduce the numbers. See docs/INVALIDATED.tsv.
+    _guard_invalidated(['MVB22_native'])
     cols = ["season", "pitcher_id", "batter_id", "balls_before",
             "strikes_before"]
     all_rows = pd.read_csv("data/train.csv", encoding="utf-8-sig", usecols=cols)
