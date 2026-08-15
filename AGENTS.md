@@ -277,6 +277,33 @@ If SYSTEM registration is ever unavailable, the fallback is a held-open ssh call
 (`ssh -o ServerAliveInterval=30 desktop-5070 'cmd /c C:\aimers\scripts\X.bat'`),
 but then the laptop and the network become part of the job's lifetime.
 
+### Do not delete a failed artifact before the cause is named
+
+Added 2026-08-15 after the rank incident. A stage-1 ranker crashed every
+downstream process; the logs recorded early stopping firing and
+`Groupwise loss function. OneHotMaxSize set to 10`, and that was **not enough**
+to separate scale, CTRs, `border_count` and early stopping — every one of those
+was consistent with what the logs showed, and three of the four turned out to be
+innocent.
+
+Two things settled it, and neither is a log:
+
+- a **positive control at the failing configuration** — the same rows, trees,
+  borders and categoricals fitted fresh, which scored in 0.0s and cleared the
+  configuration;
+- a **direct autopsy of the broken `.cbm`**, which loaded cleanly, reported the
+  right tree count and features, dumped 18.7 MB of valid JSON, and then died
+  with `0xC0000005` on a **one-row** predict.
+
+The local copy had already been deleted; the run survived only because the
+remote still had it. So: **keep the failing artifact until the cause is
+written down**, and prefer `--only`-style probes that rebuild a known-good
+counterpart at the same scale over reasoning from a log.
+
+Corollary for any model whose scoring path is in doubt: fitting is not
+validation. Save, then load in a **new process**, then predict **one row**. The
+2026-08-15 artifact passed every in-process check and failed exactly there.
+
 ## Environment drift
 
 | | pandas | numpy | sklearn |

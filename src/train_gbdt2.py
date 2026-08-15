@@ -854,6 +854,32 @@ def _hard_exit(code=0):
     os._exit(code)
 
 
+def _assert_scoreable(model, expected_trees, where):
+    """Refuse a ranker artifact that carries the early-stopping fingerprint.
+
+    The stage-1 model of 2026-08-15 loaded cleanly -- right tree count, right
+    features, right cat indices, a valid 18.7 MB JSON dump -- and then died with
+    0xC0000005 on a **one-row** predict. Everything about it looked fine except
+    that it had been produced by a fit the overfitting detector cut short.
+
+    `iterations != tree_count_` is not itself a defect: CatBoost documents
+    `iterations` as the maximum, so early stopping legitimately leaves fewer
+    trees. It is a *fingerprint* of having taken that path, and that path is the
+    one that produced an unscoreable artifact, so the fix is not to reason about
+    the mismatch but to keep the shipping models off that path entirely.
+    """
+    n = int(model.tree_count_)
+    if expected_trees is not None and n != int(expected_trees):
+        raise SystemExit(f"{where}: fitted {n} trees, expected "
+                         f"{expected_trees} -- something cut the fit short")
+    od = model.get_all_params().get("od_type")
+    if od is not None:
+        raise SystemExit(f"{where}: model carries od_type={od!r}. A shipping "
+                         f"ranker must be fitted to a fixed length with no "
+                         f"eval_set and no early stopping.")
+    return n
+
+
 def _rank_meta_path(args):
     return args.rank_meta or f"./out/rank_meta_{args.tag}.json"
 
@@ -885,11 +911,13 @@ def run_rank(args, train, features, is_val, art=None, train_dep=None):
     for c in CAT_COLS:
         train[c] = train[c].astype(str)
 
+    if args.rank_stage == 12:
+        return _run_rank_stage12(args, train, features, is_val, art)
     if args.rank_stage == 15:
         return _run_rank_stage15(args, train, features, is_val, art)
     if args.rank_stage == 25:
         return _run_rank_stage25(args, train, features, is_val, art)
-    if args.rank_stage not in (1, 2):
+    if args.rank_stage not in (1, 2, 12):
         # FLAG --model rank full-refit is BANNED in one process: group16 crashed
         # natively on both the 4070 and the A100. Refuse rather than reproduce.
         raise SystemExit(
@@ -937,18 +965,23 @@ def run_rank(args, train, features, is_val, art=None, train_dep=None):
     # but touching this model again at all inside the process that fitted it.
     # So persist what was learned and leave; scoring happens in a fresh
     # interpreter that never opens a CUDA context.
-    _cbm = f"./out/rank_stage1_{args.tag}.cbm"
+    # This model is a SCOUT. It exists to report where the eval curve turned
+    # and is never scored, calibrated or shipped -- the 2026-08-15 artifact
+    # proved that a model off this path can be unscoreable while looking
+    # entirely healthy. Stage 1b refits to a fixed length instead.
+    _cbm = f"./out/rank_scout_{args.tag}.cbm"
     print("MARK fit_returned / curve_read", flush=True)
     model.save_model(_cbm)
-    print(f"MARK model_saved -> {_cbm}", flush=True)
+    print(f"MARK scout_saved (NOT for scoring) -> {_cbm}", flush=True)
     _partial = _rank_meta_path(args)
     os.makedirs(os.path.dirname(_partial) or ".", exist_ok=True)
     with open(_partial, "w", encoding="utf-8") as _fh:
-        json.dump({"stage": "partial", "best_iteration": int(best_iter_),
+        json.dump({"stage": "scout", "best_iteration": int(best_iter_),
+                   "scout_model_not_for_scoring": _cbm,
                    "ntree_end": int(best_iter_ + 1),
                    "refit_trees": int(_refit_trees(best_iter_,
                                                    args.refit_mult)),
-                   "model_file": _cbm, "seed": int(args.seed),
+                   "seed": int(args.seed),
                    "group_size": int(args.rank_group_size),
                    "features": list(features), "n_features": len(features),
                    "cat_cols": list(CAT_COLS),
@@ -968,6 +1001,47 @@ def run_rank(args, train, features, is_val, art=None, train_dep=None):
     _hard_exit(0)
 
 
+def _run_rank_stage12(args, train, features, is_val, art):
+    """Refit the selection ranker to a fixed length, off the early-stopping path.
+
+    Same fit partition as the scout, `iterations = best_iteration + 1`, no
+    eval_set, no early stopping. The artifact this produces is the one that gets
+    calibrated and compared; the scout's is discarded.
+    """
+    from catboost import CatBoostRanker
+
+    path = _rank_meta_path(args)
+    with open(path, encoding="utf-8") as fh:
+        meta = json.load(fh)
+    if meta.get("stage") != "scout":
+        raise SystemExit("rank stage1a: the handoff is not a scout record")
+    if list(meta["features"]) != list(features):
+        raise SystemExit("rank stage1a: the scout described a different frame")
+    trees = int(meta["best_iteration"]) + 1
+    print(f"rank stage1a: refitting the selection model to {trees} fixed "
+          f"iterations (scout best_iteration {meta['best_iteration']}), "
+          f"no eval_set, no early stopping", flush=True)
+
+    tr, _ = _rank_pool(train, features, ~is_val, args.rank_group_size)
+    final = CatBoostRanker(
+        iterations=trees, learning_rate=args.lr, depth=args.depth,
+        l2_leaf_reg=args.l2, border_count=args.border_count,
+        task_type=args.device, devices="0",
+        loss_function="PairLogitPairwise", random_seed=args.seed, verbose=200)
+    final.fit(tr)
+    _assert_scoreable(final, trees, "rank stage1a")
+    cbm = f"./out/rank_select_{args.tag}.cbm"
+    final.save_model(cbm)
+    meta["stage"] = "selected"
+    meta["model_file"] = cbm
+    meta["select_trees"] = trees
+    meta["ntree_end"] = 0          # fitted to length: nothing to slice
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(meta, fh, indent=1, default=str)
+    print(f"MARK stage1a model_saved -> {cbm} ({trees} trees)", flush=True)
+    _hard_exit(0)
+
+
 def _run_rank_stage15(args, train, features, is_val, art):
     """Score and calibrate stage 1's ranker in a process that never saw a GPU.
 
@@ -984,14 +1058,25 @@ def _run_rank_stage15(args, train, features, is_val, art):
         raise SystemExit("stage1b: stage 1 described a different feature list")
     if int(meta["rows"]["val"]) != int(is_val.sum()):
         raise SystemExit("stage1b: validation row count differs from stage 1")
+    if meta.get("stage") != "selected":
+        raise SystemExit("rank stage1b: the handoff still points at the scout. "
+                         "Run --rank-stage 12 first; a scout model is never "
+                         "scored.")
     model = CatBoostRanker()
     model.load_model(meta["model_file"])
     best_iter_ = int(meta["best_iteration"])
+    _assert_scoreable(model, meta.get("select_trees"), "rank stage1b")
+    # One row, in this process, before anything larger. The failure mode is a
+    # deserialised artifact that dies on any predict, and it dies on one row --
+    # so a one-row smoke is a complete test and costs nothing.
+    _ = model.predict(train.loc[is_val, features].head(1))
     print(f"loaded {meta['model_file']} ({model.tree_count_} trees), "
-          f"slicing at ntree_end={meta['ntree_end']}", flush=True)
+          f"one-row smoke passed", flush=True)
 
-    raw = model.predict(train.loc[is_val, features],
-                        ntree_start=0, ntree_end=int(meta["ntree_end"]))
+    ne = int(meta.get("ntree_end") or 0)
+    raw = (model.predict(train.loc[is_val, features], ntree_start=0,
+                         ntree_end=ne) if ne
+           else model.predict(train.loc[is_val, features]))
     y = train.loc[is_val, TARGET].to_numpy(np.float64)
     calib = _fit_rank_sigmoid(raw, y)
     p = _rank_probability(raw, calib)
@@ -1099,6 +1184,7 @@ def _run_rank_stage2(args, train, features, is_val, art, train_dep=None):
     print(f"  refit: {trees} trees (best_iter {best_iter} x "
           f"{args.refit_mult}), group {args.rank_group_size}", flush=True)
     final.fit(full)
+    _assert_scoreable(final, trees, "rank stage2")
     # Same discipline as stage 1: this process does not touch the model again.
     # Everything after a GPU ranker fit has either aborted (exit 255, three
     # times) or refused to exit (8.6 hours), and stage 2 has more to do
@@ -1137,6 +1223,8 @@ def _run_rank_stage25(args, train, features, is_val, art):
     calib = (float(c["a"]), float(c["b"]), float(c["mu"]), float(c["sd"]))
     model = CatBoostRanker()
     model.load_model(meta["stage2_model_file"])
+    _assert_scoreable(model, meta.get("stage2_trees"), "rank stage2b")
+    _ = model.predict(train.loc[is_val, features].head(1))     # one-row smoke
     model._rank_calib = calib
     model._rank_ntree_end = 0          # fitted to length; nothing to slice
     print(f"loaded {meta['stage2_model_file']} ({model.tree_count_} trees), "
@@ -1451,7 +1539,7 @@ def main():
                     help="failmode-cells 검증/test의 전체 클래스 확률을 저장. "
                          "학습이나 저장 모델은 바꾸지 않는 분석 전용 출력")
     ap.add_argument("--rank-stage", type=int, default=0,
-                    choices=[0, 1, 15, 2, 25],
+                    choices=[0, 1, 12, 15, 2, 25],
                     help="1 = selection only, write meta and stop; 2 = fresh "
                          "process, read meta and fit the deployment ranker. "
                          "0 refuses to refit (SETTLED bans it in one process).")
