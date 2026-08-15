@@ -2104,6 +2104,21 @@ def main():
              if args.seeds else [args.seed])
     base_tag = args.tag
     _lineage_seeds = {}
+    # The strong training fingerprint, computed once and stamped into every
+    # pack. `member_fingerprint.py` used to compare one float -- the mean of
+    # `asof_pitcher_success_rate` over the fit rows -- which is a mean, not an
+    # identity: it cannot say *which* rows moved, and a `.pkl` alone could not
+    # answer "what trained this?" at all. The 2026-08-15 P0 audit had to
+    # reconstruct fit eras from ledger timestamps and a commit date because
+    # nothing was stored in the artifact.
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
+        import lineage as _lineage_mod
+        _pack_lineage = _lineage_mod.pack_record(args, features, train,
+                                                 is_fit, is_val)
+    except Exception as _e:
+        print(f"  (pack lineage 생성 실패: {_e})")
+        _pack_lineage = None
     for _si, _sd in enumerate(seeds):
         args.seed = _sd
         args.tag = base_tag if len(seeds) == 1 else f"{base_tag}_s{_sd}"
@@ -2262,7 +2277,12 @@ def main():
                                                    False)),
                      "rank_ntree_end": int(getattr(model, "_rank_ntree_end",
                                                    0) or 0),
-                     "season_means": season_means},
+                     "season_means": season_means,
+                     # Self-describing artifact: fit row-set hash, row counts,
+                     # fit era both ends, val/test season, ordered feature
+                     # hash, feat_k and the training-relevant flags. Compared
+                     # across members by tools/member_fingerprint.py.
+                     "lineage": _pack_lineage},
                     f"./model/{args.model}_{args.tag}.pkl", compress=3)
         print(f"saved: model/{args.model}_{args.tag}.pkl")
         _lineage_seeds[str(_sd)] = {

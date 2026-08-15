@@ -17,6 +17,12 @@ mechanism; where it jumped, part of the delta is lottery.
 So every row here carries both. A candidate that wins while its stopping point
 moved several hundred iterations has not been separated from the lottery yet.
 
+The adoption rule comes from `tools/judge.py`, shared with `surf_report.py`.
+**They share the rule, not the surface**: this tool scores `*_val_preds.npz`,
+`surf_report` scores the unseen `*_test_preds.npz`. The same arm shows
+different numbers in the two tables and that is correct; do not read one
+against the other.
+
   python tools/arm_compare.py --control CTRL_base --cand CTR3_base
   python tools/arm_compare.py --control NULLC_cell --cand CTR3_cell --base CTRL_base
 """
@@ -32,10 +38,13 @@ import numpy as np
 import pandas as pd
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# The adoption rule lives in tools/judge.py so this tool and surf_report.py
+# cannot drift apart again -- they disagreed on the interval, the bar and the
+# centring until 2026-08-15.
+from judge import SHIFT, SLOPE, T975, bss, debias, verdict     # noqa: E402,F401
+
 W_CELL = 0.55
-SHIFT, SLOPE = 0.0052, 1.0416
-# Keyed by n, not degrees of freedom: T975[6] is t(.975, df=5) = 2.571.
-T975 = {2: 12.706, 3: 4.303, 4: 3.182, 5: 2.776, 6: 2.571, 7: 2.447, 8: 2.365}
 
 
 def seed_of(p):
@@ -52,42 +61,51 @@ def preds(tag, split="val"):
     return out
 
 
-def ledger(tag):
+def ledger(tag, strict=True):
+    """Newest row per seed, and a refusal when a re-run changed the command.
+
+    `drop_duplicates("tag")` kept the **first** match, which is the *oldest*
+    row. A tag re-run under different flags -- the ordinary way a control gets
+    refreshed -- therefore reported the superseded run's iteration count, host
+    and argv while the npz on disk came from the new one. Sorting by timestamp
+    and keeping the last fixes the read; `strict` makes a silent overwrite an
+    error rather than a preference, because if two runs share a tag and differ
+    in argv, "the newest" is a guess about which produced the predictions.
+    """
     d = pd.read_csv(os.path.join(ROOT, "LEDGER.tsv"), sep="\t", header=None,
                     names=["ts", "host", "tag", "m", "v", "t", "seed", "it",
                            "val", "test", "argv"])
-    d = d[d.tag.str.match(rf"{tag}_s\d+$", na=False)].drop_duplicates("tag")
+    d = d[d.tag.str.match(rf"{tag}_s\d+$", na=False)].sort_values("ts")
+    if strict:
+        for tg, grp in d.groupby("tag"):
+            argvs = {a for a in grp.argv.astype(str)}
+            if len(argvs) > 1:
+                raise SystemExit(
+                    f"{tg} appears {len(grp)} times in the ledger with "
+                    f"{len(argvs)} different commands:\n  "
+                    + "\n  ".join(f"{r.ts}  {r.argv}" for r in grp.itertuples())
+                    + f"\nThe npz on disk came from one of them and the tag "
+                      f"does not say which. Re-run under a fresh tag.")
+    d = d.drop_duplicates("tag", keep="last")
     return {int(r.seed): (int(r.it), float(r.val), r.host, r.argv)
             for r in d.itertuples()}
 
 
-def bss(p, y):
-    r = y.mean()
-    return 1e5 * (1 - np.mean((p - y) ** 2) / (r * (1 - r)))
-
-
-def debias(p):
-    q = np.clip(p, 1e-6, 1 - 1e-6)
-    return np.clip(1 / (1 + np.exp(-SLOPE * np.log(q / (1 - q)))) - SHIFT, 0, 1)
-
-
 def report(name, d):
     d = np.asarray(d, float)
-    n = len(d)
-    se = d.std(ddof=1) / np.sqrt(n)
-    t = d.mean() / se if se else float("nan")
-    crit = T975.get(n, 1.96)
-    lo, hi = d.mean() - crit * se, d.mean() + crit * se
-    ok = d.mean() >= 3 and t >= 2.4 and n >= 6
+    v = verdict(d)
     print(f"\n  {name}")
-    print(f"    mean {d.mean():+.3f}  SE {se:.3f}  t {t:+.2f}  "
-          f"95% CI [{lo:+.2f}, {hi:+.2f}]")
-    print(f"    median {np.median(d):+.3f}  trimmed {np.sort(d)[1:-1].mean():+.3f}  "
-          f"positive {int((d > 0).sum())}/{n}")
-    print(f"    delta>=+3 {'Y' if d.mean() >= 3 else 'N'}  "
-          f"t>=2.4 {'Y' if t >= 2.4 else 'N'}  n>=6 {'Y' if n >= 6 else 'N'}  "
-          f"95% upper>=+3 {'Y' if hi >= 3 else 'N (reject)'}  -> "
-          f"{'KEEP' if ok else ('DROP' if hi < 3 else 'PARK')}")
+    print(f"    mean {v['mean']:+.3f}  SE {v['se']:.3f}  t {v['t']:+.2f}  "
+          f"95% CI [{v['lo']:+.2f}, {v['hi']:+.2f}]")
+    print(f"    median {v['median']:+.3f}  "
+          f"trimmed {np.sort(d)[1:-1].mean():+.3f}  "
+          f"positive {v['positive']}/{v['n']}")
+    print(f"    delta>=+3 {'Y' if v['gate_delta'] else 'N'}  "
+          f"t>=2.4 {'Y' if v['gate_t'] else 'N'}  "
+          f"n>=6 {'Y' if v['gate_n'] else 'N'}  "
+          f"95% upper>=+3 {'Y' if v['hi'] >= 3 else 'N (reject)'}  -> "
+          f"{v['verdict']}")
+    return v
 
 
 def main():

@@ -1,25 +1,56 @@
-"""미학습 표면 축 재판정 결과표. 기준선과 페어 비교해서 t 까지 낸다.
+"""Unseen-surface arm table: paired per-seed deltas against a baseline, with t.
 
-test_preds npz 만 읽으므로 로그 인코딩과 무관하다 (한글 grep 이 머신마다 깨져서
-로그로 읽으려다 두 번 헛발질했다).
+Reads `test_preds` npz only, so console encoding cannot corrupt it (reading the
+Korean logs broke differently on each machine and cost two false starts).
 
-실행: python tools/surf_report.py RN1.5 SC_k40 SC_k120 SD_lr02 ...
+**Two things changed on 2026-08-15.** Both were judgement defects, not display
+choices:
+
+1. **The score is no longer oracle-centred by default.** This tool used to
+   score `p - (p.mean() - r)`, shifting every candidate onto the mean of the
+   season being scored. That constant does not exist at submission time, so a
+   centred number hides a candidate's calibration loss and answers "did
+   resolution improve?" rather than "would this score better?". The default is
+   now the champion's fixed debiasing (constants that do exist at submission
+   time). `--centred` restores the old behaviour and labels the table
+   DIAGNOSTIC.
+
+2. **The adoption rule now comes from `tools/judge.py`**, the same module
+   `arm_compare.py` uses. This tool adopted on `t >= 2.4` alone and used
+   `1.96 * se` at n=6, where the correct critical value is
+   `t(.975, df=5) = 2.571`; the documented bar is
+   `delta >= +3 AND t >= 2.4 AND n >= 6`. The two tools could return different
+   verdicts on identical evidence, and did.
+
+**They share the rule, not the surface.** This tool scores `*_test_preds.npz`
+— the unseen season. `arm_compare.py` scores `*_val_preds.npz` and pairs the
+early-stopping iteration alongside. The same arm will show different numbers in
+the two tables and that is correct; do not read one against the other.
+
+  python tools/surf_report.py BASELINE CAND1 CAND2 ...
+  python tools/surf_report.py --centred BASELINE CAND1     # resolution only
 """
 
+from __future__ import annotations
+
+import argparse
 import glob
+import os
 import sys
 
 import numpy as np
 
-from invalidated import guard as _guard_invalidated
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from invalidated import guard as _guard_invalidated           # noqa: E402
+from judge import bss, centred_bss, debias, verdict           # noqa: E402
 
 
 def machine_of(tag):
-    """LEDGER 에서 그 태그를 만든 머신을 찾는다.
+    """Which machine produced a tag, from the ledger.
 
-    2026-08-08: std-k 40 이 A100 에서 +15.05, 4070 에서 +4.27 이었다. 같은 설정·
-    같은 시드인데 11점이 **머신 차이**다. 기준선이 4070 산인 줄 모르고 A100 결과와
-    비교해서 하마터면 근거 없는 설정으로 제출할 뻔했다. 이제 비교 전에 대조한다.
+    2026-08-08: `--std-k 40` measured +15.05 on the A100 and +4.27 on the 4070 —
+    same setting, same seeds, 11 points of **machine**. A baseline was nearly
+    compared across hosts and shipped. Checked before every comparison now.
     """
     try:
         with open("./LEDGER.tsv", encoding="utf-8") as f:
@@ -44,53 +75,72 @@ def load(tag):
 
 
 def main():
-    _guard_invalidated(sys.argv[1:])
-    tags = sys.argv[1:]
+    ap = argparse.ArgumentParser()
+    ap.add_argument("tags", nargs="*")
+    ap.add_argument("--centred", action="store_true",
+                    help="score each arm shifted onto the evaluation season's "
+                         "own mean. DIAGNOSTIC ONLY -- that constant does not "
+                         "exist at submission time.")
+    a = ap.parse_args()
+    tags = a.tags
     if len(tags) < 2:
         print(__doc__)
         return 1
+    _guard_invalidated(tags)
+
     B, y, bs = load(tags[0])
     if B is None:
-        print(f"기준 없음: {tags[0]}")
+        print(f"baseline not found: {tags[0]}")
         return 1
-    r = float(y.mean())
-    base = r * (1 - r)
 
-    def sc(p):
-        p = p - (p.mean() - r)          # 수준은 SHIFT 가 따로 맡는다
-        return 1e5 * (1 - ((np.clip(p, 0, 1) - y) ** 2).mean() / base)
+    sc = (lambda p: centred_bss(p, y)) if a.centred else \
+         (lambda p: bss(debias(p), y))
+    mode = ("CENTRED -- resolution diagnostic, NOT an adoption number"
+            if a.centred else "debiased (submission-time constants)")
 
     b_ens = sc(np.mean(list(B.values()), 0))
     b_host = machine_of(tags[0])
-    print(f"기준 {tags[0]}  {len(bs)}시드 앙상블 {b_ens:.2f}  "
-          f"[{b_host}]  (미학습 {len(y):,}행)\n")
-    print(f"{'축':<12}{'시드':>5}{'앙상블':>10}{'Δ':>8}{'페어평균':>10}"
-          f"{'SE':>7}{'t':>7}  판정  머신")
+    print(f"baseline {tags[0]}  {len(bs)} seeds, ensemble {b_ens:.2f}  "
+          f"[{b_host}]  (unseen {len(y):,} rows)")
+    print(f"score: {mode}\n")
+    print(f"{'arm':<14}{'seeds':>6}{'ens':>10}{'d_ens':>9}{'paired':>10}"
+          f"{'SE':>7}{'t':>7}{'95% lo':>9}  {'call':<8}machine")
+    rc = 0
     for t in tags[1:]:
         A, _, _ = load(t)
         if A is None:
-            print(f"{t:<12}  (없음)")
+            print(f"{t:<14}  (no predictions)")
             continue
         common = sorted(set(A) & set(B))
         if not common:
-            print(f"{t:<12}  (공통 시드 없음)")
+            print(f"{t:<14}  (no shared seeds)")
             continue
         d = np.array([sc(A[s]) - sc(B[s]) for s in common])
-        se = d.std(ddof=1) / np.sqrt(len(d)) if len(d) > 1 else float("nan")
+        v = verdict(d)
         ens = sc(np.mean([A[s] for s in common], 0))
-        tv = d.mean() / se if se else float("nan")
-        hi = d.mean() + 1.96 * se
-        verdict = ("채택" if tv >= 2.4 else ("기각" if hi < 3 else "보류"))
         host = machine_of(t)
-        # 머신이 다르면 판정을 지운다. 11점짜리 머신 효과가 실측됐으므로
-        # 이 비교는 t 값이 아무리 커도 의미가 없다.
+        call = v["verdict"]
+        # A cross-machine comparison is void however large t is: the measured
+        # machine effect (11 points) exceeds most candidate effects.
         if host != "?" and b_host != "?" and host != b_host:
-            verdict = "**무효(머신다름)**"
-        print(f"{t:<12}{len(common):>5}{ens:>10.2f}{ens - b_ens:>+8.2f}"
-              f"{d.mean():>+10.2f}{se:>7.2f}{tv:>+7.2f}  {verdict}  {host}")
-    print("\n※ 채택 t>=2.4 / 기각 95%상한<+3 / 그 외 보류(시드 추가 필요)")
-    print("※ 기준과 머신이 다르면 판정 무효 — std-k 40 이 A100 +15.05 / 4070 +4.27 이었다")
-    return 0
+            call = "VOID(host)"
+            rc = 2
+        elif a.centred:
+            call = call + "*"
+        print(f"{t:<14}{v['n']:>6}{ens:>10.2f}{ens - b_ens:>+9.2f}"
+              f"{v['mean']:>+10.2f}{v['se']:>7.2f}{v['t']:>+7.2f}"
+              f"{v['lo']:>+9.2f}  {call:<8}{host}")
+
+    print("\nKEEP: mean>=+3 AND t>=2.4 AND n>=6 | DROP: 95% upper < +3 | "
+          "else PARK (more seeds)")
+    print("Interval is Student-t (2.571 at n=6), from tools/judge.py -- the "
+          "same rule arm_compare.py applies.")
+    if a.centred:
+        print("* CENTRED: these are resolution diagnostics. No adoption may "
+              "rest on them.")
+    print("A different machine from the baseline voids the row -- --std-k 40 "
+          "measured A100 +15.05 vs 4070 +4.27.")
+    return rc
 
 
 if __name__ == "__main__":
