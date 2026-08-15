@@ -250,3 +250,21 @@ cell-only는 결과를 본 뒤 정의되는 새 가설이므로 별도 사전등
 | FM multilabel | single-seed core `-12.07` |
 | predicted pitch-type 기존 경로 | oracle `+120~+142`, 합법적 주변화 `-13~-29`, masked auxiliary LB 약 `-2.3~-2.5` |
 | 기존 TabM/TabDecoder | 챔피언 블렌드에서 유효 가중치 없음 |
+
+---
+
+## 2026-08-16 Codex rule/data audit (append-only correction)
+
+The blanket claim that E-LB1--4 conflict with the independent-row notice is
+withdrawn. Dacon's 2026-08-12 official reply explicitly permits leaderboard
+selection/adjustment of models, hyperparameters and ensemble weights, including
+interpolation. A fixed parameter remains legal when a row is bit-identical alone
+and in the full frame. Thus E-LB1 and E-LB2 are cleared for packaging; E-LB4 is
+row-local but remains conditional on E-LB1.
+
+E-LB3 is not cleared for a different reason: the supplied 30-column Trackman
+table contains release position, movement and speed but **no plate location or
+strike-zone top/bottom coordinates**. The proposed old-zone boundary-band share
+cannot be computed from official data as written, and importing 2025 ABS boundary
+numbers as model data would conflict with the external-data ban. No E-LB3 package
+will be built from this specification.
