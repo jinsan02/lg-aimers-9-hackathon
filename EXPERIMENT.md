@@ -523,3 +523,41 @@ base/control로 독립 재현했다. fixed core `890.294435 -> 885.486834`, delt
 **-4.807601**이며 모든 확인 세그먼트가 음수였다. 머신 간 수치는 합치지 않지만
 FAIL 방향은 일치한다. 상세:
 [`docs/P3C2_LOCAL_REPLICATION_20260815.md`](docs/P3C2_LOCAL_REPLICATION_20260815.md).
+# 2026-08-16 overnight closeout — GSK2 and E-LB1 preparation
+
+## GSK2 GENERAL_SKILL_ADD cell-only — Codex first pass (provisional): HOLD
+
+Fresh control `GSK2CTL_cell` and candidate `GSK2CAND_cell` ran in one session on
+`DESKTOP-053T952`, fit<=2022 / val2023 / untouched2024, seeds 3,4,5,6,8,13.
+The fixed core used the same-host `RMSE2CTL_base` and frozen 0.45/0.55 blend.
+All 18 compared members matched row_id, target and fit-row hash
+`383a417f7f146006`; the cell control retained 121 features and the candidate
+added exactly `skill_hat, skill_hat_vs_std` (123 features). New-process replay
+and reversal/half/single-row drift were exactly zero for all 12 new artifacts.
+
+Untouched-2024 paired core deltas were
+`[+3.053,+4.697,+5.199,+3.388,-0.007,+2.514]`: mean **+3.141**, SE 0.753,
+t **4.168**, Student-t 95% CI **[+1.204,+5.077]**, median +3.221, 5/6
+positive. The six-seed ensemble was **+3.108**. First/second halves were
++4.575/+1.641 and R/F were +3.945/**-3.126**. Reliability worsened
+`2.8051e-5 -> 2.9855e-5` while resolution improved
+`0.00222169 -> 0.00223322`; RMS 0.001434, correlation 0.999516. Source-2023
+core deltas were mostly negative (mean about -1.24).
+
+The pre-registered KEEP gate required R and F both >=0, so the mechanical
+verdict is **HOLD**, not a submission candidate. The overall/ensemble result is
+the strongest legal core-resolution signal in this queue, but the F reversal
+and source/target sign change make a direct promotion unsafe. No seed extension,
+coefficient change, cell-only submission or segment correction was attempted.
+Claude/team review is requested on whether this remains a research signal or
+closes; Codex does not append a SETTLED verdict provisionally.
+
+## E-LB1 overnight preparation — no submission
+
+From the immutable B1S8 ZIP, two script-only fixed final-output probes were
+built: `elb1_plus_0816.zip` (+0.010) and `elb1_minus_0816.zip` (-0.010).
+All 21 non-script members are byte-identical to the champion. Both passed the
+public smoke, 245,789-row synthetic inference in 44 seconds, finite/range/format
+checks, and strong half/player/scattered/single-row independence with worst
+drift 0. The two predictions differ by exactly 0.020000 on the public sample.
+No Dacon submission was made; official scores and any final delta remain unknown.

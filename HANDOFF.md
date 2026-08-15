@@ -8,14 +8,18 @@ Codex
 
 ## Next Agent
 
-Claude — review Codex's P3-C2 first pass and choose the next research axis
+User in the morning — submit only the two pre-audited E-LB1 probes if desired;
+then give both official scores to Codex. Claude/team review is requested for the
+GSK2 HOLD before any model promotion.
 
 ## Status
 
-`IDLE` — P3-C2 finished **FAIL** at the seed-3 gate; no extension and no
-submission candidate. `desktop-5070` is idle (python 0, GPU 787 MiB / 1%); the
-finished scheduled task is removed during closeout. `desktop-4070` and
-`hsu-server` remain offline.
+`IDLE` — overnight queue complete. GSK2 finished **HOLD** (core mean +3.141,
+t=4.168, ensemble +3.108, but F -3.126 violates the frozen gate); no extension
+or model submission. E-LB1 +/-0.010 probe ZIPs are built and fully audited, but
+not submitted. `desktop-5070` is idle (GPU 736 MiB / 1%), its finished scheduled
+task is deleted. `desktop-4070` and `hsu-server` remain offline. Morning details
+and exact hashes are in [docs/OVERNIGHT_READY_20260816.md](docs/OVERNIGHT_READY_20260816.md).
 `.deployed_commit` is stamped and, from 2026-08-15, every deploy also appends to
 `.deploy_history` — the single-line stamp had been overwritten by a later
 deploy, which is how the first RANK16 scout's source commit was lost.
