@@ -867,6 +867,34 @@ def _hard_exit(code=0):
     os._exit(code)
 
 
+def _announce_stage(args, stage, artifacts, payload=None):
+    """Tell the supervisor this stage's artifacts are on disk and complete.
+
+    Called immediately before `_hard_exit`, and deliberately *after* the
+    artifacts are written and asserted. The supervisor is a separate scheduled
+    task: it verifies every artifact named here against the sha recorded here,
+    then ends this task from outside with `schtasks /end` -- the only
+    termination that has ever worked on the 5070, where `os._exit`,
+    `TerminateProcess` and `taskkill /f /pid` all failed.
+
+    No-op without `--stage-run-id`, so a plain local run is unchanged.
+    """
+    run_id = getattr(args, "stage_run_id", "") or ""
+    if not run_id:
+        return
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
+        import stage_contract
+        p = stage_contract.announce_ready(stage, run_id, artifacts,
+                                          payload or {}, root=".")
+        print(f"MARK announce {stage} -> {p}", flush=True)
+    except Exception as e:
+        # An announce that fails must be loud: the stage really finished, and a
+        # supervisor that never hears will wait out its whole timeout and then
+        # report a completed stage as hung.
+        print(f"!! ANNOUNCE FAILED for {stage}: {e}", flush=True)
+
+
 def _assert_scoreable(model, expected_trees, where):
     """Refuse a ranker artifact that carries the early-stopping fingerprint.
 
@@ -1008,6 +1036,11 @@ def run_rank(args, train, features, is_val, art=None, train_dep=None):
                    "val_season": args.val_season,
                    "test_season": args.test_season}, _fh, indent=1)
     print(f"MARK partial_meta -> {_partial}", flush=True)
+    _announce_stage(args, f"rank1_{args.tag}", [_cbm, _partial],
+                    {"best_iteration": int(best_iter_),
+                     "refit_trees": int(_refit_trees(best_iter_,
+                                                     args.refit_mult)),
+                     "seed": int(args.seed), "scout": True})
     # os._exit skips interpreter teardown too, which is itself a candidate for
     # the abort (tearing down a CUDA context at exit). Nothing further in stage
     # 1 is wanted, and a clean exit code is what the chain checks.
@@ -1052,6 +1085,8 @@ def _run_rank_stage12(args, train, features, is_val, art):
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(meta, fh, indent=1, default=str)
     print(f"MARK stage1a model_saved -> {cbm} ({trees} trees)", flush=True)
+    _announce_stage(args, f"rank12_{args.tag}", [cbm, path],
+                    {"select_trees": int(trees), "seed": int(args.seed)})
     _hard_exit(0)
 
 
@@ -1211,6 +1246,8 @@ def _run_rank_stage2(args, train, features, is_val, art, train_dep=None):
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(meta, fh, indent=1, default=str)
     print(f"MARK stage2 meta updated -> {path}", flush=True)
+    _announce_stage(args, f"rank2_{args.tag}", [cbm2, path],
+                    {"stage2_trees": int(trees), "seed": int(args.seed)})
     _hard_exit(0)
 
 
@@ -1561,6 +1598,12 @@ def main():
                          "(default ./out/rank_meta_<tag>.json)")
     ap.add_argument("--rank-group-size", type=int, default=64,
                     help="PairLogitPairwise 학습 블록 크기. row_id 시간순 고정 블록")
+    ap.add_argument("--stage-run-id", default="",
+                    help="announce stage completion to out/handoff/<stage>."
+                         "ready.json under this run id, so a supervisor task "
+                         "can verify the artifacts and end this task from "
+                         "outside. Empty = no announce (unchanged behaviour). "
+                         "See tools/stage_contract.py.")
     ap.add_argument("--baseline-col", default="",
                     help="E120 재검정: 그 열의 logit 을 CatBoost baseline 으로 "
                          "준다. 손실·링크는 Logloss 그대로 유지한다 "
