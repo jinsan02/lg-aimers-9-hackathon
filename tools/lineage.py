@@ -30,16 +30,24 @@ def rowid_sha(row_ids) -> str:
 
     The priors float in `member_fingerprint.py` is a mean, and a mean is a weak
     fingerprint: two different row sets can share one, and it says nothing about
-    *which* rows moved. This hashes the sorted row_id bytes, so a stray
+    *which* rows moved. This hashes the sorted row ids, so a stray
     `--drop-f-pre`, `--min-season` or `--max-train-season` changes it and a
     reordering does not -- which matches the competition's own set-membership
     criterion for what counts as the same data.
+
+    Ids are hashed **as text**. `row_id` in this competition is
+    `TRAIN_0000001`, not an integer; the first version cast to int64 and every
+    real run printed `pack lineage 생성 실패: invalid literal for int() with
+    base 10: 'TRAIN_0000001'`. The failure was caught and the run continued --
+    the fingerprint is provenance, it must never kill a fit -- but it also
+    meant no pack got one. Caught in the first live run after the change,
+    2026-08-15; the unit test had used integer ids.
     """
     import numpy as np
-    a = np.sort(np.asarray(row_ids).astype(np.int64))
+    a = np.sort(np.asarray(row_ids).astype(str))
     h = hashlib.sha256()
-    h.update(str(a.size).encode())
-    h.update(a.tobytes())
+    h.update(f"{a.size}\n".encode())
+    h.update("\n".join(a.tolist()).encode("utf-8"))
     return h.hexdigest()[:16]
 
 
