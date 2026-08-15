@@ -1298,3 +1298,20 @@ The final `delta=+0.002515795361` package then scored **`1110.9806302398`** in
 the quadratic forecast within approximately `6.4e-11`, confirming negligible
 clipping at this scale and exact recovery of the one-dimensional Brier optimum.
 This is now the champion; no further global-SHIFT probes are warranted.
+
+## 2026-08-16 GSK deployment candidate — prepared, not submitted
+
+After GSK2 gave untouched-2024 fixed-core +3.141 (t=4.168, ensemble +3.108)
+and GSK3 independently gave untouched-2023 +19.595 (t=5.330, ensemble
++19.517), the frozen deployment contract trained six `GSKDEP_cell` members on
+fit 2019--2023 / val2024. All six reference-surface deltas versus the matching
+B1S cell seeds were positive; mean +5.92 BSS. Strong lineage agrees across all
+members (`fit_rowid_sha=d69792676c50e1cf`, 123 features).
+
+The submission candidate is `submissions/gskdep_0816.zip`, SHA256
+`87617a131498b1121c100668b965b57443abbfdbe8bef5c39b28976d4f29e70d`.
+It retains the confirmed E-LB1 optimum and all other champion constants. Full
+server-style verification ran 245,789 rows in 30 seconds and strong subset
+independence had worst drift 0. No submission was made. The open risk is league
+transfer: GSK3's historical gain was F-driven whereas GSK2's F segment was
+-3.126 despite a positive overall result.

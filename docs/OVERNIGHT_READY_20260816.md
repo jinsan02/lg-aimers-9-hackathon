@@ -1,7 +1,7 @@
 # Morning handoff — 2026-08-16
 
-Nothing was submitted overnight. Champion remains B1S8 / LB
-`1108.4333490288`.
+The user submitted the pre-registered E-LB1 final package. The champion is now
+E-LB1 / LB `1110.9806302398`. No further package was submitted automatically.
 
 ## Ready probe 1 — submit first
 
@@ -91,3 +91,26 @@ with worst drift 0. If both official scores are later obtained, calculate with:
 Here `plus` means the parameter's positive direction (w=.65), and `minus`
 means w=.45. This is a local approximation because the logit slope follows the
 blend; accept only under the separate E-LB2 preregistration gate.
+
+## GSK core candidate ready — strongest model-side option
+
+`submissions/gskdep_0816.zip`
+
+- SHA256: `87617a131498b1121c100668b965b57443abbfdbe8bef5c39b28976d4f29e70d`
+- 88.8 MB, 22 entries
+- B1S8 base 8 seeds unchanged; cell replaced by six `GSKDEP_cell` members
+- confirmed E-LB1 final delta retained; every other recipe constant frozen
+- six members share strong fit hash `d69792676c50e1cf`, fit 2019--2023, and
+  exactly 123 features
+- val2024 reference BSS: `927.11/915.54/914.89/922.51/921.13/921.14`; all six
+  paired deltas versus the original B1S cell seeds are positive, mean +5.92
+- 245,789-row server-shape verification: 30 seconds
+- strong subset-independence worst drift: `0.000e+00`
+
+Evidence for the feature change comes from two independent untouched seasons:
+GSK2 core +3.141 (t=4.168, ensemble +3.108) on 2024 and GSK3 core +19.595
+(t=5.330, ensemble +19.517) on 2023. The reason this was not auto-submitted is
+the segment caveat: GSK3's large gain was F-driven while GSK2 F was -3.126.
+It is nevertheless the strongest prepared model-side candidate. Prefer this
+over reopening sub-1-point PARK arms; submit only after the user's explicit
+choice.

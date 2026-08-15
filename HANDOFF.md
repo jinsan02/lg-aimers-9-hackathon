@@ -4,20 +4,31 @@ Read first: [AGENTS.md](AGENTS.md) -> [EXPERIMENT.md](EXPERIMENT.md) -> this fil
 
 ## Current Agent
 
-Codex
+Codex (overnight queue complete)
 
 ## Next Agent
 
-Codex continues until 09:00 KST — finish GSK3, then review remaining PARK/HOLD
-axes. The user has completed E-LB1 submission; no further submission is allowed
-without a new explicit request.
+User / independent review: choose whether to submit the prepared GSK core
+candidate, then optionally run the two pre-registered E-LB2 weight probes.
+No further submission is allowed without a new explicit request.
 
 ## Status
 
-`RUNNING` — GSK3 independent historical transfer confirmation returned KEEP
-(core +19.595, t=5.330, ensemble +19.517, integrity clean). Its scheduled task
-is removed and conditional `GSKDEP_cell` deployment training is next on
-`desktop-5070`. E-LB1 final
+`READY` — overnight queue completed early. GSK3 independent historical transfer confirmation returned KEEP
+(core +19.595, t=5.330, ensemble +19.517, integrity clean). Conditional
+`GSKDEP_cell` deployment training completed on `desktop-5070`: six strong-
+fingerprint-matched 123-feature cell members, fit 2019--2023, val2024 BSS
+`927.11/915.54/914.89/922.51/921.13/921.14`. The six paired differences versus
+the original B1S cell members are all positive (`+7.07/+5.31/+5.97/+11.24/
++4.08/+1.86`, mean `+5.92`) on the reference val2024 surface. The frozen
+B1S8-base + GSKDEP-cell + E-LB1-final package is
+`submissions/gskdep_0816.zip`, SHA256
+`87617a131498b1121c100668b965b57443abbfdbe8bef5c39b28976d4f29e70d`.
+It passed fresh-process server smoke, 245,789 rows in 30 s, and the strong
+subset audit at exactly zero drift. It is prepared, **not submitted**; Codex's
+submission recommendation remains provisional because the historical F effect
+was unstable. The scheduled task is deleted, Python is absent, GPU is idle.
+E-LB1 final
 was submitted by the user and scored **1110.9806302398**, exactly matching the
 quadratic forecast and becoming the new champion (+2.547281211 over B1S8).
 GSK2 finished **HOLD** (core mean +3.141,

@@ -546,6 +546,26 @@ that both untouched transitions improved overall (+19.52 and +3.11), not that
 F transfer is stable. Deployment and packaging proceed under the pre-written
 contract, but Codex does not decide a submission from this provisional review.
 
+## GSK deployment package — Codex first pass: READY, provisional
+
+`GSKDEP_cell` was trained on the submission surface (fit 2019--2023,
+val2024), seeds 3/4/5/6/8/13, on `DESKTOP-053T952`. All six packs share strong
+fit hash `d69792676c50e1cf`, feature hash `a109f03b48b72da7`, and exactly 123
+features. Val2024 BSS is `927.11/915.54/914.89/922.51/921.13/921.14`; paired
+against the same six B1S cell seeds, every delta is positive and the mean is
+about +5.92. This is reference/self-validation only; the adoption evidence
+remains the two prior untouched transitions.
+
+The frozen package changes only the cell family and retains B1S8 base,
+0.45/0.55 blend, legacy slope/shift/recent-middle/PB, plus the confirmed E-LB1
+final delta. `submissions/gskdep_0816.zip` has SHA256
+`87617a131498b1121c100668b965b57443abbfdbe8bef5c39b28976d4f29e70d`, 22
+entries, 88.8 MB. New-process verification completed 245,789 rows in 30 s;
+half/player/scattered/single-row strong audit worst drift is exactly zero.
+Prepared only, not submitted. Main risk: the GSK effect is overall-positive on
+two untouched seasons but league-F transfer changes sign, so submission remains
+a human/reviewer decision rather than an automatic promotion.
+
 ## GSK2 GENERAL_SKILL_ADD cell-only — Codex first pass (provisional): HOLD
 
 Fresh control `GSK2CTL_cell` and candidate `GSK2CAND_cell` ran in one session on
