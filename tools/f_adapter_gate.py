@@ -222,8 +222,11 @@ def main():
     seg = {k: gain(yt[m], pt[m], qt[m], denom) for k, m in segments.items()}
     rng0 = np.random.default_rng(20260808)
     rng1 = np.random.default_rng(20260808)
-    h0 = honest_rank_resolution(pt[mt], yt[mt], denom, rng0)/(mt.mean())
-    h1 = honest_rank_resolution(qt[mt], yt[mt], denom, rng1)/(mt.mean())
+    # `honest_rank_resolution` already returns the within-segment gain on the
+    # global Brier denominator.  This is the table's `hon/norm` quantity;
+    # multiplying by segment share would turn it into full-score contribution.
+    h0 = honest_rank_resolution(pt[mt], yt[mt], denom, rng0)
+    h1 = honest_rank_resolution(qt[mt], yt[mt], denom, rng1)
     rel0, res0 = murphy(yt, pt)
     rel1, res1 = murphy(yt, qt)
     report = {

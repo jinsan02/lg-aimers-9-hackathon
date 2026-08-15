@@ -11,6 +11,15 @@
 Brier Skill Score 최대화. 1차 목표 **1120대 합법 진입**. 사용자 제공 리더보드에서
 최근 확인한 최고점은 1,288.180881이며 실시간 현재값은 별도 확인 전이다.
 
+## 2026-08-16 F1 partial-pooling adapter — FAIL
+
+F만 `sigmoid(logit(p0)+Xbeta)`로 보정하고 R을 bit-identical로 고정한
+offset-logistic ridge를 사전등록 후 판정했다. source 2023은 `+3.788`이었지만
+untouched 2024는 **-7.895**로 반전했고, F normalized honest resolution도
+`501.09 -> 478.73`(-22.36)로 감소했다. 전/후반과 달력 반기 모두 음수,
+R 변화 0, 새 프로세스 및 subset drift 0이다. F1은 확장 없이 종료하며
+alpha·feature·tree·intercept 변형은 하지 않는다.
+
 ## 2026-08-15 P3-C2 종료 — 제출 후보 없음, 챔피언 불변
 
 Success cell 9·10만 CE 질량을 균형화하고 residual cell 11은 weight 1로
