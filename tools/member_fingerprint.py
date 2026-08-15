@@ -154,19 +154,33 @@ def main(argv=None):
                 mism.append(k)
 
     if mism:
-        # loss_function is expected to differ between a binary base and a
-        # multiclass cell arm; a row set or a feature list is never expected to.
-        hard = [k for k in mism if k != "flags" and "hyper" not in k]
+        # What is fatal is a different **training set**. Everything else is
+        # reported loudly and left to the reader, because two legitimate cases
+        # look like a mismatch here and both are real experiments:
+        #   * a binary base (depth 8, Logloss) beside a multiclass cell
+        #     (depth 5, MultiClass) -- that is the champion's own blend;
+        #   * a 122-feature candidate beside its 121-feature control -- that is
+        #     what a single-feature ablation *is*.
+        # Treating `n_features` as fatal made this tool refuse the H1ADD
+        # base-only comparison on 2026-08-15 even though all three families
+        # shared the fit fingerprint 0.5352282203 exactly.
+        TRAINING_SET = ("priors_mean", "fit_rowid_sha", "rows.")
+        hard = [k for k in mism
+                if any(k == t or k.startswith(t) for t in TRAINING_SET)]
         print("!! members differ on: " + ", ".join(mism))
         for k in mism:
             print(f"   {k}")
             for t, _, _, d, _, _ in rows:
                 print(f"      {t:<14}{str(d[k])[:130]}")
         if hard:
-            print("\n!! that includes a training-set or feature difference. "
-                  "These members were not trained on the same data; do not "
-                  "blend them or pick weights across them.")
+            print("\n!! that includes a TRAINING-SET difference "
+                  f"({', '.join(hard)}). These members were not trained on the "
+                  "same data; do not blend them or pick weights across them.")
             bad.extend(t for t, *_ in rows)
+        else:
+            print("\nThe training set matches across all members; the "
+                  "differences above are model shape, not data. Confirm each "
+                  "is intended before blending.")
     elif len(rows) > 1:
         print("identity matches across all members"
               + (" (STRONG)" if not weak_rows else ""))
