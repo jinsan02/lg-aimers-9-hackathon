@@ -18,6 +18,15 @@ processes, GPU 695 MiB / 1%. `desktop-4070` and `hsu-server` offline.
 `.deploy_history` — the single-line stamp had been overwritten by a later
 deploy, which is how the first RANK16 scout's source commit was lost.
 
+**Four axes closed on 2026-08-15, no submission candidate produced.** RANK16
+FAIL (−219.73), H1ADD base-only DROP (+0.387, CI upper +2.61), D12 FAIL
+(−62.96), P3-A CLOSED (−0.23). Three of the four cost no GPU at all. Next
+unstarted item is **P3-B, a common base tree budget** — it needs 6 GPU refits at
+one fixed budget (the median of the same-host fresh `CTRL_base` stopping points:
+938, 1142, 1169, 1438, 1500, 1714 → **median 1303.5**), with `CTRL_base` as the
+same-host fresh control, and it has **not** been pre-registered yet. P3-C is
+designed only if P3-B produces nothing.
+
 **RANK16 is closed, FAIL on performance.** Seed-3 gate on the judging surface,
 all three members on the same host with identical `row_id` and target arrays:
 base 865.50, cell 881.02, **rank 28.73**; `CONTROL_CORE 888.81` vs
