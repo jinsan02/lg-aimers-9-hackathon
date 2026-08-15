@@ -208,9 +208,50 @@ other block reproduces within ±0.02. So the MV surrogate was a good stand-in fo
 *transfer* all along; its poor PredictionValuesChange agreement measured
 routing, which is exactly what the two taxonomies disagree about.
 
+## The supervision-geometry night (2026-08-15) — both tracks closed
+
+The attribution map said base and cell route the same information differently,
+so the open question was the objective, not another feature family. The Murphy
+decomposition agreed: on the judging surface a perfect recalibration of the core
+is worth **+13.3 BSS** (reliability is 0.013% of uncertainty) while +0.001 of
+absolute resolution is worth **+400**. Two supervision geometries were tried.
+
+**Ranking (PairLogitPairwise, group16) — BLOCKED, not judged.** The fitted model
+cannot be scored. Loading the saved `.cbm` and predicting **100 rows on the
+laptop's CPU** segfaults. Not OOM (22 GB free), not this machine (two hosts),
+not `task_type=GPU` alone (40k x 60 trees is fine), not the categorical set
+(121 features and 9 categoricals at 60k x 30 trees is fine) — it is scale: at
+300 trees `predict` hangs, at 1224 it segfaults. The old BANNED note blamed the
+refit; the refit was only the first thing that ever touched the model. CPU
+training is the sole remaining route at a measured **9.7 h/seed**, so ~58 h for
+the 6-seed judgement. No number was produced and no verdict is claimed on the
+hypothesis. The four-process infrastructure (`--rank-stage 1/15/2/25`), the
+handoff frame-equivalence guard and `tests/test_rank_contract.py` survive.
+
+**FM_MULTILABEL_V2 — FAIL at the single-seed gate.** Both label defects repaired
+first: partition-safe recovery (113 rows) and complete-case training (99.849%
+kept, 1,691 dropped) instead of `nan_to_num(..., 0)` asserting "did not happen"
+for "unknown". Artifact sound, fingerprint identical to the controls. **ML_CORE
+876.73 against CONTROL_CORE 888.81, delta −12.07** — the pre-registered FAIL
+condition. Mechanism: the multilabel member's resolution is **0.002173, the base
+arm's 0.002174 and below the cell arm's 0.002207**, so swapping it into the cell
+slot costs exactly the resolution the cell geometry was contributing.
+
+**Two packaging traps found, both fixed.** A CatBoost object drops custom
+attributes through joblib, so `_rank_calib` came back MISSING from every saved
+rank pkl and inference would have shipped a clipped raw PairLogit score as
+P(success) — mean 0.2279 against a calibrated 0.5417. `_fm_multilabel` had the
+same exposure: without it a reloaded multilabel model looks binary and column 1,
+P(middle), is read as P(success). Both now travel in the pack dict, and the rank
+path **raises** rather than degrading when the calibration is absent.
+
+**`schtasks` on the 5070 is not broken** — it was registered `Interactive only`
+and the console session belongs to a different account, so it waited forever
+(`267011` = never started). `/ru SYSTEM` fires. See `tools/run5070.sh`.
+
 ## Next candidates
 
-1. **FM_MULTILABEL_V2 — HOLD.** The calibration fired the branch that
+1. **FM_MULTILABEL_V2 — closed by measurement, not HOLD any more.** The calibration fired the branch that
    deprioritises it: family-specific feature admission is not supported, and it
    may only be revisited as *the same information under a different supervision
    geometry*, never as a family-specialisation play. It still needs the
