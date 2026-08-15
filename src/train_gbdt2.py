@@ -415,6 +415,78 @@ def _assert_partitions(train, args, is_val, is_fit):
           + (f" | test @{args.test_season}" if args.test_season else ""))
 
 
+def _d12_checkpoint(args, clf, train, features, is_val, succ, fm, mc_iter):
+    """Pick the cell checkpoint that minimises the FIXED-CORE Brier on the
+    selection season, not the one that minimises MultiClass loss.
+
+    The base predictions are read from an npz and re-attached **by row_id**;
+    position agreement between two separately written files is an assumption,
+    not a fact. The grid, the tie-break and its 0.05 tolerance are fixed in
+    `docs/D12_PREREGISTRATION_20260815.md` and are not refined after the curve
+    is seen -- a finer grid around the winner is a search.
+
+    Returns the chosen iteration. Selection touches only the validation season;
+    the untouched season is not read here.
+    """
+    import pandas as pd
+
+    vid = train.loc[is_val, "row_id"].to_numpy()
+    # `np.load` on an npz keeps the archive open; without the context manager
+    # the file stays locked, which on Windows blocks anything that later tries
+    # to move or delete it.
+    with np.load(args.d12_base_preds, allow_pickle=True) as z:
+        base = pd.Series(z["pred"].astype(np.float64),
+                         index=z["row_id"]).reindex(vid).to_numpy()
+    if not np.isfinite(base).all():
+        raise SystemExit(
+            f"--d12-base-preds {args.d12_base_preds}: its row_id set does not "
+            f"cover the validation season, so the fixed core cannot be formed")
+    y = train.loc[is_val, TARGET].to_numpy(np.float64)
+    r = float(y.mean())
+    denom = r * (1.0 - r)
+    w = 0.55                                    # frozen, never fitted
+
+    Xv = train.loc[is_val, features]
+    step = int(args.d12_step)
+    rows = []
+    for i, proba in enumerate(
+            clf.staged_predict_proba(Xv, ntree_start=0,
+                                     ntree_end=clf.tree_count_,
+                                     eval_period=step)):
+        it = min((i + 1) * step, clf.tree_count_)
+        core = (1 - w) * base + w * fm.success_prob(proba, succ)
+        rows.append((it, 1e5 * (1 - np.mean((np.clip(core, 0, 1) - y) ** 2)
+                                / denom)))
+    if not rows:
+        raise SystemExit("D12: the staged grid is empty")
+
+    best = max(s for _, s in rows)
+    # Tie-break 1 is the maximum; tie-break 2 takes the smallest iteration
+    # within 0.05 BSS of it. The pre-registered tie-break 3 (nearest to the
+    # incumbent) cannot fire -- iteration counts on the grid are distinct, so
+    # the minimum is unique -- and is left unimplemented rather than written as
+    # dead code that looks like it does something.
+    near = [it for it, s in rows if best - s <= 0.05]
+    pick = min(near)
+    print(f"D12: grid {rows[0][0]}..{rows[-1][0]} step {step} "
+          f"({len(rows)} checkpoints)", flush=True)
+    print(f"D12: fixed-core BSS on the selection season -- best {best:.2f} at "
+          f"iter {max(rows, key=lambda t: t[1])[0]}, "
+          f"{len(near)} within 0.05, chosen {pick}", flush=True)
+    mc_core = [s for it, s in rows if it >= mc_iter]
+    print(f"D12: incumbent MultiClass iter {mc_iter} -> fixed-core "
+          f"{(mc_core[0] if mc_core else float('nan')):.2f}; "
+          f"candidate {pick} -> {dict(rows)[pick]:.2f}", flush=True)
+    if pick == mc_iter:
+        print("D12: the two selectors agree -- NO-OP, close the axis",
+              flush=True)
+    np.savez_compressed(f"./out/d12_curve_{args.tag}.npz",
+                        iters=np.array([t[0] for t in rows]),
+                        bss=np.array([t[1] for t in rows]),
+                        mc_iter=mc_iter, picked=pick)
+    return int(pick)
+
+
 def run_cat(args, train, features, is_val, train_dep=None):
     """`train` is the selection view. `train_dep`, when given, is the same rows
     featurised by an artifact fitted on the whole final-train partition, and is
@@ -478,6 +550,15 @@ def run_cat(args, train, features, is_val, train_dep=None):
         cell_proba = clf.predict_proba(train.loc[is_val, features])
         p = fm.success_prob(cell_proba, succ)
         best_iter = clf.get_best_iteration()
+        if args.d12_base_preds:
+            # D12: choose the checkpoint by the objective we are actually
+            # scored on -- the Brier of 0.45*base + 0.55*sum(success cells) --
+            # instead of by 12-class MultiClass loss. Supervision, taxonomy,
+            # blend weight and post-processing are untouched; only the
+            # iteration the refit is scaled from changes.
+            # Pre-registered in docs/D12_PREREGISTRATION_20260815.md.
+            best_iter = _d12_checkpoint(args, clf, train, features, is_val,
+                                        succ, fm, best_iter)
         clf._fm_success = sorted(succ)      # 추론에서 성공 셀을 알아야 한다
         if args.dump_cell_proba:
             # 성공 셀을 합친 스칼라만 저장하면 14개 실패 구성의 정보가 사라진다.
@@ -1598,6 +1679,18 @@ def main():
                          "(default ./out/rank_meta_<tag>.json)")
     ap.add_argument("--rank-group-size", type=int, default=64,
                     help="PairLogitPairwise 학습 블록 크기. row_id 시간순 고정 블록")
+    ap.add_argument("--d12-base-preds", default="",
+                    help="D12: path to the FIXED base predictions npz for the "
+                         "selection season. When set (with --failmode-cells), "
+                         "the cell checkpoint is chosen by the Brier of "
+                         "0.45*base + 0.55*sum(success cells) instead of by "
+                         "MultiClass loss. Supervision, taxonomy and blend "
+                         "weight are unchanged. See "
+                         "docs/D12_PREREGISTRATION_20260815.md.")
+    ap.add_argument("--d12-step", type=int, default=25,
+                    help="D12 staged-prediction grid spacing, fixed at 25 by "
+                         "the pre-registration. Do not refine it after seeing "
+                         "the curve.")
     ap.add_argument("--stage-run-id", default="",
                     help="announce stage completion to out/handoff/<stage>."
                          "ready.json under this run id, so a supervisor task "
