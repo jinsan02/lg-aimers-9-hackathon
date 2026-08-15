@@ -8,7 +8,7 @@ Claude
 
 ## Next Agent
 
-Claude
+Codex — P3-C2 implementation, see docs/P3C2_HANDOFF_TO_CODEX.md
 
 ## Status
 
@@ -18,14 +18,22 @@ processes, GPU 695 MiB / 1%. `desktop-4070` and `hsu-server` offline.
 `.deploy_history` — the single-line stamp had been overwritten by a later
 deploy, which is how the first RANK16 scout's source commit was lost.
 
-**Four axes closed on 2026-08-15, no submission candidate produced.** RANK16
-FAIL (−219.73), H1ADD base-only DROP (+0.387, CI upper +2.61), D12 FAIL
-(−62.96), P3-A CLOSED (−0.23). Three of the four cost no GPU at all. Next
-unstarted item is **P3-B, a common base tree budget** — it needs 6 GPU refits at
-one fixed budget (the median of the same-host fresh `CTRL_base` stopping points:
-938, 1142, 1169, 1438, 1500, 1714 → **median 1303.5**), with `CTRL_base` as the
-same-host fresh control, and it has **not** been pre-registered yet. P3-C is
-designed only if P3-B produces nothing.
+**Next agent: Codex.** P3-C2 is pre-registered with its safety gate passed and
+its implementation not started — the brief is
+[docs/P3C2_HANDOFF_TO_CODEX.md](docs/P3C2_HANDOFF_TO_CODEX.md), with the frozen
+contract in [docs/P3C2_PREREGISTRATION_20260815.md](docs/P3C2_PREREGISTRATION_20260815.md).
+Weights `w9 = 0.70575412, w10 = 1.71504249, w11 = 1.0`, mass preserved exactly,
+all eight checks PASS. The predecessor P3-C stays **HOLD** (its gate fired at
+`w11 = 207.03`) and must not be re-run. **Five axes closed on 2026-08-15 with no
+submission candidate; zero GPU was spent on P3-C or P3-C2.**
+
+The five: RANK16 **FAIL** (−219.73), H1ADD base-only **DROP** (+0.387, CI upper
++2.61), D12 **FAIL** (−62.96), P3-A **CLOSED** (−0.23), P3-B **DROP** (+0.278,
+CI [−1.28, +1.84]). Only RANK16, D12 and P3-B used the GPU at all. P3-B's
+common budget **803** did halve the dispersion it targeted (base BSS sd 3.702 →
+1.781, best_iter sd 50.5 → 0) and every segment came out positive, but the size
+was ~+0.3 rather than +3 and one seed carried it — no further budget, quantile
+or multiplier search.
 
 **RANK16 is closed, FAIL on performance.** Seed-3 gate on the judging surface,
 all three members on the same host with identical `row_id` and target arrays:
@@ -45,7 +53,7 @@ sha256 `c2771bfdbbd9d81f9e43632d57fea5befeb16ff59478af06fb86114a4c6e7332`).
 Unchanged — nothing has cleared the bar since, and all 14 shipped members were
 re-verified bit-identical through the current `fpipe` on 2026-08-15
 (`tools/verify_champion_identical.py`: 14/14 max |diff| 0.00e+00, blend
-0.5087694207). Ledger 692 rows, SETTLED 158 FLAG lines.
+0.5087694207). Ledger 706 rows, SETTLED 168 FLAG lines.
 
 ### 0815 브랜치 팀원 공유 기록 — Codex 1차 분석(잠정)
 
