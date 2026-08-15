@@ -610,3 +610,13 @@ Judging tools: `tools/arm_compare.py` (paired, prints best_iter),
 `tools/cell_arm_delta.py` (holds a base family fixed),
 `tools/orphan_audit.py` (lead generator only — its raw deltas pair baselines
 naively and put distillation at +241).
+
+## Independent local P3-C2 replication
+
+After the primary 5070 FAIL was recorded, the same seed-3 experiment was run
+independently on the current RTX 3070 Ti with a fresh local base and control.
+Fixed core moved **890.294435 -> 885.486834 = -4.807601**; source 2023, both
+2024 row halves, both calendar halves, and R/F were all negative. The machines'
+point estimates are not pooled, but both fire the same `delta <= 0` FAIL branch.
+Closure and champion status are unchanged. Details:
+[docs/P3C2_LOCAL_REPLICATION_20260815.md](docs/P3C2_LOCAL_REPLICATION_20260815.md).
