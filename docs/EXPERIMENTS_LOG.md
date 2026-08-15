@@ -1284,3 +1284,11 @@ feature discovery 가 아니다. 같은 base family 의 시드 수를 늘려
 **앙상블 분산을 줄인 것**이고 사전 등록된 이유다. 구조 변경 위험이 매우 낮고
 로컬에서 +0.89 가 확인됐다 — LB 이득이 보장된다는 뜻이 아니다.
 (이전 기록에서 이를 "위험 0" 이라고 쓴 것은 과한 표현이었다.)
+# 2026-08-16 E-LB1 fixed-shift probes
+
+Champion B1S8 baseline was `1108.4333490288`. The script-only `+0.010` probe
+scored `1088.4373257989` (32 s) and the `-0.010` probe scored
+`1047.936715123` (31 s). Both are worse than baseline, with the positive arm
+less harmful. The pre-registered quadratic gives second difference
+`-80.4926571357`, optimum `delta=+0.002515795361`, expected gain `+2.547281`
+and expected score `1110.980630`. No other model, weight or constant changed.

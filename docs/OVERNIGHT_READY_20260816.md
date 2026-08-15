@@ -42,9 +42,23 @@ The baseline is frozen at `1108.4333490288`. Stop if curvature is non-concave,
 overnight because doing so before the two scores exist would fabricate the only
 value it is meant to contain.
 
+## Official probe results received 2026-08-16
+
+- baseline: `1108.4333490288`
+- `+0.010`: `1088.4373257989`
+- `-0.010`: `1047.936715123`
+- second difference: `-80.4926571357` (valid concave response)
+- fitted optimum: `+0.002515795361`
+- fitted gain: `+2.547281`
+- fitted score: `1110.980630`
+
+Both large probes lost because Brier calibration is very sensitive at a 0.01
+shift, but the asymmetric losses identify a small positive optimum. The optimum
+is inside the pre-registered +/-0.02 bound. A final script-only package is built
+with the 12-decimal fixed delta and must be fully re-audited before submission.
+
 ## GSK2 result
 
 GSK2 is **HOLD**, not ready for submission: six-seed fixed-core mean +3.141,
 t=4.168, ensemble +3.108, but F=-3.126 violates the pre-registered non-negative
 segment gate. Full machine-readable report: `out/gsk2_gate.json`.
-

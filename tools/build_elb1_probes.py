@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import os
@@ -37,6 +38,16 @@ def safe_names(zf):
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--final-delta", type=float)
+    args = ap.parse_args()
+    arms = ARMS
+    report_name = "elb1_manifest.json"
+    if args.final_delta is not None:
+        if not (-0.02 <= args.final_delta <= 0.02):
+            raise SystemExit("final delta outside pre-registered [-0.02, 0.02]")
+        arms = {"final": (args.final_delta, "elb1_final_0816.zip")}
+        report_name = "elb1_final_manifest.json"
     if sha_file(BASE) != BASE_SHA:
         raise SystemExit("champion ZIP hash drift")
     with zipfile.ZipFile(BASE) as zf:
@@ -49,8 +60,8 @@ def main():
     manifest = {"baseline": os.path.basename(BASE), "baseline_sha256": BASE_SHA,
                 "arms": {}}
     os.makedirs(os.path.join(ROOT, "submissions"), exist_ok=True)
-    for arm, (delta, filename) in ARMS.items():
-        signed = f"{delta:+.6f}"
+    for arm, (delta, filename) in arms.items():
+        signed = f"{delta:+.12f}" if arm == "final" else f"{delta:+.6f}"
         new = ("    # E-LB1 fixed final-output probe; no test-frame aggregate.\n"
                f"    return np.clip(p + mid + pb + ({signed}), 0, 1)")
         patched = script.replace(OLD, new).encode("utf-8")
@@ -73,7 +84,7 @@ def main():
         }
         print(f"{arm}: {out} | sha256 {manifest['arms'][arm]['zip_sha256']}")
 
-    report = os.path.join(ROOT, "out", "elb1_manifest.json")
+    report = os.path.join(ROOT, "out", report_name)
     os.makedirs(os.path.dirname(report), exist_ok=True)
     with open(report, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2)
