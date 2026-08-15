@@ -394,6 +394,19 @@ def _assert_partitions(train, args, is_val, is_fit):
         assert not (is_val & test_mask).any(), "validation and test overlap"
     # Table fitting (TE / priors / skill) must never see the validation season.
     assert not (s[is_fit] == args.val_season).any(), "fit partition contains the validation season"
+    # ...nor any season after it. The checks above only excluded the val and
+    # test seasons themselves, so `--val-season 2022` with no `--test-season`
+    # left 2023 and 2024 in fit, and `--val-season 2022 --test-season 2024`
+    # left 2023 -- both printed "partitions ok". A 2026-08-15 audit of all 692
+    # ledger rows found no run that took either path, so this closes a hole
+    # rather than invalidating anything; it is stated because it was not.
+    if is_fit.any():
+        _mx = int(s[is_fit].max())
+        assert _mx < int(args.val_season), (
+            f"fit partition reaches season {_mx}, which is not earlier than "
+            f"the validation season {args.val_season}. Tables fitted on it "
+            f"would carry the future. Use --max-train-season, or make the "
+            f"test season val+1.")
     if args.test_season:
         assert not (s[is_fit] == args.test_season).any(), "fit partition contains the test season"
     print(f"  partitions ok | fit {int(is_fit.sum()):,} (<= "

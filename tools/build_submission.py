@@ -72,6 +72,21 @@ def collect(members):
             raise SystemExit(f"{tag}: seeds disagree on the training-set "
                              f"fingerprint {sorted(uniq)}")
         print(f"  {tag}: {len(d)} seeds, fingerprint {uniq.pop() if uniq else 'n/a'}")
+    # ...and the tags must agree with each other. Checking only inside a tag
+    # would have passed a base fitted on one training set blended with a cell
+    # fitted on another -- the exact shape of the v16 (-6.15) and v17 (-53.6)
+    # mistakes, where a stray --drop-f-pre changed one member's data.
+    across = {}
+    for tag, d in fps.items():
+        for v in d.values():
+            if v is not None:
+                across.setdefault(round(v, 10), []).append(tag)
+    if len(across) > 1:
+        raise SystemExit(
+            "members disagree on the training-set fingerprint across tags: "
+            + "; ".join(f"{k} <- {sorted(set(t))}" for k, t in across.items())
+            + ". A blend of models trained on different data is not the model "
+              "that was measured.")
     return paths
 
 
@@ -82,8 +97,15 @@ def main():
     ap.add_argument("--constants", default="model/matchup_constants_2024.npz")
     ap.add_argument("--out", required=True)
     ap.add_argument("--skip-smoke", action="store_true",
-                    help="package without running the script. Use only when the "
-                         "same script already passed a smoke on this member set.")
+                    help="stage and check everything but REFUSE to write the "
+                         "zip. Use to inspect a candidate package; it can no "
+                         "longer produce a submittable artefact.")
+    ap.add_argument("--strong-audit", default="",
+                    help="path to the tools/audit_subset_independence.py "
+                         "report for this package. Required to write a zip: "
+                         "the packaged smoke only sees the 5-row public "
+                         "test.csv, which is too small for a per-player "
+                         "aggregate to surface.")
     a = ap.parse_args()
 
     print("members")
@@ -208,6 +230,22 @@ def main():
                   f"tools/audit_subset_independence.py for the strong version.")
         shutil.rmtree(os.path.join(stage, "output"), ignore_errors=True)
         shutil.rmtree(os.path.join(stage, "data"), ignore_errors=True)
+
+    # A zip is only written when every check actually ran. `--skip-smoke` used
+    # to turn the checks off and still produce a submittable artefact, which
+    # made the guards advisory; and the strong subset audit was only *mentioned*
+    # in a printed note, so the one check that can catch a per-player aggregate
+    # was never a gate. Both are gates now.
+    if a.skip_smoke:
+        raise SystemExit(
+            "--skip-smoke stages and checks but will not write a zip. Re-run "
+            "without it to produce a submittable artefact.")
+    if not a.strong_audit or not os.path.exists(a.strong_audit):
+        raise SystemExit(
+            "--strong-audit <report> is required. The packaged smoke runs on "
+            "the 5-row public test.csv, which cannot surface a per-player "
+            "aggregate; run tools/audit_subset_independence.py against the "
+            "staged package and pass its report here.")
 
     dest = os.path.join(ROOT, a.out)
     os.makedirs(os.path.dirname(dest), exist_ok=True)

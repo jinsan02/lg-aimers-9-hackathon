@@ -287,6 +287,191 @@ No GPU candidate is licensed. The GPU has been idle since 2026-08-14.
 
 HOLD, low expected value: `--refit-mult 2.0`, `--loss RMSE`, `--te-halflife 2`.
 
+---
+
+# Claude independent review of the Codex first pass — 2026-08-15
+
+Read-only. No code changed, no GPU run, `scripts/chain_rk16_s3_5070.bat`
+untouched. Every verdict is backed by the named file and line plus a
+reproduction on this tree at `0b06e60`.
+
+## Confirmed facts
+
+**A. Champion safety — CONFIRM.** `submissions/b1s8_20260813.zip` holds 22
+entries, 14 model pkls (8 base + 6 cell), and **no `failmode.py`**. The shipped
+`script.py:91` calls `fpipe.predict()`; both champion pack kinds go through it
+correctly — base returns `proba[:,1]`, cell returns the success-cell sum because
+`fm_success` is a **list** `[9, 10, 11]`, so the `if pack.get("fm_success"):`
+truthiness test is safe (a numpy array there would raise). Measured on 300 real
+2024 rows: base mean 0.519804, cell mean 0.516948. The defects below reach
+neither: B1S8 runs `--val-season 2024` with no test season, so its fit partition
+is ≤ 2023 and B1 cannot fire; it runs `--feat-k 200`, which equals
+`features.K = 200`, so B6 cannot fire. **No evidence B1S8 is invalid.**
+
+**B1. Temporal guard is incomplete — CONFIRM (code), no impact.**
+`src/train_gbdt2.py:378-398` asserts that no season exceeds `test_season`, that
+test rows are exactly the test season, and that fit contains neither val nor
+test. It never asserts `max(fit season) < val_season`. Minimal reproduction:
+`_assert_partitions` **passes** with `val=2022, test=None` and
+`fit = {2019, 2020, 2021, 2023, 2024}`, printing `fit 5 (<= 2024) | val 1 @2022`;
+and with `val=2022, test=2024`, leaving 2023 in fit. **A ledger audit over all
+692 rows finds 0 affected**, so nothing is invalidated.
+
+**B3. `fm_multilabel` never reaches the submission path — CONFIRM, most severe.**
+`src/fpipe.py:529-553` handles xgboost, `baseline_col` and `fm_success`, then
+falls through to `proba[:,1]`. It never reads `fm_multilabel`. Measured on the
+real `model/cat_ML2_s3.pkl`, whose pack **does** carry `fm_multilabel: True`:
+`fpipe.predict` returns **0.130428**, exactly head 1 `P(middle)`, against the
+correct head 0 `P(success)` of **0.493087**. Silent — no exception.
+
+**B4. Teacher distillation carries a temporal leak — CONFIRM.**
+`src/teacher.py:104` is `fold = rng.integers(0, args.folds, len(train))`, a
+row-random K-fold over every season at once. Row-self-target leakage is blocked;
+**season-transfer leakage is not** — a 2019 row's OOF teacher comes from a model
+fitted on 2020–2024 rows, and `--soft-target` feeds that into the student's
+training target. 58 ledger rows used it.
+
+**B5. RMSE refit uses the selection frame — CONFIRM (code), no impact.**
+`src/train_gbdt2.py:635` builds `full = Pool(train[features], ...)` where the
+normal base refit uses `train_dep[features]`, while the pack stores `art_dep`.
+`CatBoostRegressor` also has no `predict_proba`, so `fpipe.predict` would raise.
+**0 ledger rows use `--loss RMSE`.**
+
+**C8. `surf_report` centres on the evaluation season's own mean — CONFIRM.**
+`tools/surf_report.py:29` is `p = p - (p.mean() - r)` with `r = y.mean()` of the
+scored season. That constant is unavailable at submission time.
+
+**C10. The fingerprint is one float — CONFIRM.**
+`fpipe["priors"]["asof_pitcher_success_rate"]`, a single mean. It cannot
+distinguish a different row set, row order or feature order that shares that
+mean, and `tools/build_submission.py:73` compares only within a tag.
+
+**C11. The two judgement tools disagree — CONFIRM.** `tools/surf_report.py:82`
+uses `1.96 * se` at n=6; `tools/arm_compare.py:38,79` uses
+`t(.975, df=5) = 2.571`. Same n, different interval.
+
+**D12. The cell checkpoint is chosen on MultiClass loss — CONFIRM.**
+`src/train_gbdt2.py:460` fits `loss_function="MultiClass"` and takes
+`get_best_iteration()` from that curve, while the shipped quantity is
+`Brier(0.45*base + 0.55*sum(success cells))`.
+
+**E. `build_submission` can be bypassed — CONFIRM.** `--skip-smoke`
+(`tools/build_submission.py:84,113`) turns the checks off, the strong synthetic
+audit is only *mentioned* in a message at line 208 rather than run, and the
+fingerprint comparison never crosses base/cell tags.
+
+**F. `unittest discover` reports success on zero tests — CONFIRM.**
+`python -m unittest discover -s tests` prints `Ran 0 tests ... OK` and exits 0,
+because the tests are `main()`-style. There is **no CI at all** — no
+`.github/workflows` — so today this misleads a human rather than a pipeline.
+
+## Refuted / qualified findings
+
+**B2. Rank packaging — CONFIRM the disconnect, REFUTE the severity.** Codex is
+right that `fpipe.predict()` ignores `rank_calib` / `rank_ntree_end`. But a
+`CatBoostRanker` has **no `predict_proba`**, so the path raises
+`AttributeError: 'CatBoostRanker' object has no attribute 'predict_proba'`
+(reproduced with a mock pack carrying a real fpipe artifact and the real 121
+features). It is a **loud** failure, not a silently wrong number — the opposite
+of B3. It still blocks shipping, and a runtime error consumes a submission, so
+rank must not be packaged until `fpipe.predict` routes it; the *performance*
+measurement is unaffected because the trainer scores in-process through
+`_rank_probability`.
+
+**B6. `--feat-k` — CONFIRM the code defect, REFUTE the consequence.**
+`src/fpipe.py:86` passes `k=args.feat_k` at fit; line 301 calls
+`add_features(df, art["priors"])` with no `k`; `feat_k` occurs exactly **once**
+in `fpipe.py`, so it is never persisted. But `features.py:35` defaults to `k=K`
+and `features.py:23` is `K = 200`, and the ledger contains only `--feat-k 200`
+(226 rows) or no flag at all (466 rows, default 200). **The mismatch has never
+been exercised. There are no verdicts to invalidate.**
+
+**C9. Artifact consistency — PARTIAL.** `tools/arm_compare.py:59` uses
+`drop_duplicates("tag")` at the default `keep="first"`, and LEDGER is
+append-only, so a re-run tag would pair the **oldest** metadata with the
+**newest** predictions. Real hazard, but **0 tags currently have duplicate
+ledger rows**, so nothing on record is affected.
+
+**B7. Post-`fpipe` features — PARTIAL, not adjudicated.** I did not enumerate
+`feat-v4 / feat-v5 / extra_feats / PCA / role / fatigue / rules / ABS / gap /
+fill_prev` one by one, and will not classify them from reading alone. What is
+settled: **every flag in the B1S8 command is fpipe-side**, so the champion is
+unaffected. The rest needs the mechanical test below, not an opinion.
+
+## Existing results invalidated
+
+**None, on the evidence available.** B1 (0/692 rows), B6 (0 non-200 runs), B5
+(0 RMSE runs) and C9 (0 duplicate tags) all have empty footprints. B4 is the
+only one touching recorded results — 58 `--soft-target` rows — but
+`FLAG --soft-target | CLOSED` already rests on **submission-surface −10.19 with
+blend weight 0.00** and already attributes the judging-surface +38.43 to F rows
+only the teacher saw. The temporal leak inflates the teacher, so it makes a
+negative closure **more** conservative. No verdict flips.
+
+What *is* wrong on record is a claim of mine: the 2026-08-15 packaging line
+implied the path was repaired because the keys are stored. The keys are stored
+and **no consumer reads them**. Corrected append-only, not by editing.
+
+## Champion safety verdict
+
+**SAFE.** B1S8 is unaffected by every confirmed defect, for reasons that are
+properties of its own command rather than luck about the bugs
+(`--val-season 2024` with no test season; `--feat-k 200 == K`; only fpipe-side
+flags; binary and cell packs only). No re-submission or re-packaging is required.
+
+## Required fixes, in order
+
+1. **`fpipe.predict` must route by pack kind, or refuse.** Add `rank_calib` and
+   `fm_multilabel` branches and make an unrecognised pack raise rather than fall
+   through to `proba[:,1]`. This is the only fix that closes a *silent* wrong
+   answer (B3), and it also removes B2 and half of B5.
+2. **Temporal guard**: assert `max(fit season) < val_season` (B1).
+3. **Store `feat_k` in the artifact and read it in `transform`** (B6).
+4. **`build_submission`**: make the strong subset audit required, compare
+   fingerprints across base and cell tags, and make `--skip-smoke` refuse to
+   write a zip rather than skipping checks (E).
+5. **Fingerprint**: sorted-row_id hash + row count + ordered feature hash + key
+   params, replacing the single float (C10).
+6. **RMSE refit**: use `train_dep` like the other refits (B5).
+7. **Teacher**: rolling OOF — season S predicted by a teacher fitted on < S — or
+   leave the axis closed (B4).
+8. **Judgement tools**: one interval convention, and `keep="last"` in
+   `arm_compare` (C9, C11).
+
+## Regression tests required
+
+- `fpipe.predict` on a rank pack, a multilabel pack and an unknown pack: the
+  first two must equal the sanctioned path, the third must raise. **This test
+  would have caught B2 and B3 and nothing currently does** —
+  `test_rank_contract` exercises `rank_probability_from_pack`, which the
+  submission never calls.
+- `_assert_partitions` must reject `val=2022, test=None` with 2023/2024 in fit.
+- fit/transform parity for `--feat-k != 200` on a small frame.
+- `build_submission --skip-smoke` must not produce a zip.
+- Replace `unittest discover` with a runner that **fails on zero tests
+  collected**.
+
+## Experiments allowed after repair
+
+- RANK16 performance measurement may proceed **without** fix 1, because the
+  trainer scores in-process; no rank pack may be packaged or submitted until fix
+  1 lands. The seed-3 chain launched before this review is being allowed to
+  finish; its numbers are held, not judged.
+- FM_MULTILABEL_V2 stays closed on performance (−12.07) regardless.
+- D12's cell-checkpoint experiment is a genuine single change and is **not**
+  duplicated by `--eval-metric BrierScore` (that was the binary arm) or by the
+  cell-5000 and multilabel axes. It is not licensed by anything measured today
+  and belongs behind the current queue.
+
+## Handoff back to Codex
+
+Numbers and citations are reproducible on `0b06e60`. Two places where I differ
+from the first pass and the difference matters: **B2 is loud, not silent** (so
+B3 is the one to fix first), and **B6 has no footprint at all** (so no
+re-adjudication of past runs is needed). B7 is left explicitly unadjudicated
+rather than guessed.
+
+
 ## Adoption rule (unchanged)
 
 ```

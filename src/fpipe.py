@@ -83,6 +83,12 @@ def fit(train, args, is_fit, tm_table=None, verbose=True):
     if args.feat_v2:
         from features import NEW_CAT, add_features, compute_priors
         art["priors"] = compute_priors(train.loc[is_fit])
+        # The shrinkage strength has to travel with the artifact. It used not
+        # to, so `transform` always used the module default and any model
+        # trained with `--feat-k != 200` scored on different features than it
+        # learned. No run ever did (the ledger holds only 200 or the flag
+        # absent), so this is a hole being closed, not a result being fixed.
+        art["feat_k"] = int(args.feat_k)
         train, cols = add_features(train, art["priors"], k=args.feat_k)
         new_cols += cols
         new_cats += [c for c in NEW_CAT if c in cols]
@@ -297,8 +303,11 @@ def transform(df, art):
     if art.get("tm_table") is not None:
         df, _ = merge_tm(df, art["tm_table"])
     if art.get("priors") is not None:
-        from features import add_features
-        df, _ = add_features(df, art["priors"])
+        from features import K as _FEAT_K_DEFAULT, add_features
+        # Artifacts written before 2026-08-15 have no feat_k; they were all
+        # fitted at the default, so falling back to it reproduces them exactly.
+        df, _ = add_features(df, art["priors"],
+                             k=int(art.get("feat_k", _FEAT_K_DEFAULT)))
     if art.get("league_runner"):
         df["league_runner"] = (df["game_type"].astype(str) + "_" +
                                df["num_runners_on"].astype(str))
@@ -526,8 +535,37 @@ def design(df, pack):
     return X
 
 
+def _rank_probability(raw, calib):
+    """Sigmoid fitted on the source validation season, frozen for inference."""
+    a, b, mu, sd = (float(calib[k]) for k in ("a", "b", "mu", "sd")) \
+        if isinstance(calib, dict) else (float(v) for v in calib)
+    z = (np.asarray(raw, np.float64) - mu) / max(sd, 1e-12)
+    return 1.0 / (1.0 + np.exp(-np.clip(a + b * z, -30, 30)))
+
+
 def predict(pack, test):
-    """아티팩트 하나로 예측까지."""
+    """아티팩트 하나로 예측까지 — **pack 종류를 명시적으로 분기한다**.
+
+    2026-08-15 audit: this function used to end in `return proba[:, 1]` for
+    everything it did not recognise, and it recognised only xgboost, a baseline
+    column and `fm_success`. Two pack kinds fell off that edge:
+
+      * a **multilabel** pack (`fm_multilabel`) returned column 1, `P(middle)`,
+        as `P(success)` -- measured on `cat_ML2_s3.pkl`, **0.130428 against a
+        true 0.493087**, silently.
+      * a **ranker** pack has no `predict_proba` at all, so it raised
+        `AttributeError` here while the trainer scored it correctly in-process.
+        A runtime error in `script.py` costs a submission.
+
+    Both packs already carried the keys that describe them; nothing read them.
+    So the dispatch is now explicit and **anything unrecognised raises** rather
+    than falling through to a plausible-looking column. In particular a
+    multiclass classifier with no `fm_success` and no `fm_multilabel` is refused
+    instead of being read as binary.
+
+    The binary and cell paths are byte-identical to before -- asserted in
+    `tests/test_predict_routing.py` against the champion's own packs.
+    """
     src = transform(test, pack)
     model = pack["model"]
     if type(model).__module__.startswith("xgboost"):
@@ -537,6 +575,28 @@ def predict(pack, test):
             X[c] = X[c].astype("category")
         return np.asarray(model.predict(xgb.DMatrix(X, enable_categorical=True)))
     X = design(src, pack)
+    cls = type(model).__name__
+
+    # ---- ranking: raw PairLogit scores are not probabilities ---------------
+    if cls.endswith("Ranker") or pack.get("rank_calib") is not None:
+        calib = pack.get("rank_calib")
+        if calib is None:
+            raise ValueError(
+                "fpipe.predict: ranker pack has no rank_calib. A raw PairLogit "
+                "score is not a probability and must not be clipped into one.")
+        ne = int(pack.get("rank_ntree_end") or 0)
+        raw = (model.predict(X, ntree_start=0, ntree_end=ne) if ne
+               else model.predict(X))
+        return _rank_probability(raw, calib)
+
+    # ---- regression on the 0/1 target: predict() already is the probability -
+    if cls.endswith("Regressor"):
+        return np.clip(np.asarray(model.predict(X), np.float64), 0.0, 1.0)
+
+    if not hasattr(model, "predict_proba"):
+        raise ValueError(f"fpipe.predict: {cls} has no predict_proba and no "
+                         f"branch here knows how to score it")
+
     baseline_col = pack.get("baseline_col") or getattr(model, "_baseline_col", "")
     if baseline_col:
         from catboost import Pool
@@ -546,8 +606,18 @@ def predict(pack, test):
         proba = model.predict_proba(pool)
     else:
         proba = model.predict_proba(X)
+
     if pack.get("fm_success"):
         # E124: 실패모드 셀 다중분류. P(성공) = 성공 비트를 가진 셀들의 합.
         # 셀에 타깃 비트를 넣었으므로 이 합산은 근사가 아니라 정확하다.
         return proba[:, pack["fm_success"]].sum(axis=1)
-    return proba[:, 1]
+    if pack.get("fm_multilabel"):
+        # MultiLogloss over [control_success, middle, ball, reverse]: four
+        # independent sigmoids sharing one ensemble. Head 0 is the target.
+        return proba[:, 0]
+    if proba.shape[1] == 2:
+        return proba[:, 1]
+    raise ValueError(
+        f"fpipe.predict: {cls} returned {proba.shape[1]} columns and the pack "
+        f"declares neither fm_success nor fm_multilabel. Refusing to guess "
+        f"which column is P(success).")
