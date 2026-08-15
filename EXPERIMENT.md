@@ -11,6 +11,20 @@
 Brier Skill Score 최대화. 1차 목표 **1120대 합법 진입**. 사용자 제공 리더보드에서
 최근 확인한 최고점은 1,288.180881이며 실시간 현재값은 별도 확인 전이다.
 
+## 2026-08-16 RMSE2 corrected direct-Brier path — DROP
+
+RMSE 선택·배포 경로의 refit-frame 결함을 고친 뒤, 5070 동일 세션에서
+fresh Logloss control과 6시드 paired 판정을 완료했다. 강한 fit-row/feature
+지문이 일치했고, 여섯 candidate pack 모두 새 프로세스에서 저장 예측을
+bit-identical하게 재현했으며 subset drift는 0이었다.
+
+고정 cell을 결합한 untouched-2024 core delta는 **-0.376**, SE 0.927,
+t -0.41, Student-t 95% CI **[-2.759, +2.008]**, ensemble **-0.798**이다.
+전/후반 -0.077/-1.519, R/F -0.815/-0.674로 전 구간 음수였고 95% 상한이
++3에 못 미쳐 사전등록대로 DROP한다. 직접 Brier 회귀는 resolution을 아주
+조금 늘렸지만 seed 변동과 평균 손실을 이기지 못했다. loss·eval metric·clip·
+tree budget 변형이나 seed 확장은 하지 않는다.
+
 ## 2026-08-16 F1 partial-pooling adapter — FAIL
 
 F만 `sigmoid(logit(p0)+Xbeta)`로 보정하고 R을 bit-identical로 고정한
