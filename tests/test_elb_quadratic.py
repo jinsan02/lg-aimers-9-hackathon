@@ -14,6 +14,7 @@ def main():
     got = solve(score(0), score(.01), score(-.01))
     assert abs(got["delta_star"]-.004) < 1e-12
     assert abs(got["expected_gain"]-6.4) < 1e-10
+    assert abs(.55 + got["delta_star"] - .554) < 1e-12
     assert got["within_preregistered_bound"]
     try:
         solve(1, 2, 2)

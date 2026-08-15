@@ -68,3 +68,26 @@ nearby shifts.
 GSK2 is **HOLD**, not ready for submission: six-seed fixed-core mean +3.141,
 t=4.168, ensemble +3.108, but F=-3.126 violates the pre-registered non-negative
 segment gate. Full machine-readable report: `out/gsk2_gate.json`.
+
+## E-LB2 probes ready — do not submit until the user chooses
+
+These start from the verified E-LB1 champion and change only `_W_CELL`:
+
+- `submissions/elb2_w045_0816.zip` (w=.45), SHA256
+  `61e48d0ff7d169bf0243d0983de0aaf48d3175606ea9a32244a6da6a469e2dfc`
+- `submissions/elb2_w065_0816.zip` (w=.65), SHA256
+  `b42c42be94f831fd97041b6a9d5c93d5926ba7653e0f6258e1f09bbb742f1914`
+
+Both have 22 members, differ from E-LB1 final only in `script.py`, finish the
+245,789-row synthetic inference in 35 seconds, and pass strong subset audits
+with worst drift 0. If both official scores are later obtained, calculate with:
+
+```powershell
+.\.venv\Scripts\python.exe tools\elb_quadratic.py `
+  --base 1110.9806302398 --plus SCORE_W065 --minus SCORE_W045 `
+  --h .10 --center .55
+```
+
+Here `plus` means the parameter's positive direction (w=.65), and `minus`
+means w=.45. This is a local approximation because the logit slope follows the
+blend; accept only under the separate E-LB2 preregistration gate.

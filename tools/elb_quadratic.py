@@ -24,8 +24,12 @@ def main():
     ap.add_argument("--plus", type=float, required=True)
     ap.add_argument("--minus", type=float, required=True)
     ap.add_argument("--h", type=float, default=.01)
+    ap.add_argument("--center", type=float, default=0.0,
+                    help="absolute baseline parameter; reports center+delta_star")
     a = ap.parse_args()
     ans = solve(a.base, a.plus, a.minus, a.h)
+    ans["center"] = a.center
+    ans["parameter_star"] = a.center + ans["delta_star"]
     print(json.dumps(ans, indent=2))
     return 0 if ans["within_preregistered_bound"] else 2
 
