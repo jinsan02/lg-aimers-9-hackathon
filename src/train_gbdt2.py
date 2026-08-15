@@ -802,6 +802,24 @@ def rank_probability_from_pack(pack, X):
     return _rank_probability(raw, (a, b, mu, sd))
 
 
+def _hard_exit(code=0):
+    """Terminate now, whatever the runtime's other threads are doing.
+
+    `os._exit(0)` was not enough. A stage-1 process that had already written its
+    model and its handoff sat alive for 8.6 hours afterwards, burning 9.2 hours
+    of CPU across two spinning threads at 33 MB resident -- so the batch waited
+    on it and the rest of the chain never ran. The work was complete on disk the
+    whole time. TerminateProcess does not ask the runtime's permission.
+    """
+    sys.stdout.flush()
+    sys.stderr.flush()
+    if os.name == "nt":
+        import ctypes
+        k = ctypes.windll.kernel32
+        k.TerminateProcess(k.GetCurrentProcess(), int(code))
+    os._exit(code)
+
+
 def _rank_meta_path(args):
     return args.rank_meta or f"./out/rank_meta_{args.tag}.json"
 
@@ -835,6 +853,8 @@ def run_rank(args, train, features, is_val, art=None, train_dep=None):
 
     if args.rank_stage == 15:
         return _run_rank_stage15(args, train, features, is_val, art)
+    if args.rank_stage == 25:
+        return _run_rank_stage25(args, train, features, is_val, art)
     if args.rank_stage not in (1, 2):
         # FLAG --model rank full-refit is BANNED in one process: group16 crashed
         # natively on both the 4070 and the A100. Refuse rather than reproduce.
@@ -911,9 +931,7 @@ def run_rank(args, train, features, is_val, art=None, train_dep=None):
     # os._exit skips interpreter teardown too, which is itself a candidate for
     # the abort (tearing down a CUDA context at exit). Nothing further in stage
     # 1 is wanted, and a clean exit code is what the chain checks.
-    sys.stdout.flush()
-    sys.stderr.flush()
-    os._exit(0)
+    _hard_exit(0)
 
 
 def _run_rank_stage15(args, train, features, is_val, art):
@@ -1047,9 +1065,56 @@ def _run_rank_stage2(args, train, features, is_val, art, train_dep=None):
     print(f"  refit: {trees} trees (best_iter {best_iter} x "
           f"{args.refit_mult}), group {args.rank_group_size}", flush=True)
     final.fit(full)
-    _snap("rank refit", final)
-    final._rank_calib = calib
-    return final, p, best_iter
+    # Same discipline as stage 1: this process does not touch the model again.
+    # Everything after a GPU ranker fit has either aborted (exit 255, three
+    # times) or refused to exit (8.6 hours), and stage 2 has more to do
+    # afterwards than stage 1 did -- score the unseen season, package the pkl.
+    cbm2 = f"./out/rank_stage2_{args.tag}.cbm"
+    print("MARK stage2 fit_returned", flush=True)
+    final.save_model(cbm2)
+    print(f"MARK stage2 model_saved -> {cbm2}", flush=True)
+    meta["stage2_model_file"] = cbm2
+    meta["stage2_trees"] = int(trees)
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(meta, fh, indent=1, default=str)
+    print(f"MARK stage2 meta updated -> {path}", flush=True)
+    _hard_exit(0)
+
+
+def _run_rank_stage25(args, train, features, is_val, art):
+    """Load stage 2's deployment ranker and hand it to the normal save path.
+
+    CPU only. The model is fitted with exactly `stage2_trees` iterations and no
+    early stopping, so there is no prefix to slice: ntree_end is 0, meaning all
+    trees. The calibration is stage 1b's, fitted on the selection model over the
+    source validation season, which is the contract -- calibrating on this
+    model's own training rows would be in-sample.
+    """
+    from catboost import CatBoostRanker
+
+    path = _rank_meta_path(args)
+    with open(path, encoding="utf-8") as fh:
+        meta = json.load(fh)
+    if "stage2_model_file" not in meta:
+        raise SystemExit("rank stage2b: stage 2 never saved a model")
+    if list(meta["features"]) != list(features):
+        raise SystemExit("rank stage2b: stage 2 described a different frame")
+    c = meta["calib"]
+    calib = (float(c["a"]), float(c["b"]), float(c["mu"]), float(c["sd"]))
+    model = CatBoostRanker()
+    model.load_model(meta["stage2_model_file"])
+    model._rank_calib = calib
+    model._rank_ntree_end = 0          # fitted to length; nothing to slice
+    print(f"loaded {meta['stage2_model_file']} ({model.tree_count_} trees), "
+          f"calib a={calib[0]:.6f} b={calib[1]:.6f}", flush=True)
+
+    z = np.load(meta["val_preds"], allow_pickle=True)
+    s_ = pd.Series(z["pred"].astype(np.float64), index=z["row_id"])
+    p = s_.reindex(train.loc[is_val, "row_id"]).to_numpy()
+    if not np.isfinite(p).all():
+        raise SystemExit("rank stage2b: stage 1b val predictions do not cover "
+                         "this frame")
+    return model, p, int(meta["best_iteration"])
 
 
 def run_lgb(args, train, features, is_val):
@@ -1352,7 +1417,7 @@ def main():
                     help="failmode-cells 검증/test의 전체 클래스 확률을 저장. "
                          "학습이나 저장 모델은 바꾸지 않는 분석 전용 출력")
     ap.add_argument("--rank-stage", type=int, default=0,
-                    choices=[0, 1, 15, 2],
+                    choices=[0, 1, 15, 2, 25],
                     help="1 = selection only, write meta and stop; 2 = fresh "
                          "process, read meta and fit the deployment ranker. "
                          "0 refuses to refit (SETTLED bans it in one process).")
