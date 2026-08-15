@@ -34,6 +34,8 @@ def main():
     assert "Pool(train_dep[features]" in block
     assert "_refit_weights(args, train_dep)" in block
     assert "Pool(train[features]" not in block
+    assert 'eval_metric="RMSE"' in block
+    assert '"CrossEntropy", "RMSE"' in source
     print("RMSE deployment refit contract PASS")
     return 0
 

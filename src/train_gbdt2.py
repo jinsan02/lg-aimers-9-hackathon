@@ -850,6 +850,7 @@ def run_cat(args, train, features, is_val, train_dep=None):
             bagging_temperature=args.bagging_temp,
             random_strength=args.random_strength,
             task_type=args.device, devices="0", loss_function="RMSE",
+            eval_metric="RMSE",
             early_stopping_rounds=args.es, random_seed=args.seed, verbose=200)
         rp.update(_bootstrap_only(args))
         if args.bootstrap_type and args.bootstrap_type != "Bayesian":
@@ -1749,7 +1750,7 @@ def main():
     ap.add_argument("--val-league", default="", choices=["", "R", "F"],
                     help="검증셋만 이 리그로 제한 (학습·평가 데이터는 그대로)")
     ap.add_argument("--eval-metric", default="Logloss",
-                    choices=["Logloss", "BrierScore", "CrossEntropy"],
+                    choices=["Logloss", "BrierScore", "CrossEntropy", "RMSE"],
                     help="E121: 조기종료 지표. 대회 지표는 Brier(MSE)인데 지금까지 "
                          "Logloss 최소 지점을 골라왔다 - 두 최적점은 다르다")
     ap.add_argument("--refit-mult", type=float, default=1.0,
