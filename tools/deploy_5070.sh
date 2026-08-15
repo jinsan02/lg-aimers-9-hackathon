@@ -27,6 +27,14 @@ scp -q tools/*.py "$H:$R/tools/"
 # cmd redirection needs a backslash path; $R is the scp (forward-slash) form.
 W="${R//\//\\}"
 ssh "$H" "cmd /c echo $C> $W\\.deployed_commit"
+# ...and append, never overwrite. `.deployed_commit` holds only the latest
+# revision, so a later deploy erases which code produced an earlier artifact.
+# That happened on 2026-08-15: the RANK16 scout was written at 18:02 and the
+# stamp was overwritten by the next deploy, leaving its source commit
+# recoverable only by bounding it between commit timestamps. The history line
+# lets an artifact's mtime be matched to a deployment.
+T=$(date '+%Y-%m-%d %H:%M:%S')
+ssh "$H" "cmd /c echo $T $C>> $W\\.deploy_history"
 
-echo "deployed ${C:0:8} to $H"
+echo "deployed ${C:0:8} to $H at $T"
 ssh "$H" "cmd /c type $W\\.deployed_commit" 2>/dev/null
