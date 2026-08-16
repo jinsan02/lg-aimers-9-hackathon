@@ -4,16 +4,128 @@ Read first: [AGENTS.md](AGENTS.md) -> [EXPERIMENT.md](EXPERIMENT.md) -> this fil
 
 ## Current Agent
 
-Claude (GSK champion review complete, 2026-08-16)
+Codex, handed over by Claude 2026-08-16 at `f9672e9`.
 
 ## Next Agent
 
-Awaiting user approval of the next-experiment preregistration. No experiment is
-running. Nothing is queued for submission.
+**One GPU job is live**: `AimersBND` on `DESKTOP-053T952` (5070), registered
+under SYSTEM so it survives ssh disconnect and the laptop being off. 24 fits,
+roughly 2.5-3 h from 2026-08-16. It produces **artifacts, not a candidate** —
+see `docs/BND_PREREGISTRATION_20260816.md` for the spending contract, which is
+fixed in advance and binding.
+
+```
+watch:  ssh desktop-5070 "type C:\aimers\out\bnd.log"     # ==== BND COMPLETE ====
+        ssh desktop-5070 "schtasks /query /tn AimersBND /v /fo list" | grep -i "last result"
+        267009 = running, 0 = finished
+clean:  ssh desktop-5070 "schtasks /delete /tn AimersBND /f"
+then:   bash tools/ledger_sync.sh    # the trainer writes its row on the runner
+```
+
+Nothing is queued for submission. Champion `submissions/gskdep_0816.zip`, LB
+**1111.3713632162**, is frozen and unchanged by everything below.
 
 ## Status
 
-**2026-08-16 structural research: two axes closed on CPU, zero GPU spent.**
+**2026-08-16 GPU queue: four axes measured, four DROPs, 49 fits, champion
+untouched.** Every one was pre-registered before any fit, on a deciding surface
+named in advance, with fresh controls on both arms and a large negative
+pre-accepted.
+
+| Axis | Surface | Core delta | Verdict |
+|---|---|---|---|
+| `--drop-f-pre 2022` (FPRE) | submission, n=6 | **−61.008** SE 1.361, t −44.84, 0/6 | DROP |
+| `--fm-coarse failure` (FMCOARSE) | judging, n=3 | **−18.581**, 0/3 | DROP |
+| `--std-k 40` (SK40) | submission, n=6 | **−7.780** SE 1.600, t −4.86, 0/6 | DROP |
+| `--feat-id-cohort` (ICOH) | submission, n=6 | **−2.780** SE 1.856, 95% upper +1.99 | DROP |
+
+Full verdicts and mechanisms: `docs/SETTLED.md`, FLAGs `--drop-f-pre 2022 on the
+submission surface`, `FMCOARSE collapse the failure block`, `--std-k 40 (SK40)`,
+`--feat-id-cohort (ICOH)`.
+
+**Four results that change what should be proposed next.**
+
+**1. The shared tables are load-bearing across leagues.** FPRE removed 105,308
+pre-2022 F rows whose target mean shifts .7087 → .4729 while R stays flat. F lost
+−134.49, which is unsurprising. **R lost −51.23**, and R has no label-regime
+problem at all. Row filters run before `fpipe.fit`, so they truncate the TE /
+season-standardisation / asof-anchor tables every league draws on. This is the
+same mechanism recorded for `--min-season 2021` (−95.09), now demonstrated rather
+than inferred. **Treat any row-dropping proposal as a table-truncation proposal.**
+
+**2. The cell-supervision family is closed in every direction anyone has
+pushed.** Reweight (P3-A/B/C/C2) FAIL, reparametrise (FM_MULTILABEL/V2) FAIL,
+project (SUCCESS_AUX_GRADIENT) nothing survives, **delete (FMCOARSE) −18.6**. The
+motivation for FMCOARSE remains factually true — 7.4× of the mutual information
+sits in distinctions the aggregated Brier cannot see, and those distinctions
+conflict with the primary gradient at up to a 100% minibatch rate — and the
+supervision is load-bearing anyway. The candidate also early-stops at ~2350
+against ~2980 and fits in 97 s against 236 s, which is what less structure to
+learn looks like. **Do not reopen without a mechanism that is none of those four
+operations.**
+
+**3. SK40 closes the downward `--std-k` direction, and only the downward one.**
+Pre-committed in the preregistration: no k20, no k10, no k30, no sweep. The
+judging-surface positives (k20 +3.21 t=2.01) are recorded as surface-transfer
+failure, the same shape as `--te-halflife 2`. **`--std-k 120` is upward and is
+still an open rule-5 violation** (recorded upper bound +3.86) — it is not covered
+by this closure.
+
+**4. The single-seed noise floor is now measured on the deciding surface.** The
+base arm's paired per-seed standard deviation is `3.126 × √6 = 7.66` BSS points.
+That places ICOH's two surviving headline "transfers", **+13.93 and +8.13, at 1.8
+and 1.1 sd** — inside the noise. Any axis still resting on single-seed ledger rows
+should be read against 7.7, not against zero.
+
+### Method notes worth carrying
+
+- **A rho pre-screen must quote a matched null.** A random direction in the
+  champion's own feature space already correlates with its out-of-time residual
+  at |rho| median 0.0035-0.0058. The +3 bar is rho = 0.0055, **at or below that
+  median**. Rho below the null median is not weak evidence, it is no evidence.
+  Details in `docs/SETTLED.md` FLAG `rho pre-screen needs a random-direction null`.
+- **The leaderboard cannot resolve below about +2 to +3** (LB delta sampling SE
+  ±1.06). Do not read a small LB move as confirmation or refutation.
+- **One control pair may serve two experiments** when it is the same command in
+  the same session on the same host. The SK40/ICOH chain did this and saved 8
+  identical fits. It is not a shortcut around the fresh-control contract.
+- **`tools/precheck.py` has an argument-dispatch hole.** Anything that is not
+  exactly `--file` falls through to the flag checker, which prints plausible
+  `[OK]`/`[WARN]` lines and **exits 0 without opening the file**. Reproduced with
+  `--bat`. Use `python tools/precheck.py --file <script>` and confirm the
+  `N command(s) checked` line is present. A fix is queued but not applied.
+
+### Queue after BND, in order
+
+1. **Re-judge the 7 downgraded axes** on three clean boundaries once BND lands —
+   under the fixed contract, not as a candidate pool.
+2. **Tier 1 remainder**: `--feat-window + cells` (A100 6-seed +0.51 vs
+   single-seed cross-machine −5.85), `--baseline-col` (n=1), `xgb-121-blend`
+   (contaminated legs).
+3. **Remaining rule-5 violations**: `--std-k 120` (upper +3.86),
+   `--drop-cols li,wexp` (+4.06), `--skill-neutral-mode const` (+3.25).
+4. **Tier 3**: of 20 wired-but-never-run flags at ledger=0, only `--grow`
+   (Depthwise/Lossguide) and `--ptype` have no closed analogue. `--weight-mode`
+   is already dead via the cross-season result.
+
+### Review requested from Codex
+
+1. Confirm or contest the four DROPs against the stored arrays. All 36 chain
+   members are in `out/` locally and on the 5070; `row_id` and target are
+   elementwise identical across all of them, verified before any BSS was read.
+2. Confirm that the FMCOARSE result is read correctly as closing the family
+   rather than as a bug — the taxonomy behaved as designed (4 cells, 3 success
+   cells, recovery 99.85%) and the pre-registered `rms` kill-check was read
+   first at 0.009634 against a 0.002 threshold, so the arms were genuinely
+   distinct.
+3. Decide nothing about `--std-k 120` from SK40. The closure is directional and
+   the preregistration says so.
+4. Do not infer any champion constant, league weight or blend coefficient from
+   any number above. None of these ran on the submission path.
+
+---
+
+## Earlier: 2026-08-16 structural research — two axes closed on CPU, zero GPU spent.
 
 `TM_DIST` trackman distributional arsenal embedding -- **FAIL**. The embedding is
 genuinely new (champion's 112 numeric features reconstruct it at CV R^2 <= 0.18)
