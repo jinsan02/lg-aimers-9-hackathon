@@ -1,7 +1,8 @@
 # Morning handoff — 2026-08-16
 
-The user submitted the pre-registered E-LB1 final package. The champion is now
-E-LB1 / LB `1110.9806302398`. No further package was submitted automatically.
+The user submitted the pre-registered E-LB1 final package and then the frozen
+GSK deployment package. The champion is now GSKDEP + E-LB1 / LB
+`1111.3713632162`. No package was submitted automatically by an agent.
 
 ## Ready probe 1 — submit first
 
@@ -92,7 +93,7 @@ Here `plus` means the parameter's positive direction (w=.65), and `minus`
 means w=.45. This is a local approximation because the logit slope follows the
 blend; accept only under the separate E-LB2 preregistration gate.
 
-## GSK core candidate ready — strongest model-side option
+## GSK core result — submitted, new champion
 
 `submissions/gskdep_0816.zip`
 
@@ -111,6 +112,8 @@ Evidence for the feature change comes from two independent untouched seasons:
 GSK2 core +3.141 (t=4.168, ensemble +3.108) on 2024 and GSK3 core +19.595
 (t=5.330, ensemble +19.517) on 2023. The reason this was not auto-submitted is
 the segment caveat: GSK3's large gain was F-driven while GSK2 F was -3.126.
-It is nevertheless the strongest prepared model-side candidate. Prefer this
-over reopening sub-1-point PARK arms; submit only after the user's explicit
-choice.
+The user submitted this exact package. Official result: **1111.3713632162** in
+31 seconds, +0.3907329764 over E-LB1. It is the new champion. The gain confirms
+the direction but is far smaller than historical estimates, consistent with the
+pre-recorded F-transfer risk. Do not tune a GSK strength or league coefficient
+from this LB result.

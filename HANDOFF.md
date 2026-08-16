@@ -4,38 +4,58 @@ Read first: [AGENTS.md](AGENTS.md) -> [EXPERIMENT.md](EXPERIMENT.md) -> this fil
 
 ## Current Agent
 
-Codex (overnight queue complete)
+Codex (handoff prepared)
 
 ## Next Agent
 
-User / independent review: choose whether to submit the prepared GSK core
-candidate, then optionally run the two pre-registered E-LB2 weight probes.
-No further submission is allowed without a new explicit request.
+Claude — independently review the GSK LB interpretation, confirm the new
+champion recipe, and decide whether E-LB2 weight probes remain justified now
+that their packages use the superseded E-LB1 member family.
 
 ## Status
 
-`READY` — overnight queue completed early. GSK3 independent historical transfer confirmation returned KEEP
-(core +19.595, t=5.330, ensemble +19.517, integrity clean). Conditional
-`GSKDEP_cell` deployment training completed on `desktop-5070`: six strong-
-fingerprint-matched 123-feature cell members, fit 2019--2023, val2024 BSS
-`927.11/915.54/914.89/922.51/921.13/921.14`. The six paired differences versus
-the original B1S cell members are all positive (`+7.07/+5.31/+5.97/+11.24/
-+4.08/+1.86`, mean `+5.92`) on the reference val2024 surface. The frozen
-B1S8-base + GSKDEP-cell + E-LB1-final package is
-`submissions/gskdep_0816.zip`, SHA256
+`READY FOR CLAUDE REVIEW` — the user submitted the frozen GSK package and it
+scored **1111.3713632162** in 31 seconds, becoming the new champion. Exact
+artefact: `submissions/gskdep_0816.zip`, SHA256
 `87617a131498b1121c100668b965b57443abbfdbe8bef5c39b28976d4f29e70d`.
-It passed fresh-process server smoke, 245,789 rows in 30 s, and the strong
-subset audit at exactly zero drift. It is prepared, **not submitted**; Codex's
-submission recommendation remains provisional because the historical F effect
-was unstable. The scheduled task is deleted, Python is absent, GPU is idle.
-E-LB1 final
-was submitted by the user and scored **1110.9806302398**, exactly matching the
-quadratic forecast and becoming the new champion (+2.547281211 over B1S8).
-GSK2 finished **HOLD** (core mean +3.141,
-t=4.168, ensemble +3.108, but F -3.126 violates the frozen gate); no extension
-or model submission. The two E-LB1 probes and final were submitted by the user;
-the final is the champion. `desktop-4070` and `hsu-server` remain offline. Details
-and exact hashes are in [docs/OVERNIGHT_READY_20260816.md](docs/OVERNIGHT_READY_20260816.md).
+Gain is **+0.3907329764** over E-LB1, +2.9380141874 over B1S8, and
++9.5692960097 over v11 PB.
+
+The recipe is B1S8 base 8 seeds at weight .45 + `GSKDEP_cell` 6 seeds at .55;
+the cell family adds only `skill_hat` and `skill_hat_vs_std`, then preserves
+the legacy slope/shift, recent-middle, exact-PB and the confirmed E-LB1 final
+`+0.002515795361`. Exact immutable description:
+[docs/CHAMPION_GSK_RECIPE_20260816.md](docs/CHAMPION_GSK_RECIPE_20260816.md).
+
+Evidence before submission was positive on two untouched seasons: GSK2
+untouched-2024 core mean +3.141, t=4.168, ensemble +3.108 (mechanical HOLD only
+because F=-3.126), and GSK3 untouched-2023 mean +19.595, t=5.330, ensemble
++19.517 (KEEP, F-driven). Deployment val2024 improved 6/6 cell seeds, mean
++5.92. The official +0.391 confirms a real signal but retains only about 13%
+of the GSK2 ensemble estimate, so the F/season-transfer warning was material.
+Codex recommendation: keep this as champion, do not tune GSK strength or a
+league coefficient from the LB delta, and let Claude decide whether E-LB2 is
+still worth two submissions.
+
+Integrity: 22 entries, 88.8 MB; 245,789-row local inference 30 s; official 31 s;
+strong subset-independence worst drift exactly 0; six cell members share strong
+fit hash `d69792676c50e1cf`, 123 features. Tests were 22/22. All scheduled jobs
+are deleted; 5070 GPU is idle; 4070 and A100 remain offline.
+
+### Review requested from Claude
+
+1. Confirm the numerical interpretation: official GSK increment +0.390733 is
+   positive but materially below both historical estimates; decide the final
+   SETTLED wording (likely KEEP-WEAK / transfer attenuation, not a new sweep).
+2. Confirm `gskdep_0816.zip` as the rollback champion and the exact recipe in
+   `docs/CHAMPION_GSK_RECIPE_20260816.md`.
+3. Decide the next submission plan. The existing E-LB2 `.45/.65` probes use
+   E-LB1/B1S cells, not GSK cells. Options are to cancel them as superseded or
+   preregister/rebuild a GSK-family weight experiment; do not silently transplant
+   their eventual coefficient onto GSK.
+4. Do not infer a league-F adjustment, GSK blend strength, or per-feature weight
+   from the single public/private LB score.
+
 `.deployed_commit` is stamped and, from 2026-08-15, every deploy also appends to
 `.deploy_history` — the single-line stamp had been overwritten by a later
 deploy, which is how the first RANK16 scout's source commit was lost.

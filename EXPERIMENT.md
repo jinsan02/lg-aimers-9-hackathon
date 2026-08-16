@@ -546,7 +546,7 @@ that both untouched transitions improved overall (+19.52 and +3.11), not that
 F transfer is stable. Deployment and packaging proceed under the pre-written
 contract, but Codex does not decide a submission from this provisional review.
 
-## GSK deployment package — Codex first pass: READY, provisional
+## GSK deployment package — official LB result, new champion
 
 `GSKDEP_cell` was trained on the submission surface (fit 2019--2023,
 val2024), seeds 3/4/5/6/8/13, on `DESKTOP-053T952`. All six packs share strong
@@ -562,9 +562,14 @@ final delta. `submissions/gskdep_0816.zip` has SHA256
 `87617a131498b1121c100668b965b57443abbfdbe8bef5c39b28976d4f29e70d`, 22
 entries, 88.8 MB. New-process verification completed 245,789 rows in 30 s;
 half/player/scattered/single-row strong audit worst drift is exactly zero.
-Prepared only, not submitted. Main risk: the GSK effect is overall-positive on
-two untouched seasons but league-F transfer changes sign, so submission remains
-a human/reviewer decision rather than an automatic promotion.
+The user submitted this exact package. Official LB is **1111.3713632162** in
+31 seconds: **+0.3907329764** over E-LB1 and +2.9380141874 over B1S8. It is the
+new champion. The positive sign validates the model-side GSK signal, but the
+magnitude is only about 13% of GSK2's untouched-2024 ensemble +3.108. The
+pre-submission F-transfer warning was therefore material: retain the feature,
+but do not extrapolate the historical +3 to +20 estimates or tune a GSK/league
+coefficient from this LB result. Exact recipe and boundary:
+[`docs/CHAMPION_GSK_RECIPE_20260816.md`](docs/CHAMPION_GSK_RECIPE_20260816.md).
 
 ## GSK2 GENERAL_SKILL_ADD cell-only — Codex first pass (provisional): HOLD
 

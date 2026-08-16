@@ -1299,7 +1299,7 @@ the quadratic forecast within approximately `6.4e-11`, confirming negligible
 clipping at this scale and exact recovery of the one-dimensional Brier optimum.
 This is now the champion; no further global-SHIFT probes are warranted.
 
-## 2026-08-16 GSK deployment candidate — prepared, not submitted
+## 2026-08-16 GSK deployment — **LB 1111.3713632162, new champion**
 
 After GSK2 gave untouched-2024 fixed-core +3.141 (t=4.168, ensemble +3.108)
 and GSK3 independently gave untouched-2023 +19.595 (t=5.330, ensemble
@@ -1312,6 +1312,12 @@ The submission candidate is `submissions/gskdep_0816.zip`, SHA256
 `87617a131498b1121c100668b965b57443abbfdbe8bef5c39b28976d4f29e70d`.
 It retains the confirmed E-LB1 optimum and all other champion constants. Full
 server-style verification ran 245,789 rows in 30 seconds and strong subset
-independence had worst drift 0. No submission was made. The open risk is league
-transfer: GSK3's historical gain was F-driven whereas GSK2's F segment was
--3.126 despite a positive overall result.
+independence had worst drift 0.
+
+The user submitted the exact package and it scored **1111.3713632162** in 31
+seconds. This is +0.3907329764 over E-LB1, +2.9380141874 over B1S8, and
++9.5692960097 over v11 PB. The positive sign confirms the GSK feature adds real
+2025 signal; the small magnitude confirms the transfer caveat. Relative to the
+untouched-2024 ensemble estimate +3.108, only about 13% appeared on LB. Do not
+use this single delta to fit a GSK strength or league-specific coefficient.
+Full immutable recipe: `docs/CHAMPION_GSK_RECIPE_20260816.md`.

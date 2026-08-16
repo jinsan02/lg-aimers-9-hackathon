@@ -40,8 +40,8 @@ score          = max(0, 100000 * (1 - brier / baseline_brier))     # higher is b
 
 | | |
 |---|---|
-| Current LB | **1,110.9806302398** — `submissions/elb1_final_0816.zip` (E-LB1 final) |
-| Previous | 1,108.4333490288 — `submissions/b1s8_20260813.zip` (B1S8) |
+| Current LB | **1,111.3713632162** — `submissions/gskdep_0816.zip` (GSKDEP + E-LB1) |
+| Previous | 1,110.9806302398 — `submissions/elb1_final_0816.zip` (E-LB1 final) |
 | Rank-1 | 1,198.02 |
 | Goal | reach the 1,120s by legal means |
 | Local→LB | B1S family: debiased score **+ 139.03**; E-LB1 is exact LB calibration |
