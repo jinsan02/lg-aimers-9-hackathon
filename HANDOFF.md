@@ -4,20 +4,27 @@ Read first: [AGENTS.md](AGENTS.md) -> [EXPERIMENT.md](EXPERIMENT.md) -> this fil
 
 ## Current Agent
 
-Codex, CTX_ADJ_PITCHER_SKILL CPU audit completed on 2026-08-16.
+Codex, CTX_ADJ unique-signal confirmation completed on 2026-08-16.
 
 ## Next Agent
 
-No queued experiment. `CTX_ADJ_PITCHER_SKILL_AUDIT` is **HOLD**, not licensed
-for GPU: reconstructibility R2 .613 is in the predeclared .50--.80 HOLD band,
-despite both full-boundary rhos clearing matched-null p99. Read
-`docs/CTX_ADJ_PITCHER_SKILL_AUDIT_20260816.md` for the exact segment caveat.
+No queued experiment. `CTX_ADJ_PITCHER_SKILL_AUDIT` is now **CLOSED** after its
+single allowed confirmation: the champion-orthogonal component flips negative
+on 2022->2023 and is inside matched-null noise on 2023->2024. Read
+`docs/CTX_ADJ_UNIQUE_SIGNAL_AUDIT_20260816.md`.
 
 No job is live, no GPU candidate is licensed, and nothing is queued for
 submission. Champion `submissions/gskdep_0816.zip`, LB **1111.3713632162**, is
 frozen and unchanged.
 
 ## Status
+
+**CTX_ADJ_UNIQUE_SIGNAL_AUDIT: FAIL, CPU only.** z_unique retains 39.41% of
+variance and has only .0852 OOF reconstructibility, but frozen rho is -.004603
+(38.75th percentile) then +.002742 (68.50th; p99 .006791). The raw signal's
+transferable portion is already represented by the champion. No GPU candidate.
+
+---
 
 **CTX_ADJ_PITCHER_SKILL_AUDIT: HOLD, CPU only.** Novelty R2 .613212; raw/std/
 skill_pc/skill correlations .718884/.525214/.713779/.595669. Frozen rho
