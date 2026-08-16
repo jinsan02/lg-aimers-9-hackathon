@@ -187,7 +187,7 @@ def _apply_noise(cell, row_id, rate, names):
 
 def build_cells(train, modes=MODES, verbose=True, context="",
                 min_share=MIN_SHARE, fit_mask=None, legacy_shift=False,
-                noise_rate=0.0):
+                noise_rate=0.0, coarse=""):
     """(성공, 실투, 볼, 반대) 조합을 다중분류 셀로 만든다.
 
     셀에 **타깃 자신을 포함**하는 것이 핵심이다. 실패모드만으로는 타깃이
@@ -236,9 +236,36 @@ def build_cells(train, modes=MODES, verbose=True, context="",
             raise KeyError(f"--fm-context 컬럼 없음: {c}")
         cell = cell.str.cat(train[c].astype(str), sep="|")
 
+    # FMCOARSE: collapse the whole failure block to one class.
+    #
+    # The model is trained with 12-way MultiClass cross-entropy but SCORED on
+    # the aggregated binary Brier of the success cells, so CE spends capacity
+    # discriminating among failure modes the score never distinguishes. Measured
+    # on a 120-bucket (pitcher-skill decile x count) grid: I(bucket; block) =
+    # 0.003885 nats/row against I(bucket; within-failure split) = 0.028673 --
+    # **7.4x more mutual information sits inside the failure block than in the
+    # only distinction the metric can see**.
+    #
+    # SUCCESS_AUX_GRADIENT then showed the within-failure supervision actively
+    # fights the primary: every auxiliary gradient conflicts on both rolling
+    # boundaries (cos(success, reverse) -0.9868/-0.1902, 100%/100% minibatch
+    # conflict rate) and nothing survives PCGrad projection. That experiment
+    # tried to KEEP the supervision and protect the primary; this one deletes it.
+    #
+    # The summation identity is untouched, because the success bit is character
+    # 0 and only cells whose success bit is "0" are merged. `succ` is derived
+    # from the names below, so it follows automatically.
     # 드문 셀과 복원 실패 행은 **성공 비트만 남기고** 묶는다 → 합산식이 보존된다
     # 맥락을 붙이면 셀 수가 배로 늘어 기본 임계(0.5%)에서 대부분 뭉개진다.
     fallback = pd.Series(y, index=train.index).astype(str) + "xxx"
+    if coarse:
+        if coarse != "failure":
+            raise ValueError(f"--fm-coarse: unknown mode {coarse!r}")
+        # Both are collapsed. If only `cell` were, an unrecovered failure row
+        # would fall through to "0xxx" and the failure block would end up as two
+        # classes instead of one -- silently defeating the whole change.
+        cell = cell.where(cell.str[0] != "0", "0")
+        fallback = fallback.where(fallback.str[0] != "0", "0")
     if fit_mask is None:
         share = cell.value_counts(normalize=True)
         rare = set(share[share < min_share].index)
@@ -250,7 +277,12 @@ def build_cells(train, modes=MODES, verbose=True, context="",
         keep = set(share[share >= min_share].index)
         cell = cell.where(cell.isin(keep) & known, fallback)
         # 이름 목록도 fit 기준. 검증에만 있는 셀은 위에서 이미 예약 셀로 갔다.
-        names = sorted(set(cell[fit_mask].unique()) | {"0xxx", "1xxx"})
+        # Under --fm-coarse the failure reserve is "0", not "0xxx"; keeping the
+        # old name would reserve a class index no row can ever take, and an
+        # empty class desynchronises `classes_` from `names`, which is exactly
+        # what `success_prob`'s column indexing depends on.
+        reserve = {"0", "1xxx"} if coarse else {"0xxx", "1xxx"}
+        names = sorted(set(cell[fit_mask].unique()) | reserve)
         unseen = ~cell.isin(names)
         if unseen.any():                       # 있으면 안 되지만 조용히 두지 않는다
             cell = cell.where(~unseen, fallback)

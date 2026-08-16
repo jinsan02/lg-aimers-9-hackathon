@@ -102,6 +102,7 @@ TRAINING_RELEVANT = (
     "std_to_prior", "std_season_prior", "feat_domain", "feat_skill",
     "feat_skill_pc", "feat_h1", "feat_k", "te", "te_dev", "te_halflife",
     "failmode_cells", "fm_modes", "fm_min_share", "fm_multilabel",
+    "fm_coarse",
     "p3c2_balanced",
     "missing_strategy", "extra_feats", "soft_target", "resid_col",
     "baseline_col", "lr", "depth", "l2", "es", "iters", "refit_mult",

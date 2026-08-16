@@ -600,7 +600,7 @@ def run_cat(args, train, features, is_val, train_dep=None):
             train, modes=_fm_modes, context=args.fm_context,
             min_share=args.fm_min_share, fit_mask=(~is_val).to_numpy(),
             legacy_shift=args.fm_legacy_shift,
-            noise_rate=args.fm_noise_rate)
+            noise_rate=args.fm_noise_rate, coarse=args.fm_coarse)
         _p3_select = None
         if args.p3c2_balanced:
             if w_tr is not None:
@@ -694,7 +694,7 @@ def run_cat(args, train, features, is_val, train_dep=None):
         rcode, rnames, rsucc = fm.build_cells(
             train_dep, modes=_fm_modes, verbose=False, context=args.fm_context,
             min_share=args.fm_min_share, legacy_shift=args.fm_legacy_shift,
-            noise_rate=args.fm_noise_rate)
+            noise_rate=args.fm_noise_rate, coarse=args.fm_coarse)
         _refit_row_weights = _refit_weights(args, train_dep)
         _p3_refit = None
         if args.p3c2_balanced:
@@ -1803,6 +1803,15 @@ def main():
                     help="LightGBM bagging_fraction")
     ap.add_argument("--fm-context", default="",
                     help="셀 코드에 붙일 상황 컬럼 (예: strikes_before)")
+    ap.add_argument("--fm-coarse", default="", choices=["", "failure"],
+                    help="'failure' collapses the whole failure block to ONE "
+                         "class, leaving the success cells untouched. The model "
+                         "is scored on the aggregated binary Brier, so 12-way CE "
+                         "spends capacity on distinctions the metric cannot see: "
+                         "I(bucket;within-failure)=0.028673 vs "
+                         "I(bucket;block)=0.003885 nats/row. The summation "
+                         "identity is preserved because only cells whose success "
+                         "bit is '0' are merged.")
     ap.add_argument("--fm-min-share", type=float, default=0.005,
                     help="이보다 드문 셀은 성공 비트만 남기고 병합")
     ap.add_argument("--fm-modes", default="middle,ball,reverse",
