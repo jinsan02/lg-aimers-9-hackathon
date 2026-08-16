@@ -16,12 +16,12 @@ resolution after removing the target-season mean error; only ``raw_bss`` is a
 legal deployable score.
 """
 
+from __future__ import annotations
+
 import os as _os
 import sys as _sys
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
 from invalidated import guard as _guard_invalidated                # noqa: E402
-
-from __future__ import annotations
 
 import argparse
 import gc

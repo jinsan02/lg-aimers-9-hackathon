@@ -1,5 +1,6 @@
-"""Honest 2023 -> unseen 2024 transfer audit for historical lineup roles."""
+"""Time-honest transfer audit for historical lineup roles."""
 
+import argparse
 from glob import glob
 import os
 
@@ -77,11 +78,18 @@ def audit(name, ks, kt, s, t):
     return rows
 
 
-def main():
-    b23, y23 = ensemble("AB_base", "val")
-    c23, yc23 = ensemble("DW_cell", "val")
-    b24, y24 = ensemble("AB_base", "test")
-    c24, yc24 = ensemble("DW_cell", "test")
+def main(argv=None):
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--base", default="AB_base")
+    ap.add_argument("--cell", default="DW_cell")
+    ap.add_argument("--source", type=int, default=2023)
+    ap.add_argument("--target", type=int, default=2024)
+    ap.add_argument("--output", default="")
+    args = ap.parse_args(argv)
+    b23, y23 = ensemble(args.base, "val")
+    c23, yc23 = ensemble(args.cell, "val")
+    b24, y24 = ensemble(args.base, "test")
+    c24, yc24 = ensemble(args.cell, "test")
     if not (np.array_equal(y23, yc23) and np.array_equal(y24, yc24)):
         raise ValueError("base/cell mismatch")
     p23 = (1 - W_CELL) * b23 + W_CELL * c23
@@ -90,14 +98,15 @@ def main():
     d = pd.read_csv(os.path.join(ROOT, "data", "train.csv"))
     lu = pd.read_csv(os.path.join(ROOT, "data", "processed", "lineup_history.csv"))
     d = d.merge(lu, on=["batter_id", "season"], how="left")
-    s = d[d.season == 2023].reset_index(drop=True)
-    t = d[d.season == 2024].reset_index(drop=True)
+    s = d[d.season == args.source].reset_index(drop=True)
+    t = d[d.season == args.target].reset_index(drop=True)
     if len(s) != len(y23) or len(t) != len(y24):
         raise ValueError("row mismatch")
     s["y"], s["pred"] = y23, p23
     t["y"], t["pred"] = y24, p24
-    print(f"coverage 2023={s.lineup_slot.notna().mean():.1%} "
-          f"2024={t.lineup_slot.notna().mean():.1%}")
+    print(f"surface {args.source}->{args.target} base={args.base} cell={args.cell}")
+    print(f"coverage {args.source}={s.lineup_slot.notna().mean():.1%} "
+          f"{args.target}={t.lineup_slot.notna().mean():.1%}")
 
     def slot(d0):
         return d0.lineup_slot.fillna(-1).astype(int).astype(str).to_numpy()
@@ -134,7 +143,9 @@ def main():
     print("\nPROMOTE")
     print(stable.to_string(index=False, float_format=lambda x: f"{x:+.3f}")
           if len(stable) else "none")
-    out.to_csv(os.path.join(ROOT, "out", "lineup_transfer_audit.csv"), index=False)
+    output = args.output or os.path.join(
+        ROOT, "out", f"lineup_transfer_{args.source}_{args.target}.csv")
+    out.to_csv(output, index=False)
     return 0
 
 

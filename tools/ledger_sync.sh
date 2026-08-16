@@ -12,9 +12,12 @@
 set -u
 cd "$(dirname "$0")/.." || exit 1
 T=$(mktemp -d)
-scp -q hsu-server:~/aimers/LEDGER.tsv     "$T/a100.tsv" 2>/dev/null || true
-scp -q desktop-4070:C:/aimers/LEDGER.tsv  "$T/4070.tsv" 2>/dev/null || true
-scp -q desktop-5070:C:/aimers/LEDGER.tsv  "$T/5070.tsv" 2>/dev/null || true
+# Pull the active direct host first.  Without a connection timeout, two offline
+# upstream hosts can consume the caller's whole timeout before the 5070 is ever
+# reached, leaving a plausible-looking but stale merged ledger.
+scp -q -o ConnectTimeout=5 desktop-5070:C:/aimers/LEDGER.tsv  "$T/5070.tsv" 2>/dev/null || true
+scp -q -o ConnectTimeout=5 hsu-server:~/aimers/LEDGER.tsv     "$T/a100.tsv" 2>/dev/null || true
+scp -q -o ConnectTimeout=5 desktop-4070:C:/aimers/LEDGER.tsv  "$T/4070.tsv" 2>/dev/null || true
 cat LEDGER.tsv "$T"/*.tsv 2>/dev/null | grep -v '^$' | sort -u > "$T/merged.tsv"
 mv "$T/merged.tsv" LEDGER.tsv
 rm -rf "$T"

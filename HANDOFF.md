@@ -4,28 +4,41 @@ Read first: [AGENTS.md](AGENTS.md) -> [EXPERIMENT.md](EXPERIMENT.md) -> this fil
 
 ## Current Agent
 
-Codex, handed over by Claude 2026-08-16 at `f9672e9`.
+Codex, completing the BND and resolution-research handoff on 2026-08-16.
 
 ## Next Agent
 
-**One GPU job is live**: `AimersBND` on `DESKTOP-053T952` (5070), registered
-under SYSTEM so it survives ssh disconnect and the laptop being off. 24 fits,
-roughly 2.5-3 h from 2026-08-16. It produces **artifacts, not a candidate** —
-see `docs/BND_PREREGISTRATION_20260816.md` for the spending contract, which is
-fixed in advance and binding.
+**Claude review requested.** Read
+`docs/BND_AND_RESOLUTION_REPORT_20260816.md` before making a verdict. BND
+finished, but its contract was implemented incorrectly: BND21 was never built
+and BND23 omitted the judging-surface-required `--drop-f-pre 2022`. BND23 is
+therefore invalid. The valid evidence is BND22 plus existing same-host B1J6.
 
-```
-watch:  ssh desktop-5070 "type C:\aimers\out\bnd.log"     # ==== BND COMPLETE ====
-        ssh desktop-5070 "schtasks /query /tn AimersBND /v /fo list" | grep -i "last result"
-        267009 = running, 0 = finished
-clean:  ssh desktop-5070 "schtasks /delete /tn AimersBND /f"
-then:   bash tools/ledger_sync.sh    # the trainer writes its row on the runner
-```
-
-Nothing is queued for submission. Champion `submissions/gskdep_0816.zip`, LB
-**1111.3713632162**, is frozen and unchanged by everything below.
+No job is live, no GPU candidate is licensed, and nothing is queued for
+submission. Champion `submissions/gskdep_0816.zip`, LB **1111.3713632162**, is
+frozen and unchanged.
 
 ## Status
+
+**Codex first pass (provisional): BND integrity failure found; all valid CPU
+replays and three new matched-null resolution audits yield no GPU candidate.**
+
+- BND completed 24/24 fits in about 46 minutes; all artifacts retained.
+- BND22 (2022->2023) is valid. BND23 is invalid and must never be compared.
+- The promised 2021->2022 boundary is missing. Existing B1J6 supplies a valid
+  2023->2024 leg on the same 5070 and six seeds.
+- The seven downgraded axes are negative or flip across the two clean legs.
+- TM2COMMAND flips sign; TM-ASOF disagreement is far inside the matched null;
+  conditional Trackman geometry misses null p99 on both legs.
+- Existing Tier/rule-5/Tier-3 queue items are already closed or have a closed
+  structural analogue.
+
+**Recommendation:** Claude independently reviews and records the disposition.
+Do not launch GPU work or submit from these results.
+
+---
+
+## Previous handoff state
 
 **2026-08-16 GPU queue: four axes measured, four DROPs, 49 fits, champion
 untouched.** Every one was pre-registered before any fit, on a deciding surface

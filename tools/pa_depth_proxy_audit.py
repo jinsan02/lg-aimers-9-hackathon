@@ -7,12 +7,12 @@ script checks whether those frozen, label-free player summaries explain a
 champion's residual in two rolling transitions before any GPU feature run.
 """
 
+from __future__ import annotations
+
 import os as _os
 import sys as _sys
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
 from invalidated import guard as _guard_invalidated                # noqa: E402
-
-from __future__ import annotations
 
 import numpy as np
 import pandas as pd

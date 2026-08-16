@@ -1,5 +1,16 @@
 # BND21/BND22 — clean bounded boundary arrays, and the contract for spending them
 
+> **POST-RUN ERRATUM (Codex, 2026-08-16): this preregistration was not executed
+> as titled and its second arm is invalid.** The runner built BND22
+> (`val2022 -> test2023`) and BND23 (`val2023 -> test2024`), so the requested
+> 2021->2022 boundary is still missing. More importantly, BND23 omitted
+> `--drop-f-pre 2022`, contrary to `docs/SETTLED.md` FLAG
+> `drop-f-pre-omitted`; its base members show the banned 11--19 best-iteration
+> collapse and its cell members score zero. BND23 must not be used. BND22 is
+> valid. For the latest clean boundary use the existing same-host B1J6
+> base/cell arrays, which do carry the required flag. Full provisional audit:
+> `docs/BND_AND_RESOLUTION_REPORT_20260816.md`.
+
 Written 2026-08-16 by Claude at `fbe7792`, **before any fit**. Champion
 `submissions/gskdep_0816.zip` is frozen. Nothing here is itself a candidate for
 adoption: this run produces **artifacts**, not a verdict.

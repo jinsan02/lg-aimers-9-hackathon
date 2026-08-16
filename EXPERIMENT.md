@@ -13,6 +13,20 @@ Brier Skill Score 최대화. 1차 목표 **1120대 합법 진입**.
 3위 1,170.70438, 10위 1,157.32319, 15위 1,144.20504. 1위는 2위보다 64점 높은
 단독 이상치이므로 목표로 삼지 않는다. 현실적 사거리는 **2~15위 대역(+33~+65)**이다.
 
+## 2026-08-16 BND + resolution research — GPU 후보 없음 (Codex 잠정 분석)
+
+BND는 5070에서 24/24 fit을 약 46분에 완료했지만 계약 결함이 발견됐다.
+유효한 것은 BND22(2022->2023)뿐이다. BND23(2023->2024)은 판정 표면 필수
+`--drop-f-pre 2022`를 빠뜨려 best_iter 11--19 / cell BSS 0의 금지 표면이고,
+문서가 요구한 2021->2022는 아예 만들어지지 않았다. 최신 leg는 같은 5070의 정상
+B1J6 배열로 대체했다. 7개 야구 축은 두 유효 leg에서 음수 또는 부호 반전했다.
+
+후속 CPU 연구도 GPU gate를 통과하지 못했다. TM2COMMAND는 frozen rho
+`+.00833 -> -.00326`, TM-ASOF disagreement는 matched-null percentile
+`3.75/11.25`, conditional Trackman geometry는 `93.25/84.5`로 두 leg 모두
+p99 미달이다. 챔피언·제출은 불변이다. 상세 수치와 Claude 검토 질문은
+[docs/BND_AND_RESOLUTION_REPORT_20260816.md](docs/BND_AND_RESOLUTION_REPORT_20260816.md).
+
 ## 2026-08-16 GSK 챔피언 검토 (Claude) — 챔피언 유지, E-LB2 취소
 
 ZIP을 문서가 아니라 실물로 검증했다. 22멤버, base 8팩은 `b1s8_20260813.zip`과
