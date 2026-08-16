@@ -4,43 +4,53 @@ Read first: [AGENTS.md](AGENTS.md) -> [EXPERIMENT.md](EXPERIMENT.md) -> this fil
 
 ## Current Agent
 
-Codex (handoff prepared)
+Claude (GSK champion review complete, 2026-08-16)
 
 ## Next Agent
 
-Claude — independently review the GSK LB interpretation, confirm the new
-champion recipe, and decide whether E-LB2 weight probes remain justified now
-that their packages use the superseded E-LB1 member family.
+Awaiting user approval of the next-experiment preregistration. No experiment is
+running. Nothing is queued for submission.
 
 ## Status
 
-`READY FOR CLAUDE REVIEW` — the user submitted the frozen GSK package and it
-scored **1111.3713632162** in 31 seconds, becoming the new champion. Exact
-artefact: `submissions/gskdep_0816.zip`, SHA256
-`87617a131498b1121c100668b965b57443abbfdbe8bef5c39b28976d4f29e70d`.
-Gain is **+0.3907329764** over E-LB1, +2.9380141874 over B1S8, and
-+9.5692960097 over v11 PB.
+`CHAMPION VERIFIED — NEXT PLAN AWAITING APPROVAL`. Champion is
+`submissions/gskdep_0816.zip`, LB **1111.3713632162**, SHA256
+`87617a131498b1121c100668b965b57443abbfdbe8bef5c39b28976d4f29e70d`, rank **#48**.
 
-The recipe is B1S8 base 8 seeds at weight .45 + `GSKDEP_cell` 6 seeds at .55;
-the cell family adds only `skill_hat` and `skill_hat_vs_std`, then preserves
-the legacy slope/shift, recent-middle, exact-PB and the confirmed E-LB1 final
-`+0.002515795361`. Exact immutable description:
-[docs/CHAMPION_GSK_RECIPE_20260816.md](docs/CHAMPION_GSK_RECIPE_20260816.md).
+**Champion safety: SAFE TO KEEP, verified against the ZIP rather than the
+document.** 22 members; base 8 packs byte-identical (sha256) to
+`b1s8_20260813.zip`; cell 6 packs share `fit_rowid_sha d69792676c50e1cf`,
+`features_sha a109f03b48b72da7`, 123 features; `set(cell)-set(base)` is exactly
+`['skill_hat','skill_hat_vs_std']`. `failmode.py` absent and not inlined (zero
+`.diff(` anywhere in the package; every cross-row aggregation is confined to
+fit-time builders and unreachable from `fpipe.transform`). Strong subset
+independence proven empirically: half / single-pitcher / scattered / single-row
+and order-reversal all **0.000e+00**. Only `./data/test.csv`,
+`./data/sample_submission.csv` and `model/matchup_constants_2024.npz` are read.
+Five documentation-vs-zip discrepancies were found and the document was
+corrected; none of them affects the shipped arithmetic.
 
-Evidence before submission was positive on two untouched seasons: GSK2
-untouched-2024 core mean +3.141, t=4.168, ensemble +3.108 (mechanical HOLD only
-because F=-3.126), and GSK3 untouched-2023 mean +19.595, t=5.330, ensemble
-+19.517 (KEEP, F-driven). Deployment val2024 improved 6/6 cell seeds, mean
-+5.92. The official +0.391 confirms a real signal but retains only about 13%
-of the GSK2 ensemble estimate, so the F/season-transfer warning was material.
-Codex recommendation: keep this as champion, do not tune GSK strength or a
-league coefficient from the LB delta, and let Claude decide whether E-LB2 is
-still worth two submissions.
+**GSK interpretation: the "13% reproduced / transfer-attenuated" reading is
+retracted.** `+3.108` and `+19.517` were judging-surface numbers. The
+surface-matched estimate was `+1.104, SE 1.086` (`GENERAL_SKILL_ADD`), and an
+independent recomputation from the stored val2024 arrays gives **+1.342**. The
+LB delta's own sampling SE is **±1.06**, so the observed `+0.391` is **0.9 SE**
+away — consistent, not attenuated. Consequence: **the leaderboard cannot resolve
+anything below about +2 to +3.**
 
-Integrity: 22 entries, 88.8 MB; 245,789-row local inference 30 s; official 31 s;
-strong subset-independence worst drift exactly 0; six cell members share strong
-fit hash `d69792676c50e1cf`, 123 features. Tests were 22/22. All scheduled jobs
-are deleted; 5070 GPU is idle; 4070 and A100 remain offline.
+**E-LB2 cancelled.** The offline `_W_CELL` curve peaks at `w* ≈ .575-.60` and is
+worth `+0.07` over the shipped `.55`; signal-to-noise against the ±1.06 LB SE is
+0.066. `_W_CELL` stays 0.55; no coefficient is transplanted.
+
+**Leaderboard reality (read directly 2026-08-16).** Rank-1 **1,240.63302**,
+rank-2 1,176.54904, rank-3 1,170.70438, rank-10 1,157.32319, rank-15
+1,144.20504. Rank-1 stands 64 points clear of rank-2 while ranks 2-15 span 32
+points; closing 129 points needs `rho = 0.0360`, larger than knowing the true
+pitch type of every pitch (`rho = 0.0350`). Rank-1 is excluded as a target on
+arithmetic. Planning band is **ranks 2-15 = +33 to +65**.
+
+Full verdicts: `docs/SETTLED.md` FLAGs `general-skill cell-only (GSK)
+deployment`, `lb-gap-arithmetic`, `E-LB2 blend-weight LB probe`.
 
 ### Review requested from Claude
 

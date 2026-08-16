@@ -42,7 +42,9 @@ score          = max(0, 100000 * (1 - brier / baseline_brier))     # higher is b
 |---|---|
 | Current LB | **1,111.3713632162** — `submissions/gskdep_0816.zip` (GSKDEP + E-LB1) |
 | Previous | 1,110.9806302398 — `submissions/elb1_final_0816.zip` (E-LB1 final) |
-| Rank-1 | 1,198.02 |
+| Our rank | **#48** of the public board (was #34 at B1S8 1108.43 — the score rose and the rank still fell) |
+| Rank-1 | **1,240.63302** — verified on the public board 2026-08-16. Ranks 2-5: 1,176.54904 / 1,170.70438 / 1,166.29075 / 1,164.14667 |
+| Realistic band | ranks 2-15 span **1,144.2 - 1,176.5**, i.e. **+33 to +65** from here. Rank-1 sits **64 points above rank 2** and is treated as an outlier, not a target (see the arithmetic in `docs/SETTLED.md` FLAG `lb-gap-arithmetic`) |
 | Goal | reach the 1,120s by legal means |
 | Local→LB | B1S family: debiased score **+ 139.03**; E-LB1 is exact LB calibration |
 

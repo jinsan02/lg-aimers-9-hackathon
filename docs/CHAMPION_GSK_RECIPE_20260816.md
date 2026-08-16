@@ -38,6 +38,38 @@ The effective global additive part is not simplified in code: the legacy
 `-0.0052` is applied before the two frozen lookups, and the confirmed E-LB1
 `+0.002515795361` is applied at the final output. Preserve this order.
 
+### Corrections from the 2026-08-16 zip audit (the ZIP is the truth)
+
+Verified member-by-member against `submissions/gskdep_0816.zip`; everything above
+matched except these five, which are corrected here:
+
+1. **Two clips, not one.** `script.py:101` is `np.clip(preds - SHIFT, 0, 1)` — the
+   legacy shift is followed by a clip to `[0,1]` *before* the two frozen lookups,
+   and `script.py:110` clips again after them. Both are part of the recipe.
+2. **SHIFT is stored positive.** `script.py:37` holds `SHIFT = 0.0052` and line 101
+   applies `preds - SHIFT`. Writing the constant as `-0.0052` describes the effect,
+   not the literal.
+3. **Only the cell packs carry a lineage record.** All six `GSKDEP_cell` packs have
+   schema-1 lineage (host, fit rows, seasons, hashes). The eight base packs carry
+   **none** — as they did not in B1S8 either. Their provenance is established more
+   strongly instead: all eight `.pkl`, `model/matchup_constants_2024.npz`,
+   `features.py`, `season_std.py`, `skill.py` and `target_enc.py` are
+   **byte-identical (sha256) to `submissions/b1s8_20260813.zip`**, so the base arm
+   is literally the same artifact and its training set is necessarily identical.
+4. **`fpipe.py` differs from the B1S8 shipped copy** (explicit `predict` dispatch
+   plus `deweight_multiclass`). The base packs are unchanged but the code that
+   scores them is not, which is why the whole package — not just the cell arm —
+   was re-audited.
+5. The "245,789 rows in 30 seconds" figure is the 5070-class host. On the laptop
+   the honest extrapolation from a measured 60,000-row run (10.1 s including all
+   14 model loads) is **≈41 s**. Both are ~15x inside the 600 s limit.
+
+**Packaging note, not an action item.** `requirements.txt` pins only
+`catboost==1.2.10` while `script.py:27` imports `joblib` (and the modules use
+numpy/pandas). That is a real gap in principle, but the official 31-second run
+already proves the evaluation image supplies them. Do not repackage the champion
+to "fix" this.
+
 ## Training and lineage
 
 - host: `DESKTOP-053T952` (5070 Ti, evaluation-server-matched environment)
@@ -61,11 +93,27 @@ tests before deployment:
 | GSK2, untouched 2024 | mean +3.141, t=4.168, ensemble +3.108 | HOLD only because F=-3.126 |
 | GSK3, untouched 2023 | mean +19.595, t=5.330, ensemble +19.517 | KEEP |
 
-The official gain confirms that the signal is real, but also confirms the
-pre-submission transfer warning. Only about 13% of GSK2's +3.108 offline
-ensemble improvement appeared on the 2025 leaderboard (`+0.391`). GSK3 was
-heavily F-driven while GSK2's F segment was negative, so the feature transfers
-weakly rather than at its historical magnitude.
+The official gain confirms that the signal is real.
+
+⚠ **The "only 13% of +3.108 reproduced / transfer-attenuated" reading is
+retracted** (Claude review, 2026-08-16). It compared the LB against a
+**judging-surface** number that was never a prediction for 2025. The
+surface-matched estimate was already on record — `GENERAL_SKILL_ADD`
+(`docs/SETTLED.md`) gives fresh-vs-fresh core **+1.104, SE 1.086** — and an
+independent recomputation from the stored val2024 arrays, swapping only the cell
+arm and applying the shipped calibration, gives **956.136 → 957.478 = +1.342**.
+
+The sampling SE of the LB delta itself is **±1.06** (calibrated
+`rms(p_new − p_old) = 0.001323` over 245,789 rows). So the observed **+0.391**
+is **0.9 SE** below the surface-matched **+1.342** and **0.66 SE** below the
+recorded **+1.104**. There is no attenuation to explain: the submission-surface
+debiased delta predicted the leaderboard inside one standard error.
+
+The operative consequence is a limit on measurement, not on the feature: **one
+submission is one draw with SE ≈ 1, so the leaderboard cannot resolve anything
+below roughly +2 to +3 for changes of this magnitude.** The F-segment caveat
+(GSK3 F-driven, GSK2 F = −3.126) remains recorded as a segment risk, but it is
+not what produced the small official gain.
 
 ## Current interpretation and next boundary
 
@@ -76,9 +124,12 @@ weakly rather than at its historical magnitude.
   from this single LB delta. That would fit the public/private answer key and
   conflict with the project's no-LB-constant rule.
 - E-LB1's global shift remains closed at its exact one-dimensional optimum.
-- E-LB2 (`w_cell=.45/.65`) remains separately pre-registered, but its baseline
-  packages were built from E-LB1 rather than this GSK champion. Claude must
-  decide whether those probes are still scientifically useful before submission.
+- E-LB2 (`w_cell=.45/.65`) is **CANCELLED** (Claude, 2026-08-16). The offline
+  weight curve on val2024 with the GSK cell peaks at `w* ≈ 0.575–0.60` and is
+  worth **+0.07** over the shipped 0.55; the whole .45–.65 span covers 0.78
+  points. Against an LB delta SE of ±1.06 the probe's signal-to-noise is 0.066,
+  so two submissions would fit a quadratic to noise. `_W_CELL` stays 0.55 and no
+  coefficient is transplanted from those packages.
 
 ## Reproduction sources
 
