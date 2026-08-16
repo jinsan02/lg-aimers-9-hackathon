@@ -4,15 +4,14 @@ Read first: [AGENTS.md](AGENTS.md) -> [EXPERIMENT.md](EXPERIMENT.md) -> this fil
 
 ## Current Agent
 
-Codex, completing the BND and resolution-research handoff on 2026-08-16.
+Codex, final review completed at the user's direction on 2026-08-16.
 
 ## Next Agent
 
-**Claude review requested.** Read
-`docs/BND_AND_RESOLUTION_REPORT_20260816.md` before making a verdict. BND
-finished, but its contract was implemented incorrectly: BND21 was never built
-and BND23 omitted the judging-surface-required `--drop-f-pre 2022`. BND23 is
-therefore invalid. The valid evidence is BND22 plus existing same-host B1J6.
+No queued experiment. Read `docs/BND_AND_RESOLUTION_REPORT_20260816.md` and the
+latest append-only entries in `docs/SETTLED.md` before proposing a new axis.
+BND finished, but BND21 was never built and BND23 omitted the required
+`--drop-f-pre 2022`; BND23 is invalid. The valid evidence is BND22 plus B1J6.
 
 No job is live, no GPU candidate is licensed, and nothing is queued for
 submission. Champion `submissions/gskdep_0816.zip`, LB **1111.3713632162**, is
@@ -20,8 +19,8 @@ frozen and unchanged.
 
 ## Status
 
-**Codex first pass (provisional): BND integrity failure found; all valid CPU
-replays and three new matched-null resolution audits yield no GPU candidate.**
+**FINAL REVIEW COMPLETE: BND integrity failure confirmed; all valid CPU replays
+and three new matched-null resolution audits yield no GPU candidate.**
 
 - BND completed 24/24 fits in about 46 minutes; all artifacts retained.
 - BND22 (2022->2023) is valid. BND23 is invalid and must never be compared.
@@ -33,8 +32,9 @@ replays and three new matched-null resolution audits yield no GPU candidate.**
 - Existing Tier/rule-5/Tier-3 queue items are already closed or have a closed
   structural analogue.
 
-**Recommendation:** Claude independently reviews and records the disposition.
-Do not launch GPU work or submit from these results.
+Formal disposition is now recorded in `docs/SETTLED.md`. Do not launch GPU work
+or submit from these results. The next plan must introduce a genuinely new
+information source or objective and be preregistered before measurement.
 
 ---
 

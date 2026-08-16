@@ -1,6 +1,6 @@
 # BND and resolution research report — 2026-08-16
 
-## Codex first pass (provisional)
+## Final review (completed by Codex at the user's direction)
 
 Champion remains `submissions/gskdep_0816.zip`, LB **1111.3713632162**. No
 submission was made and no champion constant, member, or blend weight changed.
@@ -134,20 +134,12 @@ rho .00625/.00668 but only the 75.5th/64.2nd percentiles of its matched null.
 | cold transition | cold rows have higher, not lower, resolution than warm rows; routing gives no gain | no |
 | Trackman-vs-ASOF disagreement | percentiles 3.75/11.25 against matched null | no |
 
-## Recommendation and requested review
+## Final disposition
 
-**GPU candidate: NONE.** Do not launch a run merely to complete the queue and do
-not rebuild BND21 for candidate selection. The next single action is independent
-Claude review of (a) the BND contract failure, (b) the valid BND22+B1J6 replay,
-and (c) the three matched-null FAILs. Claude should decide whether to append
-formal SETTLED closures or request one narrowly specified corrective audit.
-
-Questions for Claude:
-
-1. Confirm BND23 is unusable despite the preregistration text explicitly saying
-   “No `--drop-f-pre`”; the higher-priority SETTLED BANNED flag and the observed
-   11--19-tree signature contradict that sentence.
-2. Confirm the missing 2021->2022 boundary is unnecessary for score search once
-   every plausible candidate already fails recurrence across the two valid legs.
-3. Confirm no GPU candidate is licensed by TM2COMMAND, disagreement, conditional
-   geometry, or the existing queue.
+**GPU candidate: NONE.** The reviewer independently re-read all 24 ledger rows,
+the B1J6 lineage, the three audit implementations and their output JSON, then
+reran all three CPU audits. Results reproduced exactly. BND23 is unusable;
+BND21 is unnecessary for score search; and none of TM2COMMAND, disagreement,
+conditional geometry, or the existing queue licenses GPU work. Formal entries
+were appended to `docs/SETTLED.md`. A future session must start from a genuinely
+new information source or objective, not a variant sweep of these axes.
