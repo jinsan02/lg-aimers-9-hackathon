@@ -13,6 +13,36 @@ running. Nothing is queued for submission.
 
 ## Status
 
+**2026-08-16 structural research: two axes closed on CPU, zero GPU spent.**
+
+`TM_DIST` trackman distributional arsenal embedding -- **FAIL**. The embedding is
+genuinely new (champion's 112 numeric features reconstruct it at CV R^2 <= 0.18)
+and genuinely persistent (consecutive-season CCA 0.95/0.93/0.89 at all five
+transitions), and it is still worth an honest **+0.43** ceiling against a +3 bar.
+Non-linear frozen transfer collapses from rho +0.06265 in-sample to **+0.00222**,
+and **-0.00003** when the source and target boundaries are swapped. The useful
+separation: what a pitcher throws is orthogonal to where this model is wrong.
+Trackman distribution axis CLOSED -- no PCA dim change, no clustering sweep, no
+feature-subset rescue.
+
+`CROSS_SEASON_ROBUST_RISK` season-loss dispersion penalty -- **FAIL**. Premise
+confirmed (out-of-fold per-season BSS spans 1005.61-2577.35, not monotone in
+time distance, not a denominator artifact), mechanism refuted: upweighting the
+worst season gives **-84.14** and the opposite weighting gives **-80.04**.
+**Season reweighting itself is the cost, not its direction** -- which explains
+the whole recency family (`W` LB -41.5, season decay, te-halflife,
+`--min-season` -95.09) as one statement. CLOSED.
+
+The CPU surrogate used for the second was admitted only after reproducing a
+known answer: recency weighting at halflife 2 scored -48.97 against the real
+`W` result of LB -41.5.
+
+Next in the pre-registered chain is `SUCCESS_AUX_GRADIENT_AUDIT` (candidate C):
+measure the cosine and conflict rate between the success gradient and the
+middle/ball/reverse auxiliary gradients on two rolling boundaries, before any
+GPU. Not started.
+
+
 `CHAMPION VERIFIED — NEXT PLAN AWAITING APPROVAL`. Champion is
 `submissions/gskdep_0816.zip`, LB **1111.3713632162**, SHA256
 `87617a131498b1121c100668b965b57443abbfdbe8bef5c39b28976d4f29e70d`, rank **#48**.
