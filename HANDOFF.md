@@ -4,20 +4,29 @@ Read first: [AGENTS.md](AGENTS.md) -> [EXPERIMENT.md](EXPERIMENT.md) -> this fil
 
 ## Current Agent
 
-Codex, final review completed at the user's direction on 2026-08-16.
+Codex, CTX_ADJ_PITCHER_SKILL CPU audit completed on 2026-08-16.
 
 ## Next Agent
 
-No queued experiment. Read `docs/BND_AND_RESOLUTION_REPORT_20260816.md` and the
-latest append-only entries in `docs/SETTLED.md` before proposing a new axis.
-BND finished, but BND21 was never built and BND23 omitted the required
-`--drop-f-pre 2022`; BND23 is invalid. The valid evidence is BND22 plus B1J6.
+No queued experiment. `CTX_ADJ_PITCHER_SKILL_AUDIT` is **HOLD**, not licensed
+for GPU: reconstructibility R2 .613 is in the predeclared .50--.80 HOLD band,
+despite both full-boundary rhos clearing matched-null p99. Read
+`docs/CTX_ADJ_PITCHER_SKILL_AUDIT_20260816.md` for the exact segment caveat.
 
 No job is live, no GPU candidate is licensed, and nothing is queued for
 submission. Champion `submissions/gskdep_0816.zip`, LB **1111.3713632162**, is
 frozen and unchanged.
 
 ## Status
+
+**CTX_ADJ_PITCHER_SKILL_AUDIT: HOLD, CPU only.** Novelty R2 .613212; raw/std/
+skill_pc/skill correlations .718884/.525214/.713779/.595669. Frozen rho
+2022->23 **+.020314** (99.75th, above p99 .015311) and 2023->24 **+.007827**
+(99.25th, above p99 .007269), but the former has R -.003666 and the latter F
++.000918; the explicit novelty rule also forces HOLD for R2 .50--.80. No GPU,
+submission, sweep, or other candidate work.
+
+---
 
 **FINAL REVIEW COMPLETE: BND integrity failure confirmed; all valid CPU replays
 and three new matched-null resolution audits yield no GPU candidate.**
