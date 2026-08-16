@@ -37,10 +37,36 @@ The CPU surrogate used for the second was admitted only after reproducing a
 known answer: recency weighting at halflife 2 scored -48.97 against the real
 `W` result of LB -41.5.
 
-Next in the pre-registered chain is `SUCCESS_AUX_GRADIENT_AUDIT` (candidate C):
-measure the cosine and conflict rate between the success gradient and the
-middle/ball/reverse auxiliary gradients on two rolling boundaries, before any
-GPU. Not started.
+`SUCCESS_AUX_GRADIENT` (candidate C) -- **FAIL**. Premise confirmed: every
+auxiliary gradient conflicts with the primary on both boundaries, sign stable
+3/3, `cos(success, reverse)` -0.9868/-0.1902 at a **100%/100%** minibatch
+conflict rate. But nothing survives the surgery -- `reverse` is nearly an
+anti-parallel duplicate (16% survives projection), `ball` is nearly orthogonal
+so it does not move the success loss at first order, and the projected
+directions rotate between boundaries (cos +0.31 / -0.10 / +0.19). CLOSED.
+
+`MULTIVARIATE_LATENT_STATE` (candidate D) -- **FAIL**. 3-d state persists only
+modestly (CCA 0.622-0.762 top component, third component ~0.18 = noise), is
+substantially reconstructible from the champion's own features (in-sample
+R^2 0.26-0.73), covers 70-74% of rows, and its frozen transfer lands at the
+**75.5th / 64.2nd percentile** of a matched null. CLOSED.
+
+**The pre-registered chain A-D is exhausted: four axes, zero GPU hours, champion
+untouched, nothing submitted.**
+
+**The most reusable output of the session is a method correction.** A direction
+drawn at random in the champion's own feature space already correlates with its
+out-of-time residual at |rho| median 0.0035-0.0058 (p90 0.0084-0.0144, n=100k,
+null SE 0.00316). **The +3 bar is rho = 0.0055, which is at or below that
+median**, so a rho pre-screen must quote a matched null with the same
+fit-and-freeze protocol and the same number of free parameters. Rho below the
+null median is not weak evidence, it is no evidence. This strengthens the
+TM_DIST and `--te pchh` FAILs and leaves every adopted result untouched, since
+adoption always ran through paired 6-seed deltas in `tools/judge.py`.
+
+No next axis is pre-registered. The four structural candidates the user supplied
+are spent, and the remaining items in `docs/NEXT_CANDIDATES_20260816.md` are
+representation-reuse rather than new information.
 
 
 `CHAMPION VERIFIED — NEXT PLAN AWAITING APPROVAL`. Champion is
