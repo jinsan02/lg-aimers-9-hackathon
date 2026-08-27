@@ -130,3 +130,62 @@ asserted by `tools/leafit_gate.py` before any BSS is printed, and a mismatch
 invalidates the comparison rather than producing a verdict.
 
 **[FACT]** `[cat LEAFIT_base] val2023 BSS 588.66 | best_iter=874 | 184s`.
+
+## Seed-3 result — FAIL
+
+**[FACT]** Parity, read before any BSS: 253,507 untouched-2024 rows; `row_id`
+and target elementwise identical across all three members; cell feature lists,
+categoricals and `fm_success == (9,10,11)` identical; **effective-parameter diff
+between the two cell packs is exactly `leaf_estimation_iterations`, control 1 /
+candidate 10**. Nothing else moved.
+
+**[FACT]** Pre-registered redundancy kill-check:
+`rms(candidate cell, control cell) = 0.004488` against the 0.002 threshold. The
+arms are genuinely distinct, so the result is not a null operation.
+
+```
+ seed      base     cellC     cellK      coreC      coreK     delta
+    3    863.99    879.68    882.26    888.835    888.454    -0.381
+```
+
+**[FACT]** `delta <= 0` -> **FAIL, STOP.** Axis closed. No sweep over
+2/3/5/8/12/20, no per-arm tuning, no seed-specific value. The n=6 script exists
+but is **not** run.
+
+**[FACT] The stated mechanism is falsified.** The pre-registered claim was
+resolution. Core resolution *fell* `0.00222858 -> 0.00222676`; reliability
+improved `0.00003761 -> 0.00003648`.
+
+**[FACT] Why the cell arm improves alone and the core does not — measured, not
+inferred.** The cell arm gained **+2.579** standing alone. Better-converged
+leaves move it *toward the base arm*:
+
+```
+corr(base, cell)                   0.9647370 -> 0.9681003
+corr(base resid, cell resid)       0.9996975 -> 0.9997291
+cell prediction sd                  0.046456 ->  0.046145
+```
+
+The blend's value is the disagreement between the arms, and this change spends
+it.
+
+**[FACT] Not an artefact of the fixed 0.55 weight.** On a diagnostic weight grid
+the control peaks at `w=0.60, 889.128` and the candidate at `w=0.65, 889.116` —
+a dead heat at each arm's own optimum. No re-weighting rescues it, and
+re-weighting is banned regardless.
+
+**[FACT]** Cost: candidate **1737s** against control **550s** (3.2x), and it
+early-stops sooner, `best_iter 2986 -> 2572`.
+
+**[FACT]** Diagnostics, never used to choose: core rms 0.002569, pearson
+0.9985669, mean prediction difference +0.000391; segments R −0.71, F +2.10,
+early −2.39, late +2.25.
+
+**[INFERENCE] The transferable lesson**: improving one arm standing alone is not
+the same as improving the core, and any intervention that makes the two arms
+agree more will show this exact signature — a positive standalone delta and a
+negative core delta. That is a constraint on what to propose next, not a
+footnote.
+
+**[FACT]** Full suite **26/26** after the change (25 before, plus the new
+contract test).
