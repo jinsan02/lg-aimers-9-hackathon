@@ -189,3 +189,65 @@ footnote.
 
 **[FACT]** Full suite **26/26** after the change (25 before, plus the new
 contract test).
+
+---
+
+# Fallback — CELL_BUDGET_CEILING
+
+Entered because LEAFIT returned `delta <= 0`. This is the **one** fallback GPU
+candidate the overnight contract §17E permits.
+
+## How it was found
+
+**[FACT]** Across all **263** cell-arm rows in `LEDGER.tsv`, `best_iter` piles
+against the `--iters 3000` ceiling: 2999 appears 37 times, 2998 26, 2997 32,
+2996 18, 2995 16 — the 2990–2999 band holds **164 of 263**. `--es 500` has never
+fired on the cell arm; `get_best_iteration()` returns the last iteration because
+the arm is still improving when the budget ends.
+
+**[FACT]** Exactly **2 of 263** rows were given more budget and both ran far
+past 3000: `CI1A_cell5k` **4533** and `MVCELL5K_s42` **3928**. Neither is usable
+evidence — `CI1A_cell5k` is the pre-B1S feature era (no `--feat-k 200`, no
+`--te-k 50`, no `--p1`, no `--feat-skill`, no `--fm-modes`) and single-seed on
+the A100; `MVCELL5K_s42` is single-seed on a third host.
+
+**[FACT]** No FLAG covers it. `D12` closed the *checkpoint criterion*; `P3-B`
+closed a common **base**-arm budget; `--refit-mult` is a multiplier applied
+after the fact. None asks whether the cell arm's `best_iter` is a selection at
+all.
+
+## Pre-registered before the fit
+
+`docs/OVERNIGHT_FALLBACK_PREREGISTRATION_20260828.md`. Two things fixed in
+advance:
+
+1. **Validity condition** — early stopping must actually fire,
+   `best_iter + 500 < 8000`, or the run is uninformative about performance and
+   the axis closes as "the cell arm does not stop", not as a verdict.
+2. **The LEAFIT failure signature is named as the threat.** LEAFIT lost because
+   `corr(base, cell)` **rose**. More trees is a capacity change, not
+   convergence-to-the-base, so the prediction is that the correlation holds or
+   falls. **If it rises the way LEAFIT's did, the axis closes on that basis even
+   if the core delta is positive** — the result would then be noise on a refuted
+   mechanism.
+
+Budget 8000 rather than 5000 because `4533 + 500 > 5000`, so 5000 may itself
+have been truncating.
+
+Base and control are **reused** from the LEAFIT session — same host, same day,
+same commit, identical command except the changed variable. `--cell-leaf-iters`
+defaults to 0 and emits nothing, so the code path is byte-equivalent to the
+pre-flag trainer. Parity is asserted before scoring: the effective-parameter
+diff must be `iterations` only, and `leaf_estimation_iterations` must read 1 on
+**both** cell packs so the closed axis cannot leak in. **1 fit.**
+
+## Validity condition — met
+
+**[FACT]** `best_iter = 3813`, shrunk to 3814 trees. `3813 + 500 = 4313 < 8000`,
+so early stopping fired and genuinely selected.
+
+**[FACT]** That alone confirms the observation on the current recipe: the
+control's `best_iter 2986` was a **truncation**, not a selection. Given the
+budget, this arm wants **28% more trees**.
+
+*(score appended when the refit completes)*
