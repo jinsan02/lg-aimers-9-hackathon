@@ -4,24 +4,35 @@ Read first: [AGENTS.md](AGENTS.md) -> [EXPERIMENT.md](EXPERIMENT.md) -> this fil
 
 ## Current Agent
 
-Codex, master research triage stopped at the PB source-parity gate on 2026-08-27.
+Codex, six-axis CPU queue completed; add-on LUPI/Batter-Trackman audit is next.
 
 ## Next Agent
 
-No job is live and no GPU candidate is licensed. Read
-`docs/RESEARCH_TRIAGE_20260827.md` before starting another axis. The supplied
-master prompt stopped at Candidate 1 (`PB_MULTIYEAR_EXACT_POOL`): the shipped PB
-is a one-season exact-pair lookup, but the repository lacks a same-generation OOF
-residual chain for all historical seasons. Do not pool `BND22` and `B1J6` arrays
-as if they were comparable; their cell feature contracts differ. Reopening PB
-requires a new, explicitly approved rolling-OOF GPU preregistration.
+No job is live and no GPU candidate is licensed. The user explicitly authorised
+the source-parity bridge and all six queued CPU axes. They are now complete; read
+`docs/SIX_AXIS_CPU_RESULTS_20260827.md` and its preregistration. All six are
+FAIL/DUPLICATE and must not be rescued with variants.
 
-Candidates 2-3 from the master prompt and the three local candidates in
-`docs/NEXT_LOCAL_BRAINSTORM_20260827.md` are queued but **unexecuted**, because
-the prompt's source-parity rule required an immediate stop. Champion
-`submissions/gskdep_0816.zip`, LB **1111.3713632162**, is frozen and unchanged.
+The next task is the user's add-on prompt, CPU only, in this order:
+`PRIVILEGED_GAP_AUDIT` then (only if it does not PASS)
+`BATTER_TRACKMAN_AUDIT`. Write `docs/LUPI_BATTER_TM_AUDIT_20260827.md`.
+Before fitting, audit exact duplication against masked-pitch auxiliary,
+soft-target/distillation, `teacher.py`, and saved Trackman residual work. No GPU,
+submission or third candidate. Champion `submissions/gskdep_0816.zip`, LB
+**1111.3713632162**, remains frozen.
 
 ## Status
+
+**2026-08-27 six-axis CPU queue complete: 0 promoted.** PB all-history surrogate
+delta flips `+1.448 -> -1.009`; its coverage-expansion rows are harmful on both
+targets. Skill disagreement is an exact linear duplicate in the shipped cell.
+ASOF event mass has one latest-p99 result but earlier null and late sign reversal.
+Context-adjusted batter pressure flips `+.00160 -> -.00103`. Batter arsenal JSD
+is novel/well covered but flips `-.01166 -> +.00212` inside null. Rank-2 pitcher
+count response flips `+.00075 -> -.00049` and leaves about 1% unique variance.
+No GPU or submission. Full numbers: `docs/SIX_AXIS_CPU_RESULTS_20260827.md`.
+
+---
 
 **2026-08-27 master triage: PB multiyear exact pooling HOLD, CPU provenance
 only.** The actual packaged champion consumes `pb0_*` generated from 2024 OOF
