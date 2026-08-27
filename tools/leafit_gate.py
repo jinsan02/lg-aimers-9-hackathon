@@ -26,6 +26,7 @@ W_CELL = 0.55
 BASE = "LEAFIT_base"
 CTRL = "LEAFITCTL_cell"
 CAND = "LEAFIT_cell"
+EXPECT_DIFF = {"leaf_estimation_iterations"}
 RMS_REDUNDANT = 0.002   # fixed in the preregistration, before any fit
 
 
@@ -105,13 +106,20 @@ def parity(seed, split):
     diff = {k: (ec[k], ek[k]) for k in ec
             if k not in ("features", "cat_cols", "best_iteration")
             and ec[k] != ek[k]}
-    if set(diff) != {"leaf_estimation_iterations"}:
+    if set(diff) != EXPECT_DIFF:
         problems.append(f"effective-param diff is not exactly "
-                        f"leaf_estimation_iterations: {diff}")
-    if ec["leaf_estimation_iterations"] != 1:
-        problems.append(f"control reports {ec['leaf_estimation_iterations']}, expected 1")
-    if ek["leaf_estimation_iterations"] != 10:
-        problems.append(f"candidate reports {ek['leaf_estimation_iterations']}, expected 10")
+                        f"{sorted(EXPECT_DIFF)}: {diff}")
+    if EXPECT_DIFF == {"leaf_estimation_iterations"}:
+        if ec["leaf_estimation_iterations"] != 1:
+            problems.append(f"control reports {ec['leaf_estimation_iterations']}, expected 1")
+        if ek["leaf_estimation_iterations"] != 10:
+            problems.append(f"candidate reports {ek['leaf_estimation_iterations']}, expected 10")
+    else:
+        # The closed leaf-iters axis must not leak into another experiment.
+        for nm, e in (("control", ec), ("candidate", ek)):
+            if e["leaf_estimation_iterations"] != 1:
+                problems.append(f"{nm} leaf_estimation_iterations is "
+                                f"{e['leaf_estimation_iterations']}, expected 1")
     return problems, ec, ek, len(r0)
 
 
@@ -134,6 +142,13 @@ def one_seed(seed, split, seg):
     }
     out["core_delta"] = out["cand_core_bss"] - out["ctrl_core_bss"]
     out["cell_delta"] = out["cand_cell_bss"] - out["ctrl_cell_bss"]
+    out["corr_base_ctrl_cell"] = float(np.corrcoef(b, c)[0, 1])
+    out["corr_base_cand_cell"] = float(np.corrcoef(b, k)[0, 1])
+    out["d_corr_base_cell"] = out["corr_base_cand_cell"] - out["corr_base_ctrl_cell"]
+    out["corr_resid_ctrl"] = float(np.corrcoef(y - b, y - c)[0, 1])
+    out["corr_resid_cand"] = float(np.corrcoef(y - b, y - k)[0, 1])
+    out["ctrl_cell_sd"] = float(c.std())
+    out["cand_cell_sd"] = float(k.std())
     rc, sc = murphy(y, pc)
     rk, sk = murphy(y, pk)
     out.update(ctrl_reliability=rc, ctrl_resolution=sc,
@@ -152,12 +167,21 @@ def one_seed(seed, split, seg):
 
 
 def main():
+    global BASE, CTRL, CAND, EXPECT_DIFF
     ap = argparse.ArgumentParser()
     ap.add_argument("--seeds", default="3")
+    ap.add_argument("--base", default=BASE)
+    ap.add_argument("--ctrl", default=CTRL)
+    ap.add_argument("--cand", default=CAND)
+    ap.add_argument("--expect-diff", default="leaf_estimation_iterations",
+                    help="comma-separated effective params allowed to differ "
+                         "between the two cell packs; anything else invalidates")
     ap.add_argument("--split", default="test",
                     help="test = the untouched season, the primary evidence")
     a = ap.parse_args()
     seeds = [int(s) for s in a.seeds.split(",") if s]
+    BASE, CTRL, CAND = a.base, a.ctrl, a.cand
+    EXPECT_DIFF = {x for x in a.expect_diff.split(",") if x}
 
     tr = pd.read_csv("data/train.csv", usecols=["row_id", "game_type", "game_month"])
     seg = {"league": dict(zip(tr.row_id, tr.game_type)),
@@ -204,7 +228,16 @@ def main():
               f"{r['cand_core_bss']:>10.3f} {r['core_delta']:>+9.3f}")
 
     d = [r["core_delta"] for r in rows]
-    print("\n--- mechanism (pre-registered: the claim is RESOLUTION) ---")
+    print("\n--- diversity mechanism test (pre-registered) ---")
+    print("  CELL_LEAF_ITERS_10 failed with corr(base, cell) RISING "
+          "0.9647370 -> 0.9681003; a capacity change should hold or lower it.")
+    for s_, r in zip(seeds, rows):
+        print(f"  seed {s_}: corr(base,cell) {r['corr_base_ctrl_cell']:.7f} -> "
+              f"{r['corr_base_cand_cell']:.7f} ({r['d_corr_base_cell']:+.7f}) | "
+              f"resid corr {r['corr_resid_ctrl']:.7f} -> {r['corr_resid_cand']:.7f}"
+              f" | cell sd {r['ctrl_cell_sd']:.6f} -> {r['cand_cell_sd']:.6f}")
+
+    print("\n--- murphy decomposition ---")
     for s, r in zip(seeds, rows):
         print(f"  seed {s}: reliability {r['ctrl_reliability']:.8f} -> "
               f"{r['cand_reliability']:.8f} ({r['d_reliability']:+.8f}) | "
@@ -227,9 +260,9 @@ def main():
         print(f"\n  {judge.line(v)}")
         print(f"  positive {v['positive']}/{len(d)}  median {v['median']:+.3f}")
         print(f"\nVERDICT: {v['verdict']}")
-    json.dump({"seeds": seeds, "split": a.split, "rows": rows,
-               "cell_rms_mean": rms},
-              open(f"out/leafit_gate_{a.split}.json", "w"), indent=1)
+    json.dump({"seeds": seeds, "split": a.split, "base": BASE, "ctrl": CTRL,
+               "cand": CAND, "rows": rows, "cell_rms_mean": rms},
+              open(f"out/gate_{CAND}_{a.split}.json", "w"), indent=1)
     return 0
 
 
