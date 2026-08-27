@@ -5,6 +5,35 @@ implementation exists**. Champion `submissions/gskdep_0816.zip`, LB
 1111.3713632162, is frozen. Licensed by
 `docs/FIVE_AGENT_RESEARCH_SYNTHESIS_20260828.md` §8 at **seed 3 only**.
 
+> **AMENDMENT, 2026-08-28, before any fit and before the flag existed.** Two
+> changes, both made on the user's explicit overnight instruction and both
+> recorded here rather than applied silently.
+>
+> 1. **Deciding surface moves to the judging surface** — `--drop-f-pre 2022
+>    --max-train-season 2024 --val-season 2023 --test-season 2024`, i.e. fit
+>    <= 2022, validate 2023, **untouched 2024**. The overnight prompt's §7 asks
+>    for it and its §14 makes the roles explicit: the untouched-season transition
+>    is the primary adoption evidence and the submission surface is deployment
+>    evidence only. The original draft had it the other way round.
+> 2. **Host is the laptop (RTX 5060 Laptop GPU), not the 5070.** `desktop-5070`
+>    is unreachable (ssh connect timeout, twice), and the user instructed local
+>    execution. All three fits run in one local session, so the paired comparison
+>    is same-host by construction. **No number from this run may be compared with
+>    any 5070, 4070 or A100 result.**
+>
+> **Correction to the motivating premise, measured before the run.** Agent D
+> described 10 / 1 as "CatBoost's loss-specific default". On a small synthetic
+> frame catboost 1.2.10 resolves the Logloss default to **1**, on both devices,
+> at every depth tested, with the champion's exact parameter dict and with or
+> without an eval set — so the default is not unconditionally loss-driven. It is
+> resolved against dataset shape: the synthetic fit also came out with
+> `max_ctr_complexity 1` against the real data's 4 and `data_partition
+> DocParallel` against `FeatureParallel`. **The asymmetry itself is still a
+> fact**: on the real frame, same host, same version and same session, every
+> Logloss / CrossEntropy / MultiLogloss artifact from 2026-08-07 to 2026-08-16
+> reports **10** and every MultiClass artifact reports **1**. The experiment is
+> unchanged; only the sentence explaining where the default comes from is.
+
 ## Exact hypothesis
 
 The cell arm's leaf values are single-Newton-step approximations of the leaf

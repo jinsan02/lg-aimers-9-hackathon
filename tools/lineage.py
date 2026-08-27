@@ -108,6 +108,7 @@ TRAINING_RELEVANT = (
     "baseline_col", "lr", "depth", "l2", "es", "iters", "refit_mult",
     "no_refit", "border_count", "one_hot_max_size", "rank_group",
     "loss_function", "subsample", "rsm", "min_data_in_leaf",
+    "cell_leaf_iters",
 )
 
 

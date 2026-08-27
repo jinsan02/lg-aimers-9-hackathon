@@ -264,6 +264,13 @@ def _cell_params(args):
         out["max_ctr_complexity"] = args.max_ctr_complexity
     if args.boosting_type:
         out["boosting_type"] = args.boosting_type
+    # 0 means "do not pass it", so CatBoost keeps its loss-specific default and
+    # every cell result already on record stays reproducible to the bit. The
+    # MultiClass default is 1 while the binary arm's Logloss default is 10, and
+    # nothing in this project ever chose either -- see docs/SETTLED.md FLAG
+    # `leaf_estimation_iterations base/cell asymmetry`.
+    if args.cell_leaf_iters:
+        out["leaf_estimation_iterations"] = args.cell_leaf_iters
     blocked = [n for n, v in (("--bootstrap-type", args.bootstrap_type),) if v]
     if blocked:
         raise SystemExit(
@@ -1968,6 +1975,12 @@ def main():
     ap.add_argument("--feat-k", type=float, default=200.0,
                     help="피처 v2 shrinkage 강도. 신호감사상 asof 투수 피처가 "
                          "지배 신호(240.8)이므로 이 평활 강도가 중요하다")
+    ap.add_argument("--cell-leaf-iters", type=int, default=0,
+                    help="failure-mode cell arm only: leaf_estimation_iterations. "
+                         "0 leaves CatBoost's loss-specific default alone (MultiClass "
+                         "= 1), which is what every existing cell result was fitted "
+                         "with. The binary arm's Logloss default is 10; the only "
+                         "sanctioned value here is 10, which aligns the two arms.")
     ap.add_argument("--iters", type=int, default=3000,
                     help="최대 부스팅 반복 (보통 조기종료가 먼저 걸린다)")
     ap.add_argument("--es", type=int, default=100,
