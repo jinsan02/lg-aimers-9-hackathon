@@ -4,21 +4,138 @@ Read first: [AGENTS.md](AGENTS.md) -> [EXPERIMENT.md](EXPERIMENT.md) -> this fil
 
 ## Current Agent
 
-Claude, 2026-08-28. Five-agent new-axis research complete. **No job is live.**
-One GPU candidate is licensed at seed 3 and **has not been implemented or run**.
+Claude, 2026-08-28 overnight autonomous run. **Complete and terminal.**
 
 ## Next Agent
 
-Champion `submissions/gskdep_0816.zip`, LB **1111.3713632162**, frozen. Nothing
-submitted, no LB probe, no GPU spent this session.
+```
+champion                submissions/gskdep_0816.zip, LB 1111.3713632162
+                        sha256 87617a1314...9e70d, verified unchanged tonight
+overnight verdict       NO CANDIDATE SURVIVED
+  seed 3 (LEAFIT)       core -0.381  -> FAIL, axis closed, no sweep
+  n = 6                 NOT RUN (gate never opened)
+  deployment candidate  NONE
+  fallback (CELLBUD)    core -1.056  -> FAIL, score search stopped per S17E
+GPU job live?           NO
+submission performed?   NO
+working tree            clean
+HEAD == origin/main     yes
+tests                   27/27
+```
 
-**The one live thread** is `docs/NEXT_GPU_PREREGISTRATION_20260828.md` (LEAFIT).
-It is written but its implementation contract is unsatisfied: the flag does not
-exist yet. Do the five implementation steps in that document in order, then run
-3 fits on the 5070. Do not start training before step 5 prints its
-`N command(s) checked` line.
+**Exact next human action: none is required.** The champion is unchanged and
+nothing is waiting for a decision. If you want a next axis, read the two
+"transferable lesson" paragraphs below first — they constrain what is worth
+proposing far more than any single verdict does.
 
 ## Status
+
+**2026-08-28 overnight: two pre-registered GPU candidates, both FAIL, champion
+untouched, nothing submitted.** Full log:
+`docs/OVERNIGHT_AUTONOMOUS_RUN_20260828.md`.
+
+Executed on the **laptop (RTX 5060)** because `desktop-5070` was unreachable
+(ssh connect timeout, twice) and the user directed local execution. Every fit in
+one local session, judging surface `--drop-f-pre 2022 --max-train-season 2024
+--val-season 2023 --test-season 2024`, untouched 2024 = 253,507 rows.
+**No number from tonight may be compared with any 5070, 4070 or A100 result.**
+
+### CELL_LEAF_ITERS_10 — FAIL, core −0.381
+
+Align the cell arm's `leaf_estimation_iterations` to the base arm's 10. Parity
+first: the effective-parameter diff between the two cell packs was **exactly**
+that one key, 1 vs 10, and `rms 0.004488` cleared the pre-registered 0.002.
+
+**The cell arm gained +2.579 standing alone and the core lost.** Measured, not
+inferred: `corr(base, cell)` rose **0.9647370 → 0.9681003**, residual
+correlation rose, cell sd shrank. Better-converged leaves move the cell arm
+*toward* the base arm, and the blend's value is the disagreement. Not a
+fixed-weight artefact either — at each arm's own optimum the two are a dead heat
+(control `w=0.60, 889.128`; candidate `w=0.65, 889.116`).
+
+The pre-registered mechanism (resolution) was **falsified**: core resolution
+*fell* `0.00222858 → 0.00222676`.
+
+### CELL_BUDGET_CEILING — FAIL, core −1.056
+
+Across all **263** cell-arm ledger rows, `best_iter` piles against `--iters
+3000`: 164 of them sit in 2990–2999. `--es 500` has **never fired** on this arm,
+so `best_iter` is a truncation and `--refit-mult 1.5` multiplies it. Given 8000,
+early stopping did fire at **best_iter 3813** — confirming the arm wants 28%
+more trees.
+
+**The pre-registered diversity test passed and the candidate still lost.**
+`corr(base, cell)` **fell** to 0.9617575 and cell sd rose — a genuine capacity
+change that genuinely increased diversity. The arm got worse anyway, and the
+mechanism is **overfitting the validation season**: `val2023 589.88 → 590.70`
+while untouched-2024 cell BSS falls 5.56.
+
+**So the `--iters 3000` ceiling is not a defect — it is implicit regularisation
+the cell arm depends on**, sitting near the right out-of-time stopping point.
+With **D12** (the checkpoint *criterion*) already closed, the cell arm's
+checkpoint machinery tracks untouched-season performance in neither criterion
+nor budget, and the shipped configuration survives because the ceiling
+compensates. Do not retry 4000/5000/6000/10000/12000, `--es`, or
+`--refit-mult`.
+
+### The two lessons worth carrying
+
+1. **Improving one arm standing alone is not the same as improving the core.**
+   Any intervention that makes the two arms agree more shows LEAFIT's signature:
+   positive standalone delta, negative core delta. Check `corr(base, cell)`
+   before believing a standalone gain.
+2. **Increasing diversity is not sufficient either.** CELLBUD increased it as
+   predicted and still lost, because the arm itself stopped generalising. Both
+   conditions have to hold.
+
+### Infrastructure repaired
+
+**`tools/precheck.py` no longer fakes a pass.** Anything that was not exactly
+`--file` fell through to the flag checker, printed `[OK] no identical flag
+combination in LEDGER` plus a plausible WARN computed from the argv, and
+**exited 0 without opening the file** — the gate every GPU launch passes
+through. Unknown options, bare paths and no-args now exit 2; the unknown-option
+test reads the trainer's own argparse from source so new flags are never
+misjudged. `tests/test_precheck_dispatch.py`, 9 checks.
+
+**`tools/leafit_gate.py` parity contract corrected.** It refused to judge
+CELLBUD on an empty diff (`iterations` was not collected); fixing that then
+broke LEAFIT's parity because its refit length moved too. `iterations`,
+`tree_count` and `best_iteration` are **outcomes**, not settings — the contract
+now asserts the changed variable from each run's own lineage `resolved_args`.
+Verified: LEAFIT differs in `cell_leaf_iters` only, CELLBUD in `iters` only.
+
+### Provenance audit (no change to the champion)
+
+`docs/CHAMPION_CONSTANT_PROVENANCE_20260828.md`. Six of the seven shipped
+constants are derivable from training data **and** independently revalidated.
+One is not: **`+0.002515795361`** was fitted as a quadratic through **three
+leaderboard scores** (1108.4333 / +0.010 → 1088.4373 / −0.010 → 1047.9367), and
+the forecast matched to 6.4e-11 because public = private here. It is worth
++2.547 and it cannot be re-derived from `train.csv`. Recorded, deliberately not
+changed — removing a measured gain to satisfy a rule adopted afterwards would
+trade real points for tidiness. A remediation hypothesis is written down and
+explicitly **not** run.
+
+### New this session
+
+```
+--cell-leaf-iters      default 0 = emit nothing; existing cell results
+                       reproduce bit-identically. Reaches both cell
+                       constructors, verified by AST.
+tools/leafit_gate.py   parity-first gate; --base/--ctrl/--cand/--expect-diff/
+                       --expect-flag, so it serves any cell-arm experiment
+tests/                 test_cell_leaf_iters.py (11), test_precheck_dispatch.py (9)
+docs/                  OVERNIGHT_AUTONOMOUS_RUN_20260828.md
+                       NEXT_GPU_PREREGISTRATION_20260828.md (+ pre-fit amendment)
+                       OVERNIGHT_FALLBACK_PREREGISTRATION_20260828.md
+                       CHAMPION_CONSTANT_PROVENANCE_20260828.md
+SETTLED                200 -> 202 FLAG lines, append-only
+```
+
+---
+
+## Earlier: 2026-08-28 five-agent new-axis research
 
 **2026-08-28 five-agent research: four axes closed, one candidate licensed,
 zero GPU.** Full synthesis: `docs/FIVE_AGENT_RESEARCH_SYNTHESIS_20260828.md`.
