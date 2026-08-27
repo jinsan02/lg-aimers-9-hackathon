@@ -4,7 +4,7 @@ Read first: [AGENTS.md](AGENTS.md) -> [EXPERIMENT.md](EXPERIMENT.md) -> this fil
 
 ## Current Agent
 
-Codex, six-axis CPU queue completed; add-on LUPI/Batter-Trackman audit is next.
+Codex completed the CPU-only `PRIVILEGED_GAP_AUDIT`; no job is live.
 
 ## Next Agent
 
@@ -13,13 +13,20 @@ the source-parity bridge and all six queued CPU axes. They are now complete; rea
 `docs/SIX_AXIS_CPU_RESULTS_20260827.md` and its preregistration. All six are
 FAIL/DUPLICATE and must not be rescued with variants.
 
-The next task is the user's add-on prompt, CPU only, in this order:
-`PRIVILEGED_GAP_AUDIT` then (only if it does not PASS)
-`BATTER_TRACKMAN_AUDIT`. Write `docs/LUPI_BATTER_TM_AUDIT_20260827.md`.
-Before fitting, audit exact duplication against masked-pitch auxiliary,
-soft-target/distillation, `teacher.py`, and saved Trackman residual work. No GPU,
-submission or third candidate. Champion `submissions/gskdep_0816.zip`, LB
-**1111.3713632162**, remains frozen.
+`PRIVILEGED_GAP_AUDIT` is now **FAIL** at its Stage-1 kill: the privileged arm
+loses `-842.171/-328.977` BSS on 2023/2024, gap-student OOF R2 is only
+`.00761/.00892`, and champion reconstructibility `.99353/.99593` leaves
+`.02249%/.01216%` unique target variance. Per contract the 400-null stage was
+not run. Full result: `docs/PRIVILEGED_GAP_AUDIT_20260828.md`.
+
+The remaining add-on is `BATTER_TRACKMAN_AUDIT`, CPU only. The sequential
+preregistration explicitly permits it after Candidate 1 FAIL, but the focused
+2026-08-28 execution prompt's hard stop was one privileged-gap question, so it
+has **not** been started. If authorised in the next turn, follow Candidate 2 in
+`docs/LUPI_BATTER_TM_PREREGISTRATION_20260827.md` exactly and write
+`docs/LUPI_BATTER_TM_AUDIT_20260827.md`. No GPU, submission, third candidate, or
+champion change. Champion remains `submissions/gskdep_0816.zip`, LB
+**1111.3713632162**.
 
 The duplicate audit is now complete: `PRIVILEGED_GAP` is **NEW**, because no
 previous path explicitly formed `q_priv-q_legal`, learned that increment from

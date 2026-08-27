@@ -4,7 +4,7 @@
 > **역사는 여기 없다** → [docs/EXPERIMENTS_LOG.md](docs/EXPERIMENTS_LOG.md)
 > 닫힌 질문 → [docs/SETTLED.md](docs/SETTLED.md) · 실행 기록 → `LEDGER.tsv`
 
-갱신 2026-08-16 (**GSKDEP+E-LB1이 LB 1111.3713632162로 현행 챔피언, 순위 #48**)
+갱신 2026-08-28 (**GSKDEP+E-LB1이 LB 1111.3713632162로 현행 챔피언, 순위 #48**)
 
 ## Objective
 
@@ -12,6 +12,18 @@ Brier Skill Score 최대화. 1차 목표 **1120대 합법 진입**.
 리더보드 1위는 **1,240.63302**(2026-08-16 공개 보드 직접 확인), 2위 1,176.54904,
 3위 1,170.70438, 10위 1,157.32319, 15위 1,144.20504. 1위는 2위보다 64점 높은
 단독 이상치이므로 목표로 삼지 않는다. 현실적 사거리는 **2~15위 대역(+33~+65)**이다.
+
+## 2026-08-28 PRIVILEGED_GAP CPU audit — FAIL, GPU 없음
+
+공식 train의 current-pitch Trackman을 privileged Z로만 써서
+`q_priv-q_legal`을 만들고 legal champion X로 Ridge student를 학습하는 정확한
+LUPI gap 경로를 처음 측정했다. 1:1 linkage는 1,120,569행(75.966%)이다.
+Privileged arm이 legal arm보다 2023/2024에서 각각 **-842.171/-328.977 BSS**
+낮아 Stage-1 kill이 발동했다. gap student OOF R2도 **.00761/.00892**, 최신
+target corr **.00792**에 그쳤고, student 출력은 champion X로
+**.99353/.99593** 재구성되어 unique 분산이 **.02249%/.01216%**만 남았다.
+계약대로 matched null·GPU·rescue·제출은 하지 않았다. 상세:
+[docs/PRIVILEGED_GAP_AUDIT_20260828.md](docs/PRIVILEGED_GAP_AUDIT_20260828.md).
 
 ## 2026-08-16 BND + resolution research — 최종 종결, GPU 후보 없음
 
