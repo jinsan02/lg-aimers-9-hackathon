@@ -4,7 +4,7 @@ Read first: [AGENTS.md](AGENTS.md) -> [EXPERIMENT.md](EXPERIMENT.md) -> this fil
 
 ## Current Agent
 
-Codex completed the CPU-only `PRIVILEGED_GAP_AUDIT`; no job is live.
+Codex completed both add-on CPU audits; no job is live and no GPU candidate is licensed.
 
 ## Next Agent
 
@@ -19,14 +19,18 @@ loses `-842.171/-328.977` BSS on 2023/2024, gap-student OOF R2 is only
 `.02249%/.01216%` unique target variance. Per contract the 400-null stage was
 not run. Full result: `docs/PRIVILEGED_GAP_AUDIT_20260828.md`.
 
-The remaining add-on is `BATTER_TRACKMAN_AUDIT`, CPU only. The sequential
-preregistration explicitly permits it after Candidate 1 FAIL, but the focused
-2026-08-28 execution prompt's hard stop was one privileged-gap question, so it
-has **not** been started. If authorised in the next turn, follow Candidate 2 in
-`docs/LUPI_BATTER_TM_PREREGISTRATION_20260827.md` exactly and write
-`docs/LUPI_BATTER_TM_AUDIT_20260827.md`. No GPU, submission, third candidate, or
-champion change. Champion remains `submissions/gskdep_0816.zip`, LB
-**1111.3713632162**.
+`BATTER_TRACKMAN_AUDIT` is now **FAIL**. The full fixed profile is genuinely
+new and adequately supported (champion reconstruction `.104/.112`, 73-75%
+unique variance, ~90% target-row coverage), but raw rho is
+`-.029565 -> -.001755`; unique rho flips `-.016961 -> +.002939`, and the latest
+unique result is only the 75.25th matched-null percentile with late rows
+negative. Full result: `docs/BATTER_TRACKMAN_AUDIT_20260828.md`.
+
+The add-on LUPI/Batter Trackman queue is exhausted: both candidates FAIL, no
+GPU or submission. A provenance correction was also recorded: committed
+`src/link_batters.py` reproduces 699 pairs/99.0429% train-row coverage, not the
+old non-reproducible 755/99.7925% SETTLED claim. Champion remains
+`submissions/gskdep_0816.zip`, LB **1111.3713632162**.
 
 The duplicate audit is now complete: `PRIVILEGED_GAP` is **NEW**, because no
 previous path explicitly formed `q_priv-q_legal`, learned that increment from

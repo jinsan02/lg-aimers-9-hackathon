@@ -25,6 +25,17 @@ target corr **.00792**에 그쳤고, student 출력은 champion X로
 계약대로 matched null·GPU·rescue·제출은 하지 않았다. 상세:
 [docs/PRIVILEGED_GAP_AUDIT_20260828.md](docs/PRIVILEGED_GAP_AUDIT_20260828.md).
 
+## 2026-08-28 BATTER_TRACKMAN CPU audit — FAIL, add-on queue 종료
+
+고정 20차원 batter 역사 Trackman profile을 source-fitted PCA-8로 압축했다.
+이 표현은 약 90% 행을 커버하고 median support가 1168/1356이며, leading CCA
+`.740/.761/.786`, champion reconstructibility `.104/.112`, unique 분산
+`73.39%/74.98%`로 **새로운 정보 자체는 맞다**. 하지만 frozen raw rho는
+`-.029565 -> -.001755`, unique rho는 `-.016961 -> +.002939`이고 최신 unique는
+matched-null 75.25 percentile(p99 `.006662`)에 그쳤다. 새로운 선수 표현과
+champion error 방향은 별개이며 GPU 후보가 아니다. 상세:
+[docs/BATTER_TRACKMAN_AUDIT_20260828.md](docs/BATTER_TRACKMAN_AUDIT_20260828.md).
+
 ## 2026-08-16 BND + resolution research — 최종 종결, GPU 후보 없음
 
 BND는 5070에서 24/24 fit을 약 46분에 완료했지만 계약 결함이 발견됐다.
