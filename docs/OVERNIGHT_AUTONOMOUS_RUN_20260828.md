@@ -251,3 +251,70 @@ control's `best_iter 2986` was a **truncation**, not a selection. Given the
 budget, this arm wants **28% more trees**.
 
 *(score appended when the refit completes)*
+
+## CELLBUD result — FAIL, and the mechanism test passing is the point
+
+**[FACT]** Parity: 253,507 untouched-2024 rows; `row_id` and target elementwise
+identical; cell features, categoricals and `fm_success` identical;
+`leaf_estimation_iterations` **1 on both**, so the closed axis did not leak in;
+the trainer's own lineage records differ in **`iters` only**.
+`rms(candidate, control) = 0.002472` against the 0.002 threshold.
+
+```
+ seed      base     cellC     cellK      coreC      coreK     delta
+    3    863.99    879.68    874.12    888.835    887.779    -1.056
+```
+
+**[FACT]** `delta <= 0` -> **FAIL, STOP.** Score search ends per §17E.
+
+**[FACT] The pre-registered diversity mechanism test PASSED — and the candidate
+still lost.**
+
+```
+                            LEAFIT (failed)        CELLBUD (this run)
+corr(base, cell)      0.9647370 -> 0.9681003   0.9647370 -> 0.9617575
+corr(base resid, cell resid)  0.9996975 -> 0.9996598 (fell)
+cell prediction sd            0.046456  -> 0.047381  (rose)
+```
+
+The prediction written before the fit was that a capacity change would hold or
+lower the correlation, unlike LEAFIT's convergence-to-the-base. It fell. The
+diversity story was right, and the arm got worse regardless.
+
+**[FACT] The mechanism is overfitting to the validation season.** The trainer's
+selection-surface score *improves* — `val2023 BSS 589.88 -> 590.70` — while
+untouched-2024 cell BSS falls **5.56**. Core resolution falls
+`0.00222858 -> 0.00222385`; reliability improves.
+
+**[INFERENCE] The ceiling is load-bearing, which is the opposite of the
+intuition that opened the axis.** `--iters 3000` is not a defect the cell arm
+suffers; it is implicit regularisation that happens to sit near the right
+stopping point for out-of-time generalisation. The 813 extra iterations early
+stopping on val2023 endorses do not survive a season boundary.
+
+**[INFERENCE]** Read with **D12** — which closed changing *which metric* picks
+the cell checkpoint — the cell arm's checkpoint machinery tracks untouched-season
+performance in neither its criterion nor its budget, and the shipped
+configuration survives because the ceiling compensates for both.
+
+**[FACT]** Segments (diagnostic only): R −1.62, F +3.20, early +2.42, late
+**−5.60**. Cost: **16,584 s (4.6 h)** for the single candidate fit against the
+control's 550 s, because the refit runs 1.5 × 3813 = 5,720 trees with no early
+stopping.
+
+## A tool defect found and fixed by the parity check
+
+**[FACT]** The gate initially **refused to judge CELLBUD**, reporting an empty
+effective-parameter diff. `effective()` was not collecting `iterations`, so an
+experiment whose changed variable *is* the budget could never satisfy its own
+parity contract. Fixing that then made the **LEAFIT** comparison fail parity,
+because its refit length moved too (better leaves → earlier `best_iter` →
+shorter refit).
+
+**[INFERENCE]** The rule was wrong in both directions. `iterations`,
+`tree_count` and `best_iteration` are **outcomes**, not settings — any change
+that moves the stopping point moves them. The parity contract now asserts the
+changed variable from each run's own **lineage record** (`resolved_args`), which
+holds the flags actually passed. Verified: LEAFIT's two cell runs differ in
+`cell_leaf_iters` only; CELLBUD's differ in `iters` only. Both gates then pass
+parity and reproduce their verdicts — LEAFIT still **−0.381**.

@@ -26,7 +26,8 @@ W_CELL = 0.55
 BASE = "LEAFIT_base"
 CTRL = "LEAFITCTL_cell"
 CAND = "LEAFIT_cell"
-EXPECT_DIFF = {"leaf_estimation_iterations"}
+EXPECT_DIFF = {"leaf_estimation_iterations"}   # effective CatBoost params
+EXPECT_FLAG = {"cell_leaf_iters"}             # resolved trainer flags
 RMS_REDUNDANT = 0.002   # fixed in the preregistration, before any fit
 
 
@@ -63,6 +64,12 @@ def effective(tag, seed):
     pk = joblib.load(f"model/{_stem(tag, seed)}.pkl")
     a = pk["model"].get_all_params()
     return {"leaf_estimation_iterations": a.get("leaf_estimation_iterations"),
+            # `iterations` on a packaged model is the refit tree count, which is
+            # `--refit-mult x best_iter`. It has to be collected or an experiment
+            # whose changed variable IS the budget produces an empty diff and can
+            # never satisfy its own parity contract.
+            "iterations": a.get("iterations"),
+            "tree_count": getattr(pk["model"], "tree_count_", None),
             "loss_function": a.get("loss_function"), "depth": a.get("depth"),
             "l2_leaf_reg": a.get("l2_leaf_reg"),
             "border_count": a.get("border_count"),
@@ -76,6 +83,16 @@ def effective(tag, seed):
             "cat_cols": tuple(pk.get("cat_cols") or []),
             "fm_success": tuple(pk.get("fm_success") or ()),
             "best_iteration": pk.get("best_iteration")}
+
+
+def lineage_flags(tag, seed):
+    """The flags the trainer actually resolved, from its own lineage record."""
+    for cand in (f"lineage_{tag}.json",):
+        p = f"out/{cand}"
+        if os.path.exists(p):
+            d = json.load(open(p, encoding="utf-8"))
+            return d.get("resolved_args") or {}
+    return {}
 
 
 def parity(seed, split):
@@ -103,12 +120,29 @@ def parity(seed, split):
     if ec["fm_success"] != (9, 10, 11):
         problems.append(f"fm_success is {ec['fm_success']}, expected (9,10,11)")
 
-    diff = {k: (ec[k], ek[k]) for k in ec
-            if k not in ("features", "cat_cols", "best_iteration")
-            and ec[k] != ek[k]}
-    if set(diff) != EXPECT_DIFF:
-        problems.append(f"effective-param diff is not exactly "
-                        f"{sorted(EXPECT_DIFF)}: {diff}")
+    # `iterations`, `tree_count` and `best_iteration` are OUTCOMES, not settings:
+    # the refit length is `--refit-mult x best_iter`, and any change that moves
+    # the stopping point moves them with it. Asserting on them would fail every
+    # honest experiment. The changed variable is asserted from the lineage
+    # record below, which holds the flags that were actually passed.
+    ignore = {"features", "cat_cols", "best_iteration", "iterations", "tree_count"}
+    diff = {k: (ec[k], ek[k]) for k in ec if k not in ignore and ec[k] != ek[k]}
+    unexpected = {k: v for k, v in diff.items() if k not in EXPECT_DIFF}
+    if unexpected:
+        problems.append(f"unexpected effective-param difference(s): {unexpected}")
+
+    lc, lk = lineage_flags(CTRL, seed), lineage_flags(CAND, seed)
+    if lc and lk:
+        moved = {k for k in set(lc) | set(lk) if lc.get(k) != lk.get(k)}
+        moved -= {"tag"}
+        if moved != EXPECT_FLAG:
+            problems.append(f"training flags differ in {sorted(moved)}, expected "
+                            f"exactly {sorted(EXPECT_FLAG)} "
+                            f"(control {[lc.get(k) for k in sorted(moved)]} -> "
+                            f"candidate {[lk.get(k) for k in sorted(moved)]})")
+    else:
+        problems.append("lineage record missing for a cell arm; the changed "
+                        "variable cannot be verified from flags")
     if EXPECT_DIFF == {"leaf_estimation_iterations"}:
         if ec["leaf_estimation_iterations"] != 1:
             problems.append(f"control reports {ec['leaf_estimation_iterations']}, expected 1")
@@ -167,21 +201,26 @@ def one_seed(seed, split, seg):
 
 
 def main():
-    global BASE, CTRL, CAND, EXPECT_DIFF
+    global BASE, CTRL, CAND, EXPECT_DIFF, EXPECT_FLAG
     ap = argparse.ArgumentParser()
     ap.add_argument("--seeds", default="3")
     ap.add_argument("--base", default=BASE)
     ap.add_argument("--ctrl", default=CTRL)
     ap.add_argument("--cand", default=CAND)
     ap.add_argument("--expect-diff", default="leaf_estimation_iterations",
-                    help="comma-separated effective params allowed to differ "
-                         "between the two cell packs; anything else invalidates")
+                    help="comma-separated effective CatBoost params allowed to "
+                         "differ between the two cell packs; anything else "
+                         "invalidates the comparison")
+    ap.add_argument("--expect-flag", default="cell_leaf_iters",
+                    help="comma-separated trainer flags allowed to differ, "
+                         "checked against each run's own lineage record")
     ap.add_argument("--split", default="test",
                     help="test = the untouched season, the primary evidence")
     a = ap.parse_args()
     seeds = [int(s) for s in a.seeds.split(",") if s]
     BASE, CTRL, CAND = a.base, a.ctrl, a.cand
     EXPECT_DIFF = {x for x in a.expect_diff.split(",") if x}
+    EXPECT_FLAG = {x for x in a.expect_flag.split(",") if x}
 
     tr = pd.read_csv("data/train.csv", usecols=["row_id", "game_type", "game_month"])
     seg = {"league": dict(zip(tr.row_id, tr.game_type)),
