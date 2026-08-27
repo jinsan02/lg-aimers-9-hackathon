@@ -4,19 +4,29 @@ Read first: [AGENTS.md](AGENTS.md) -> [EXPERIMENT.md](EXPERIMENT.md) -> this fil
 
 ## Current Agent
 
-Codex, TM_TYPE_COMMAND_MIX CPU audit completed on 2026-08-16.
+Codex, repository/local-environment refresh and next-axis review completed on
+2026-08-27.
 
 ## Next Agent
 
-No queued experiment. `TM_TYPE_COMMAND_MIX_AUDIT` is **FAIL/CLOSED**: both raw
-and champion-unique directions reverse from negative on 2022->2023 to positive
-on 2023->2024. Read `docs/TM_TYPE_COMMAND_MIX_AUDIT_20260816.md`.
-
-No job is live, no GPU candidate is licensed, and nothing is queued for
-submission. Champion `submissions/gskdep_0816.zip`, LB **1111.3713632162**, is
-frozen and unchanged.
+No job is live and no GPU candidate is licensed. The next local-only queue is
+documented in `docs/NEXT_LOCAL_BRAINSTORM_20260827.md`: run
+`CTX_ADJ_BATTER_PRESSURE` first, then `BATTER_ARSENAL_FAMILIARITY`, then
+`LOWRANK_PITCHER_COUNT_RESPONSE`, stopping at each CPU matched-null gate.
+Do not combine the three and do not start GPU work from raw rho alone.
+Champion `submissions/gskdep_0816.zip`, LB **1111.3713632162**, is frozen and
+unchanged.
 
 ## Status
+
+**2026-08-27 local refresh:** synced at `5a2ca78`, ledger 852 rows. Laptop
+Python/pandas/numpy/sklearn match the evaluation stack, RTX 5060 Laptop GPU is
+idle, C: has about 40 GB free, and no local Python job is running. Three genuinely
+distinct CPU gates were selected only after excluding the already-closed missing
+value, Trackman distribution/type, F adapter, neural, rank, feature-deletion,
+post-processing and PARK-combination families. No experiment has started.
+
+---
 
 **TM_TYPE_COMMAND_MIX_AUDIT: FAIL, CPU only.** Exact linkage coverage 75.97%;
 type skill and within-pitcher deviation persist, but raw rho -.029377 -> +.007630
