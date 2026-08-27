@@ -4,20 +4,37 @@ Read first: [AGENTS.md](AGENTS.md) -> [EXPERIMENT.md](EXPERIMENT.md) -> this fil
 
 ## Current Agent
 
-Codex, repository/local-environment refresh and next-axis review completed on
-2026-08-27.
+Codex, master research triage stopped at the PB source-parity gate on 2026-08-27.
 
 ## Next Agent
 
-No job is live and no GPU candidate is licensed. The next local-only queue is
-documented in `docs/NEXT_LOCAL_BRAINSTORM_20260827.md`: run
-`CTX_ADJ_BATTER_PRESSURE` first, then `BATTER_ARSENAL_FAMILIARITY`, then
-`LOWRANK_PITCHER_COUNT_RESPONSE`, stopping at each CPU matched-null gate.
-Do not combine the three and do not start GPU work from raw rho alone.
-Champion `submissions/gskdep_0816.zip`, LB **1111.3713632162**, is frozen and
-unchanged.
+No job is live and no GPU candidate is licensed. Read
+`docs/RESEARCH_TRIAGE_20260827.md` before starting another axis. The supplied
+master prompt stopped at Candidate 1 (`PB_MULTIYEAR_EXACT_POOL`): the shipped PB
+is a one-season exact-pair lookup, but the repository lacks a same-generation OOF
+residual chain for all historical seasons. Do not pool `BND22` and `B1J6` arrays
+as if they were comparable; their cell feature contracts differ. Reopening PB
+requires a new, explicitly approved rolling-OOF GPU preregistration.
+
+Candidates 2-3 from the master prompt and the three local candidates in
+`docs/NEXT_LOCAL_BRAINSTORM_20260827.md` are queued but **unexecuted**, because
+the prompt's source-parity rule required an immediate stop. Champion
+`submissions/gskdep_0816.zip`, LB **1111.3713632162**, is frozen and unchanged.
 
 ## Status
+
+**2026-08-27 master triage: PB multiyear exact pooling HOLD, CPU provenance
+only.** The actual packaged champion consumes `pb0_*` generated from 2024 OOF
+`VB2_base`/`ZD5` residuals with exact `(pitcher_id,batter_id)`, k=500 and zero
+fallback. Raw all-history exact-pair membership would raise coverage from
+41.33% to 54.10% for target 2023 and 38.10% to 51.16% for target 2024, but this
+is only a structural ceiling. Comparable OOF residuals for 2019-2021 are absent,
+and available `BND22`/`B1J6` cell arrays are different feature generations.
+Source parity therefore cannot be guaranteed; no multiyear score was fabricated,
+no later candidate ran, and no GPU or submission was touched. Full report:
+`docs/RESEARCH_TRIAGE_20260827.md`.
+
+---
 
 **2026-08-27 local refresh:** synced at `5a2ca78`, ledger 852 rows. Laptop
 Python/pandas/numpy/sklearn match the evaluation stack, RTX 5060 Laptop GPU is
