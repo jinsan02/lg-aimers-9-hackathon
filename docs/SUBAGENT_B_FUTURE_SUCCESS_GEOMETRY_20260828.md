@@ -51,10 +51,23 @@ fitted on the source era and frozen onto the target season:
 | ≤2023 → 2024 | +0.00381 | +0.00633 | **−0.00252** |
 
 Macro OvR AUC tells the same story: .5357 / .5465 for the entire legal feature
-set against .5350 / .5393 for the single column. **Essentially all of the
-subtype's predictable structure is `asof_pitcher_success_rate`, and the rest of
-the champion's information actively hurts** — on the earlier boundary the full
-model does not even beat a constant.
+set against .5350 / .5393 for the single column.
+
+**Read this as a probe result, not an information result.** The estimator is a
+linear `SGDClassifier(loss="log_loss", alpha=1e-4)` on standardised numerics
+plus one-hot categoricals (`out/_subagent_b_future3_audit.py:77`), and the
+single-column arm is fed unscaled, so the two arms do not carry identical
+effective regularisation. A linear probe with a hundred-odd correlated columns
+losing out-of-time to a one-column probe is a plausible regularisation outcome
+on its own, and the champion is a gradient-boosted tree that could find
+structure this probe cannot. What the measurement licenses is the narrower
+statement: **a frozen linear probe finds nothing in the subtype beyond
+`asof_pitcher_success_rate`, and that column is already shipped.** That is the
+check the prompt named and the same class of pre-screen used everywhere else
+here, but it is not proof that no information exists.
+
+One thing it does get right that matters: `boundary()` applies the champion's
+`--drop-f-pre 2022` contract, so the source era matches the shipped recipe.
 
 The direct mutual-information check agrees and quantifies how little is left:
 `I(skill decile; subtype) = 0.0086` nats, mean skill by subtype .5323 / .5440 /
@@ -98,6 +111,11 @@ imply useless supervision**: the within-failure distinctions are also only weakl
 predictable and conflict with the primary gradient at up to a 100% minibatch
 rate, and deleting them still cost **−18.581** core. "The subtype is hard to
 predict" is therefore not by itself a reason to reject a taxonomy split.
+
+That counter-argument is stronger than it first looks, because the probe above
+is linear and the failure-mode supervision would very likely fail the same
+probe. **Point 1 alone would therefore leave this at HOLD. The verdict rests on
+points 2, 3 and 4, which are descriptive statistics with no estimator in them.**
 
 The distinction that decides it is what the label is *about*. The failure modes
 (middle / ball / reverse) decompose **the current pitch's own outcome** — the
