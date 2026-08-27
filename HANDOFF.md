@@ -21,6 +21,15 @@ soft-target/distillation, `teacher.py`, and saved Trackman residual work. No GPU
 submission or third candidate. Champion `submissions/gskdep_0816.zip`, LB
 **1111.3713632162**, remains frozen.
 
+The duplicate audit is now complete: `PRIVILEGED_GAP` is **NEW**, because no
+previous path explicitly formed `q_priv-q_legal`, learned that increment from
+legal X, froze it across seasons and tested champion-residual transfer. Read the
+fixed implementation contract in
+`docs/LUPI_BATTER_TM_PREREGISTRATION_20260827.md`; do not improvise a Trackman
+subset or estimator sweep. If Candidate 1 fails, the full batter historical
+Trackman profile remains distinct from the just-closed three-family familiarity
+JSD and should run as Candidate 2.
+
 ## Status
 
 **2026-08-27 six-axis CPU queue complete: 0 promoted.** PB all-history surrogate
