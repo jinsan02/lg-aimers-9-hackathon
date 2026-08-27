@@ -178,10 +178,58 @@ def scan_file(path):
     return worst
 
 
+USAGE = ("usage: precheck.py --file <script> [<script> ...]\n"
+         "       precheck.py <training flag> [<flag> ...]")
+
+# Anything else that starts with '-' used to fall through to the flag checker,
+# which printed a plausible "[OK] no identical flag combination in LEDGER" and a
+# WARN block computed from the argv itself, then exited 0 -- **without opening
+# the file**. Reproduced 2026-08-28 with `--bat scripts/bnd_5070.bat`: a reader
+# would reasonably conclude the script had been checked. A guard that can report
+# success on a script it never read is worse than no guard, because it is the
+# gate every GPU launch passes through.
+_FILEISH = (".bat", ".sh", ".cmd", ".ps1", ".py")
+
+
+def _trainer_flags():
+    """Every option the trainer's own argparse accepts.
+
+    Read from the source rather than hardcoded, so a new trainer flag never
+    starts failing precheck for being unrecognised.
+    """
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                     "..", "src", "train_gbdt2.py")
+    try:
+        src = open(p, encoding="utf-8").read()
+    except OSError:
+        return set()
+    return set(re.findall(r'add_argument\(\s*"(--[a-z0-9-]+)"', src))
+
+
 def main():
-    if len(sys.argv) >= 3 and sys.argv[1] == "--file":
-        return max(scan_file(p) for p in sys.argv[2:])
-    return check(sys.argv[1:])
+    argv = sys.argv[1:]
+    if not argv:
+        print(USAGE)
+        return 2
+    if argv[0] == "--file":
+        if len(argv) < 2:
+            print("precheck.py --file needs at least one path\n" + USAGE)
+            return 2
+        return max(scan_file(p) for p in argv[1:])
+    known = _trainer_flags()
+    if argv[0].startswith("-") and known and argv[0] not in known:
+        print(f"precheck.py: unknown option {argv[0]!r} -- it is neither --file "
+              f"nor a flag src/train_gbdt2.py accepts. Did you mean --file?\n"
+              + USAGE)
+        return 2
+    # A bare path in the flag position can never be a training flag, and it is
+    # the shape a forgotten `--file` takes.
+    for a in argv:
+        if not a.startswith("-") and (a.endswith(_FILEISH) or "/" in a or "\\" in a):
+            print(f"precheck.py: {a!r} looks like a path, not a training flag. "
+                  f"Use --file to check a script.\n" + USAGE)
+            return 2
+    return check(argv)
 
 
 if __name__ == "__main__":
