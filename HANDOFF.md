@@ -4,44 +4,126 @@ Read first: [AGENTS.md](AGENTS.md) -> [EXPERIMENT.md](EXPERIMENT.md) -> this fil
 
 ## Current Agent
 
-Codex completed both add-on CPU audits; no job is live and no GPU candidate is licensed.
+Claude, 2026-08-28. Five-agent new-axis research complete. **No job is live.**
+One GPU candidate is licensed at seed 3 and **has not been implemented or run**.
 
 ## Next Agent
 
-No job is live and no GPU candidate is licensed. The user explicitly authorised
-the source-parity bridge and all six queued CPU axes. They are now complete; read
-`docs/SIX_AXIS_CPU_RESULTS_20260827.md` and its preregistration. All six are
-FAIL/DUPLICATE and must not be rescued with variants.
+Champion `submissions/gskdep_0816.zip`, LB **1111.3713632162**, frozen. Nothing
+submitted, no LB probe, no GPU spent this session.
 
-`PRIVILEGED_GAP_AUDIT` is now **FAIL** at its Stage-1 kill: the privileged arm
-loses `-842.171/-328.977` BSS on 2023/2024, gap-student OOF R2 is only
-`.00761/.00892`, and champion reconstructibility `.99353/.99593` leaves
-`.02249%/.01216%` unique target variance. Per contract the 400-null stage was
-not run. Full result: `docs/PRIVILEGED_GAP_AUDIT_20260828.md`.
-
-`BATTER_TRACKMAN_AUDIT` is now **FAIL**. The full fixed profile is genuinely
-new and adequately supported (champion reconstruction `.104/.112`, 73-75%
-unique variance, ~90% target-row coverage), but raw rho is
-`-.029565 -> -.001755`; unique rho flips `-.016961 -> +.002939`, and the latest
-unique result is only the 75.25th matched-null percentile with late rows
-negative. Full result: `docs/BATTER_TRACKMAN_AUDIT_20260828.md`.
-
-The add-on LUPI/Batter Trackman queue is exhausted: both candidates FAIL, no
-GPU or submission. A provenance correction was also recorded: committed
-`src/link_batters.py` reproduces 699 pairs/99.0429% train-row coverage, not the
-old non-reproducible 755/99.7925% SETTLED claim. Champion remains
-`submissions/gskdep_0816.zip`, LB **1111.3713632162**.
-
-The duplicate audit is now complete: `PRIVILEGED_GAP` is **NEW**, because no
-previous path explicitly formed `q_priv-q_legal`, learned that increment from
-legal X, froze it across seasons and tested champion-residual transfer. Read the
-fixed implementation contract in
-`docs/LUPI_BATTER_TM_PREREGISTRATION_20260827.md`; do not improvise a Trackman
-subset or estimator sweep. If Candidate 1 fails, the full batter historical
-Trackman profile remains distinct from the just-closed three-family familiarity
-JSD and should run as Candidate 2.
+**The one live thread** is `docs/NEXT_GPU_PREREGISTRATION_20260828.md` (LEAFIT).
+It is written but its implementation contract is unsatisfied: the flag does not
+exist yet. Do the five implementation steps in that document in order, then run
+3 fits on the 5070. Do not start training before step 5 prints its
+`N command(s) checked` line.
 
 ## Status
+
+**2026-08-28 five-agent research: four axes closed, one candidate licensed,
+zero GPU.** Full synthesis: `docs/FIVE_AGENT_RESEARCH_SYNTHESIS_20260828.md`.
+
+### How it was run, and the caveat that goes with it
+
+Codex launched agents A, B and C and the session ended before any report
+existed. Only **B's finished audit JSON** and **C's harness** survived on disk;
+C's harness prints to stdout and writes no file, so its five teacher fits and
+800 permutations were lost. A, D and E had produced nothing.
+
+Claude took it over and ran the remainder **sequentially in separate analysis
+contexts** rather than as parallel sub-agents. Isolation is therefore weaker
+than the prompt's §5 specifies. The one place this matters: D and E converged on
+the same parameter, and that is recorded as **one candidate found twice by one
+investigator, not as independent corroboration**.
+
+### A — CHAMPION FORENSICS: the +11 does not exist in the artifacts
+
+`FULLY_EXPLAINED_NO_CANDIDATE`, and it is a conclusive negative rather than a
+failure to find. Between v11's members (`cat_v14f`, `cat_ZD5`) and the
+champion's (`cat_B1S_base`, `cat_GSKDEP_cell`): **every CatBoost effective
+parameter is identical in both arms**; the **121-feature list matches by
+sha256**; **all five TE tables are `DataFrame.equals` True** and **all three
+anchor tables have per-season max abs diff 0** including 2024 and 2025;
+`--refit-mult 1.5` is confirmed arithmetically in both eras (1616 x 1.5 = 2424
+exactly). The `steps` 5 -> 8 difference is a **module constant**
+(`src/fpipe.py:75`), not a record of work done.
+
+The only real difference is a fallback prior — `0.5401750413365347` (= mean over
+seasons <= 2023, exactly) against `0.5352282202778269` (= mean over all rows,
+exactly), so v11 stored the selection pipeline and the champion stores the
+deployment refit. Running each era's own pipeline on the same 20,000 rows leaves
+**111 of 121 columns bit-identical**; the 10 that move are the `*_shr` columns
+and the largest move is **0.00494682**, the prior difference to seven digits.
+Post-processing is v11's, unchanged.
+
+**So the premise is what fails.** The −4.15 label figure and the −0.72 `--p1`
+figure were measured **on the B1S recipe** and then subtracted from a
+leaderboard delta between two *different* member families. That is additivity
+across a recipe change — `measure-what-you-ship` (v16, −6.15). **Clue A is
+retired. Do not propose a hyperparameter sweep from it; the finding is that
+there is nothing to sweep.**
+
+### B — FUTURE3_SUCCESS_STATE: FAIL
+
+Structurally healthy (99.906% coverage, 508 end-of-history rows, no small
+class). Fails on three estimator-free facts: prevalence drifts **11 points**
+across seasons, the **league ordering reverses** between the pooled window and
+2023-2024, and it produces **3.840** effective success classes against legacy's
+2.122 — overshooting the geometry that motivated it.
+
+Its predictability result was **deliberately downgraded** from an information
+claim to a probe claim: the estimator is a linear `SGDClassifier` and FMCOARSE
+(−18.581) proved the failure-mode supervision would very likely fail the same
+probe. That point alone would have left this at HOLD.
+
+### C — TEMPORAL_CONSENSUS: FAIL
+
+Legal, fully covered, and genuinely distinct from the closed distillation axis
+(`src/teacher.py:104` is a row-random K-fold across seasons). It dies on
+transfer: unique rho **+.01466 -> −.10753** on one boundary against
+**+.01714 -> +.00718** on the other; the two matched nulls differ **23x**
+(p99 .0915 vs .0048); the surviving boundary's frozen reconstruction R² is
+**negative** (−.2231); and corr(consensus, y) collapses from .137 to .036/.050
+on the two recent seasons.
+
+### D + E — the one surviving candidate
+
+Of the champion's 37 CatBoost effective parameters, **16 are never-decided**
+(zero occurrences in `LEDGER.tsv`, `docs/SETTLED.md`, `src/train_gbdt2.py`).
+**Exactly one is also a base/cell asymmetry**: `leaf_estimation_iterations`,
+**10 in the base arm and 1 in the cell arm**, because CatBoost's default depends
+on the loss function. It is 10/1 in v11 too, so it is not a regression — it has
+never been looked at. Every other never-decided parameter is identical on both
+arms, which makes touching it a banned global grid; this one is an **alignment**.
+
+Mechanism, stated before any score: the cell arm's leaf values are single-Newton
+approximations across ~4,497 trees and enter the shipped probability at weight
+**0.55**, and the recorded Murphy decomposition says the payoff channel is
+resolution (+0.001 absolute = +400 BSS) not reliability (perfect recalibration =
++13.3).
+
+**The weak leg is magnitude.** "Plausibly >= +3" is argued from that channel,
+not measured, and no CPU prerequisite can settle it. Licensed at **seed 3 only**
+on that basis, with `delta <= 0` a FAIL-STOP and no value sweep — there is no
+second value to try.
+
+### Infrastructure blocker for every GPU launch
+
+`tools/precheck.py` exits **0 without opening the file** when its first argument
+is not exactly `--file`; it prints plausible `[OK]`/`[WARN]` lines from the
+argv it was handed. Reproduced with `--bat`. Always confirm the
+`N command(s) checked` line before treating a script as prechecked.
+
+### Housekeeping
+
+`out/privileged_current_pitch.pkl` is **515 MB** and is the artifact of a
+recorded FAIL (`docs/PRIVILEGED_GAP_AUDIT_20260828.md`), so the
+do-not-delete-before-the-cause-is-written rule is satisfied. Deletion is the
+user's call and has not been made.
+
+---
+
+## Earlier: Codex, 2026-08-27/28 — six-axis CPU queue and two add-on audits
 
 **2026-08-27 six-axis CPU queue complete: 0 promoted.** PB all-history surrogate
 delta flips `+1.448 -> -1.009`; its coverage-expansion rows are harmful on both
