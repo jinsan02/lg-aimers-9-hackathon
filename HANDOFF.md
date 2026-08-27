@@ -4,20 +4,26 @@ Read first: [AGENTS.md](AGENTS.md) -> [EXPERIMENT.md](EXPERIMENT.md) -> this fil
 
 ## Current Agent
 
-Codex, CTX_ADJ unique-signal confirmation completed on 2026-08-16.
+Codex, TM_TYPE_COMMAND_MIX CPU audit completed on 2026-08-16.
 
 ## Next Agent
 
-No queued experiment. `CTX_ADJ_PITCHER_SKILL_AUDIT` is now **CLOSED** after its
-single allowed confirmation: the champion-orthogonal component flips negative
-on 2022->2023 and is inside matched-null noise on 2023->2024. Read
-`docs/CTX_ADJ_UNIQUE_SIGNAL_AUDIT_20260816.md`.
+No queued experiment. `TM_TYPE_COMMAND_MIX_AUDIT` is **FAIL/CLOSED**: both raw
+and champion-unique directions reverse from negative on 2022->2023 to positive
+on 2023->2024. Read `docs/TM_TYPE_COMMAND_MIX_AUDIT_20260816.md`.
 
 No job is live, no GPU candidate is licensed, and nothing is queued for
 submission. Champion `submissions/gskdep_0816.zip`, LB **1111.3713632162**, is
 frozen and unchanged.
 
 ## Status
+
+**TM_TYPE_COMMAND_MIX_AUDIT: FAIL, CPU only.** Exact linkage coverage 75.97%;
+type skill and within-pitcher deviation persist, but raw rho -.029377 -> +.007630
+and unique rho -.009993 -> +.006290. Latest p99 alone cannot overcome the clean
+boundary sign flip. No GPU, variant, submission, or other axis.
+
+---
 
 **CTX_ADJ_UNIQUE_SIGNAL_AUDIT: FAIL, CPU only.** z_unique retains 39.41% of
 variance and has only .0852 OOF reconstructibility, but frozen rho is -.004603
