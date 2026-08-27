@@ -107,3 +107,26 @@ recorded as a pre-fit amendment: `--drop-f-pre 2022 --max-train-season 2024
 (9 categorical), matching the FMCOARSE judging-surface run exactly.
 
 *(results appended below as they land)*
+
+## The premise, re-verified on the real frame
+
+**[FACT]** The shared base arm's packaged model, fitted on this laptop on the
+real judging-surface frame, reports:
+
+```
+loss_function              Logloss
+leaf_estimation_iterations 10
+leaf_estimation_method     Newton
+max_ctr_complexity         4
+data_partition             FeatureParallel
+task_type                  GPU
+```
+
+Identical to `cat_B1S_base_s3`'s resolution on the 5070. So the asymmetry is
+live and reproducible on the host actually running the experiment — the
+synthetic frame that resolved Logloss to 1 was the exception, not the artifacts.
+The control cell arm is expected to report 1 and the candidate 10; both are
+asserted by `tools/leafit_gate.py` before any BSS is printed, and a mismatch
+invalidates the comparison rather than producing a verdict.
+
+**[FACT]** `[cat LEAFIT_base] val2023 BSS 588.66 | best_iter=874 | 184s`.
