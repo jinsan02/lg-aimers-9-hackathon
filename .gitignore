@@ -22,3 +22,4 @@ __pycache__/
 
 # 아카이브 zip (내용은 docs/*.md 에 이미 있다)
 docs/handoff_archive/
+docs/competition_intro.pdf
