@@ -14,8 +14,7 @@ HEAD = origin/main = e5fbe9e      working tree clean
 tests 25/25 PASS                  no live GPU job
 ```
 
-**[FACT]** `desktop-5070` is **unreachable** — `ssh: connect to host
-100.121.174.83 port 22: Connection timed out`, twice, several minutes apart. The
+**[FACT]** `desktop-5070` is **unreachable** — `ssh: connect to host <tailscale 주소> port 22: Connection timed out`, twice, several minutes apart. The
 user then instructed local execution, so every fit below runs on the laptop
 (**RTX 5060 Laptop GPU, 8151 MiB**). All three fits are in one local session, so
 the paired comparison is same-host by construction. **No number here may be

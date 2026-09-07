@@ -184,8 +184,8 @@ submission packaging only** (thermals).
 
 | Alias | Hardware | Access | Project | Python |
 |---|---|---|---|---|
-| `desktop-5070` | **RTX 5070 Ti 16 GB** (Blackwell) | `ssh desktop-5070` (Tailscale 100.121.174.83, user `jinsan`) | `C:\aimers` | `C:\aimers\.conda\python.exe` (3.11.15) |
-| `hsu-server` | **A100 40 GB** · 80 vCPU · 503 GB RAM | `ssh hsu-server` (ProxyJump via `desktop-4070`, port 8822) | `~/aimers` | `~/venv451/bin/python` (3.10.12) |
+| `desktop-5070` | **RTX 5070 Ti 16 GB** (Blackwell) | `ssh desktop-5070` (Tailscale 사설 주소) | `C:\aimers` | `C:\aimers\.conda\python.exe` (3.11.15) |
+| `hsu-server` | **A100 40 GB** · 80 vCPU · 503 GB RAM | `ssh hsu-server` (ProxyJump via `desktop-4070`, 비표준 포트) | `~/aimers` | `~/venv451/bin/python` (3.10.12) |
 | `desktop-4070` | RTX 4070 Ti SUPER 16 GB | `ssh desktop-4070` | `C:\aimers` | `.venv\Scripts\python.exe` (3.11.15) |
 | laptop (here) | RTX 5060 8 GB | — | `C:\aimers` | `uv run python` (3.11.15) |
 
